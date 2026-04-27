@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx ts-node *)",
+      "Bash(node -e ' *)",
+      "Bash(del \"c:\\\\Users\\\\Dante\\\\Desktop\\\\Nomina\\\\backend\\\\fix-horarios.ts\")",
+      "Read(//c/Users/Dante/Desktop/**)",
+      "Bash(grep -v \"//.*observacion\")"
+    ]
+  }
+}

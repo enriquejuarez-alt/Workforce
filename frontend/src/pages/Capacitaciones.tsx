@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Pencil, Trash2, X, GraduationCap } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X, GraduationCap, UserCheck, UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/auth'
 import { capacitacionesApi, agentesApi, serviciosApi, bajasApi } from '../lib/api'
 import type { Capacitacion, Agente } from '../types'
+
+type TipoAgente = 'existente' | 'nuevo'
 
 interface CapForm {
   agente_id: string
@@ -58,6 +60,7 @@ export default function Capacitaciones() {
 
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
+  const [tipoAgente, setTipoAgente] = useState<TipoAgente>('existente')
   const [form, setForm] = useState<CapForm>(FORM_EMPTY)
 
   const [agentQuery, setAgentQuery] = useState('')
@@ -144,12 +147,20 @@ export default function Capacitaciones() {
   }
 
   function clearAgent() {
-    setForm((p) => ({ ...p, agente_id: '', agente_nombre: '', agente_dni: '', usuario_sistema: '' }))
+    setForm(FORM_EMPTY)
+    setAgentQuery('')
+  }
+
+  function switchTipo(tipo: TipoAgente) {
+    setTipoAgente(tipo)
+    setForm(FORM_EMPTY)
     setAgentQuery('')
   }
 
   function openEdit(c: Capacitacion) {
     setEditId(c.id)
+    // If it has agente_id it came from an existing agent, otherwise treat as nuevo
+    setTipoAgente(c.agente_id ? 'existente' : 'nuevo')
     setForm({
       agente_id: c.agente_id ? String(c.agente_id) : '',
       agente_nombre: c.agente_nombre,
@@ -176,6 +187,7 @@ export default function Capacitaciones() {
   function closeForm() {
     setShowForm(false)
     setEditId(null)
+    setTipoAgente('existente')
     setForm(FORM_EMPTY)
     setAgentQuery('')
   }
@@ -206,12 +218,9 @@ export default function Capacitaciones() {
   }
 
   const isBusy = createMut.isPending || updateMut.isPending
-  const canSubmit = !!form.agente_nombre && !!form.fecha_inicio && !!form.fecha_fin
+  const canSubmit = !!form.agente_nombre && !!form.fecha_inicio && !!form.fecha_fin &&
+    (tipoAgente === 'nuevo' || !!form.agente_id)
 
-  // Segmentos disponibles: opciones del servicio + "Sin definir"
-  const segmentosDisponibles = ['SIN_DEFINIR', ...(opciones?.segmentos ?? [])]
-
-  // Segmentos para filtro de tabla: del total de caps
   const segmentosUnicos = [...new Set(caps.map((c) => c.segmento ?? 'SIN_DEFINIR'))]
 
   return (
@@ -233,7 +242,6 @@ export default function Capacitaciones() {
           <option value="">Todos los servicios</option>
           {servicios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
         </select>
-
         <select value={filterSegmento} onChange={(e) => setFilterSegmento(e.target.value)} className="input-field text-sm h-9 min-w-[160px]">
           <option value="">Todos los segmentos</option>
           <option value="SIN_DEFINIR">Sin definir</option>
@@ -241,14 +249,12 @@ export default function Capacitaciones() {
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
-
         <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="input-field text-sm h-9">
           <option value="">Todos los estados</option>
           <option value="VIGENTE">Vigente</option>
           <option value="PROGRAMADA">Programada</option>
           <option value="FINALIZADA">Finalizada</option>
         </select>
-
         {(filterServicio || filterSegmento || filterEstado) && (
           <button onClick={() => { setFilterServicio(''); setFilterSegmento(''); setFilterEstado('') }} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
             <X size={14} /> Limpiar
@@ -283,9 +289,16 @@ export default function Capacitaciones() {
                 {caps.map((c) => (
                   <tr key={c.id} className="table-row">
                     <td className="table-td">
-                      <p className="font-medium text-gray-900 text-sm">{c.agente_nombre}</p>
-                      {c.agente_dni && <p className="text-xs text-gray-400">{c.agente_dni}</p>}
-                      {c.usuario_sistema && <p className="text-xs text-gray-400">{c.usuario_sistema}</p>}
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{c.agente_nombre}</p>
+                          {c.agente_dni && <p className="text-xs text-gray-400">{c.agente_dni}</p>}
+                          {c.usuario_sistema && <p className="text-xs text-gray-400">{c.usuario_sistema}</p>}
+                        </div>
+                        {!c.agente_id && (
+                          <span className="badge bg-orange-100 text-orange-700 text-xs shrink-0">Nuevo</span>
+                        )}
+                      </div>
                     </td>
                     <td className="table-td">
                       {c.servicio ? (
@@ -347,80 +360,137 @@ export default function Capacitaciones() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-5">
-              {/* Agent search */}
-              <div ref={searchRef} className="relative">
-                <label className="form-label">Agente</label>
-                {form.agente_id ? (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">{form.agente_nombre}</p>
-                      <p className="text-xs text-blue-600">
-                        {form.agente_dni && `DNI: ${form.agente_dni}`}
-                        {form.usuario_sistema && ` · ${form.usuario_sistema}`}
-                        {form.servicio_nombre && ` · ${form.servicio_nombre}`}
-                      </p>
-                    </div>
-                    {!editId && (
-                      <button type="button" onClick={clearAgent} className="text-blue-400 hover:text-blue-600 p-1">
-                        <X size={14} />
-                      </button>
-                    )}
+
+              {/* Tipo de agente toggle — solo al crear */}
+              {!editId && (
+                <div>
+                  <label className="form-label">Tipo de agente</label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => switchTipo('existente')}
+                      className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-all ${
+                        tipoAgente === 'existente'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <UserCheck size={16} />
+                      Agente existente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => switchTipo('nuevo')}
+                      className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition-all ${
+                        tipoAgente === 'nuevo'
+                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <UserPlus size={16} />
+                      Agente nuevo
+                    </button>
                   </div>
-                ) : (
-                  <>
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        value={agentQuery}
-                        onChange={(e) => { setAgentQuery(e.target.value); setShowResults(true) }}
-                        onFocus={() => agentQuery.length >= 2 && setShowResults(true)}
-                        placeholder="Buscar por nombre o DNI…"
-                        className="input-field pl-9 text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    {showResults && agentQuery.length >= 2 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                        {agentResults.length === 0 ? (
-                          <p className="px-4 py-3 text-sm text-gray-500">Sin resultados</p>
-                        ) : (
-                          agentResults.map((a) => (
-                            <button key={a.id} type="button" onClick={() => selectAgent(a)} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0">
-                              <p className="text-sm font-medium text-gray-900">{a.nombre}</p>
-                              <p className="text-xs text-gray-500">
-                                {a.dni}{a.contrato ? ` · ${a.contrato} hs` : ''}{a.servicio ? ` · ${a.servicio.nombre}` : ''}
-                              </p>
-                            </button>
-                          ))
-                        )}
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    {tipoAgente === 'existente'
+                      ? 'Ya está en el sistema — buscalo para auto-rellenar sus datos.'
+                      : 'Todavía no está en el sistema — completá sus datos manualmente.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Agent section */}
+              {tipoAgente === 'existente' ? (
+                <div ref={searchRef} className="relative">
+                  <label className="form-label">Buscar agente</label>
+                  {form.agente_id ? (
+                    <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">{form.agente_nombre}</p>
+                        <p className="text-xs text-blue-600">
+                          {form.agente_dni && `DNI: ${form.agente_dni}`}
+                          {form.usuario_sistema && ` · ${form.usuario_sistema}`}
+                          {form.servicio_nombre && ` · ${form.servicio_nombre}`}
+                        </p>
                       </div>
-                    )}
-                    {/* Allow manual entry if no agent found */}
-                    {!form.agente_id && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        También podés escribir el nombre manualmente:
+                      {!editId && (
+                        <button type="button" onClick={clearAgent} className="text-blue-400 hover:text-blue-600 p-1">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="text"
-                          value={form.agente_nombre}
-                          onChange={(e) => f('agente_nombre', e.target.value)}
-                          placeholder="Nombre del agente"
-                          className="input-field text-sm mt-1.5"
+                          value={agentQuery}
+                          onChange={(e) => { setAgentQuery(e.target.value); setShowResults(true) }}
+                          onFocus={() => agentQuery.length >= 2 && setShowResults(true)}
+                          placeholder="Nombre o DNI del agente…"
+                          className="input-field pl-9 text-sm"
+                          autoFocus
                         />
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+                      </div>
+                      {showResults && agentQuery.length >= 2 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                          {agentResults.length === 0 ? (
+                            <p className="px-4 py-3 text-sm text-gray-500">Sin resultados</p>
+                          ) : (
+                            agentResults.map((a) => (
+                              <button key={a.id} type="button" onClick={() => selectAgent(a)} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                                <p className="text-sm font-medium text-gray-900">{a.nombre}</p>
+                                <p className="text-xs text-gray-500">
+                                  {a.dni}{a.contrato ? ` · ${a.contrato} hs` : ''}{a.servicio ? ` · ${a.servicio.nombre}` : ''}
+                                </p>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                /* Agente nuevo — campos manuales de identidad */
+                <div>
+                  <label className="form-label">Nombre <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={form.agente_nombre}
+                    onChange={(e) => f('agente_nombre', e.target.value)}
+                    placeholder="Nombre completo del agente"
+                    className="input-field text-sm"
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="form-label">DNI</label>
+                      <input type="text" value={form.agente_dni} onChange={(e) => f('agente_dni', e.target.value)} className="input-field text-sm" placeholder="—" />
+                    </div>
+                    <div>
+                      <label className="form-label">Servicio de destino</label>
+                      <select value={form.servicio_id} onChange={(e) => { f('servicio_id', e.target.value); f('servicio_nombre', servicios.find((s) => String(s.id) === e.target.value)?.nombre || '') }} className="input-field text-sm">
+                        <option value="">—</option>
+                        {servicios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              {/* Nomina fields */}
+              {/* Nomina fields — common for both */}
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Datos de nómina</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="form-label">DNI</label>
-                    <input type="text" value={form.agente_dni} onChange={(e) => f('agente_dni', e.target.value)} className="input-field text-sm" placeholder="—" />
-                  </div>
+                  {tipoAgente === 'existente' && (
+                    <div>
+                      <label className="form-label">DNI</label>
+                      <input type="text" value={form.agente_dni} onChange={(e) => f('agente_dni', e.target.value)} className="input-field text-sm" placeholder="—" />
+                    </div>
+                  )}
                   <div>
                     <label className="form-label">Usuario sistema</label>
                     <input type="text" value={form.usuario_sistema} onChange={(e) => f('usuario_sistema', e.target.value)} className="input-field text-sm" placeholder="—" />
@@ -513,11 +583,11 @@ export default function Capacitaciones() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Período de capacitación</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="form-label">Fecha inicio</label>
+                    <label className="form-label">Fecha inicio <span className="text-red-400">*</span></label>
                     <input type="date" required value={form.fecha_inicio} onChange={(e) => f('fecha_inicio', e.target.value)} className="input-field text-sm" />
                   </div>
                   <div>
-                    <label className="form-label">Fecha fin</label>
+                    <label className="form-label">Fecha fin <span className="text-red-400">*</span></label>
                     <input type="date" required value={form.fecha_fin} min={form.fecha_inicio} onChange={(e) => f('fecha_fin', e.target.value)} className="input-field text-sm" />
                   </div>
                 </div>

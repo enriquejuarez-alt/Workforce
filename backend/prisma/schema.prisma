@@ -37,6 +37,7 @@ model Usuario {
   cambios_registrados          CambioServicioTemporal[]
   bajas_creadas                HistoricoBaja[]          @relation("BajaCreador")
   cambios_contrato_creados     CambioContrato[]
+  capacitaciones_creadas       Capacitacion[]
 
   @@map("usuarios")
 }
@@ -58,6 +59,7 @@ model Servicio {
   snapshots               AgenteNominaMensual[]
   bajas                   HistoricoBaja[]
   cambios_contrato        CambioContrato[]
+  capacitaciones          Capacitacion[]
 
   @@map("servicios")
 }
@@ -116,6 +118,7 @@ model Agente {
   licencias          Licencia[]
   cambios_temporales CambioServicioTemporal[]
   cambios_contrato   CambioContrato[]
+  capacitaciones     Capacitacion[]
   snapshots          AgenteNominaMensual[]
   bajas              HistoricoBaja[]
 
@@ -289,6 +292,38 @@ model CambioContrato {
   @@index([agente_id])
   @@index([servicio_id])
   @@map("cambios_contrato")
+}
+
+model Capacitacion {
+  id                  Int      @id @default(autoincrement())
+  agente_id           Int?
+  agente_dni          String?
+  agente_nombre       String
+  usuario_sistema     String?
+  superior            String?
+  servicio_id         Int?
+  servicio_nombre     String?
+  segmento            String?
+  horarios            String?
+  estado              String?
+  contrato            String?
+  sitio               String?
+  modalidad           String?
+  jefe                String?
+  observacion         String?
+  fecha_inicio        DateTime @db.Date
+  fecha_fin           DateTime @db.Date
+  creado_por          Int
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  agente   Agente?   @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("capacitaciones")
 }
 
 model Auditoria {

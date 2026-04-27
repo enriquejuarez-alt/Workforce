@@ -2,7 +2,7 @@ import api from './axios'
 import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, CambioServicioTemporal, ImportacionNomina,
-  AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato,
+  AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion,
 } from '../types'
 
 // Auth
@@ -121,6 +121,14 @@ export const bajasApi = {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     ),
+}
+
+// Capacitaciones
+export const capacitacionesApi = {
+  list: (params?: Record<string, any>) => api.get<Capacitacion[]>('/capacitaciones', { params }),
+  create: (data: any) => api.post<Capacitacion>('/capacitaciones', data),
+  update: (id: number, data: any) => api.put<Capacitacion>(`/capacitaciones/${id}`, data),
+  delete: (id: number) => api.delete(`/capacitaciones/${id}`),
 }
 
 // Cambios de contrato

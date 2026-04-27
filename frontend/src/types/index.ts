@@ -185,6 +185,32 @@ export interface HistoricoBaja {
   fecha_creacion: string
 }
 
+export interface Capacitacion {
+  id: number
+  agente_id: number | null
+  agente_dni: string | null
+  agente_nombre: string
+  usuario_sistema: string | null
+  superior: string | null
+  servicio_id: number | null
+  servicio?: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  servicio_nombre: string | null
+  segmento: string | null
+  horarios: string | null
+  estado: string | null
+  contrato: string | null
+  sitio: string | null
+  modalidad: string | null
+  jefe: string | null
+  observacion: string | null
+  fecha_inicio: string
+  fecha_fin: string
+  creado_por: number
+  creador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_creacion: string
+  estado_calculado?: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
+}
+
 export interface CambioContrato {
   id: number
   agente_id: number

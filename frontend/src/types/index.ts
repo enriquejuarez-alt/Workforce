@@ -185,6 +185,26 @@ export interface HistoricoBaja {
   fecha_creacion: string
 }
 
+export interface CambioContrato {
+  id: number
+  agente_id: number
+  agente_dni: string
+  agente_nombre: string
+  servicio_id: number | null
+  servicio?: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  tipo: 'TEMPORAL' | 'DEFINITIVO'
+  contrato_anterior: string | null
+  contrato_nuevo: string
+  fecha_desde: string
+  fecha_hasta: string | null
+  motivo: string | null
+  observacion: string | null
+  creado_por: number
+  creador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_creacion: string
+  estado_calculado?: 'PENDIENTE' | 'VIGENTE' | 'FINALIZADO'
+}
+
 export interface AuditoriaLog {
   id: number
   usuario_id: number | null

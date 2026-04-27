@@ -187,7 +187,30 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       result = result.filter((a) => a.agente.cambios_temporales.length > 0)
     }
 
-    return res.json(result)
+    // Apply active contract overrides for this nomina period
+    const firstOfMonth = new Date(nomina.anio, nomina.mes - 1, 1)
+    const lastOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
+    const prismaAny = prisma as any
+    const cambiosContrato = await prismaAny.cambioContrato.findMany({
+      where: {
+        servicio_id: nomina.servicio_id,
+        OR: [
+          { tipo: 'DEFINITIVO', fecha_desde: { lte: lastOfMonth } },
+          { tipo: 'TEMPORAL', fecha_desde: { lte: lastOfMonth }, fecha_hasta: { gte: firstOfMonth } },
+        ],
+      },
+      orderBy: { fecha_desde: 'desc' },
+    })
+    const contratoMap = new Map<number, string>()
+    for (const c of cambiosContrato) {
+      if (!contratoMap.has(c.agente_id)) contratoMap.set(c.agente_id, c.contrato_nuevo)
+    }
+
+    const finalResult: any[] = contratoMap.size > 0
+      ? result.map((a) => ({ ...a, contrato: contratoMap.get(a.agente_id) ?? a.contrato }))
+      : result
+
+    return res.json(finalResult)
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: 'Error al listar agentes de nómina' })

@@ -94,10 +94,32 @@ export const exportNomina = async (req: AuthRequest, res: Response) => {
       orderBy: { nombre: 'asc' },
     })
 
+    // Apply active contract overrides for this nomina period
+    const firstOfMonth = new Date(nomina.anio, nomina.mes - 1, 1)
+    const lastOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
+    const prismaAny = prisma as any
+    const cambiosContrato = await prismaAny.cambioContrato.findMany({
+      where: {
+        servicio_id: nomina.servicio_id,
+        OR: [
+          { tipo: 'DEFINITIVO', fecha_desde: { lte: lastOfMonth } },
+          { tipo: 'TEMPORAL', fecha_desde: { lte: lastOfMonth }, fecha_hasta: { gte: firstOfMonth } },
+        ],
+      },
+      orderBy: { fecha_desde: 'desc' },
+    })
+    const contratoMap = new Map<number, string>()
+    for (const c of cambiosContrato) {
+      if (!contratoMap.has(c.agente_id)) contratoMap.set(c.agente_id, c.contrato_nuevo)
+    }
+    const snapshotsExport = contratoMap.size > 0
+      ? snapshots.map((s) => ({ ...s, contrato: contratoMap.get(s.agente_id) ?? s.contrato }))
+      : snapshots
+
     const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
     const sheetName = `${nomina.servicio.nombre} ${meses[nomina.mes - 1]} ${nomina.anio}`
 
-    const workbook = await buildWorkbook(snapshots, sheetName)
+    const workbook = await buildWorkbook(snapshotsExport, sheetName)
 
     await createAuditLog({
       usuario_id: req.user!.userId,

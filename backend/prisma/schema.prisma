@@ -33,9 +33,10 @@ model Usuario {
   permisos             UsuarioServicioPermiso[]
   importaciones        ImportacionNomina[]
   auditorias           Auditoria[]
-  licencias_registradas Licencia[]
-  cambios_registrados  CambioServicioTemporal[]
-  bajas_creadas        HistoricoBaja[]          @relation("BajaCreador")
+  licencias_registradas        Licencia[]
+  cambios_registrados          CambioServicioTemporal[]
+  bajas_creadas                HistoricoBaja[]          @relation("BajaCreador")
+  cambios_contrato_creados     CambioContrato[]
 
   @@map("usuarios")
 }
@@ -56,6 +57,7 @@ model Servicio {
   cambios_como_temporal   CambioServicioTemporal[] @relation("ServicioTemporal")
   snapshots               AgenteNominaMensual[]
   bajas                   HistoricoBaja[]
+  cambios_contrato        CambioContrato[]
 
   @@map("servicios")
 }
@@ -113,6 +115,7 @@ model Agente {
   servicio           Servicio?               @relation(fields: [servicio_id], references: [id])
   licencias          Licencia[]
   cambios_temporales CambioServicioTemporal[]
+  cambios_contrato   CambioContrato[]
   snapshots          AgenteNominaMensual[]
   bajas              HistoricoBaja[]
 
@@ -260,6 +263,32 @@ model HistoricoBaja {
   @@index([dni])
   @@index([servicio_id])
   @@map("historico_bajas")
+}
+
+model CambioContrato {
+  id                  Int       @id @default(autoincrement())
+  agente_id           Int
+  agente_dni          String
+  agente_nombre       String
+  servicio_id         Int?
+  tipo                String    // 'TEMPORAL' | 'DEFINITIVO'
+  contrato_anterior   String?
+  contrato_nuevo      String    // '30' | '35' | '36'
+  fecha_desde         DateTime  @db.Date
+  fecha_hasta         DateTime? @db.Date
+  motivo              String?
+  observacion         String?
+  creado_por          Int
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+
+  agente   Agente    @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("cambios_contrato")
 }
 
 model Auditoria {

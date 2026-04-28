@@ -17,6 +17,7 @@ import Comparacion from './pages/Comparacion'
 import Bajas from './pages/Bajas'
 import CambiosContrato from './pages/CambiosContrato'
 import Capacitaciones from './pages/Capacitaciones'
+import Remociones from './pages/Remociones'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="bajas" element={<Bajas />} />
           <Route path="cambios-contrato" element={<CambiosContrato />} />
           <Route path="capacitaciones" element={<Capacitaciones />} />
+          <Route path="remociones" element={<Remociones />} />
           <Route path="comparacion" element={<Comparacion />} />
           <Route path="carga" element={<AdminRoute><CargaExcel /></AdminRoute>} />
           <Route path="importaciones" element={<AdminRoute><Importaciones /></AdminRoute>} />

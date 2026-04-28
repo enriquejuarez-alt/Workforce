@@ -145,6 +145,138 @@ export const updateCapacitacion = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const darDeAlta = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const { fecha_alta, segmento, superior, horarios, estado, contrato, sitio, modalidad, jefe } = req.body
+
+    if (!fecha_alta) {
+      return res.status(400).json({ error: 'fecha_alta es requerida' })
+    }
+
+    const prismaAny = prisma as any
+    const cap = await prismaAny.capacitacion.findUnique({ where: { id } })
+    if (!cap) return res.status(404).json({ error: 'Capacitación no encontrada' })
+    if (cap.dado_de_alta) return res.status(400).json({ error: 'Este agente ya fue dado de alta' })
+
+    const fechaAltaDate = new Date(fecha_alta)
+    const mes = fechaAltaDate.getMonth() + 1
+    const anio = fechaAltaDate.getFullYear()
+
+    const mergedData = {
+      segmento: segmento !== undefined ? (segmento === 'SIN_DEFINIR' ? null : segmento || null) : cap.segmento,
+      superior: superior !== undefined ? superior || null : cap.superior,
+      horarios: horarios !== undefined ? horarios || null : cap.horarios,
+      estado: estado !== undefined ? estado || null : cap.estado,
+      contrato: contrato !== undefined ? contrato || null : cap.contrato,
+      sitio: sitio !== undefined ? sitio || null : cap.sitio,
+      modalidad: modalidad !== undefined ? modalidad || null : cap.modalidad,
+      jefe: jefe !== undefined ? jefe || null : cap.jefe,
+    }
+
+    let agenteId: number = cap.agente_id
+
+    if (!agenteId) {
+      const dniOrUser = cap.agente_dni || cap.usuario_sistema
+      if (!dniOrUser) {
+        return res.status(400).json({ error: 'El agente nuevo requiere al menos un DNI o usuario de sistema para ser creado' })
+      }
+
+      const searchClause: any[] = []
+      if (cap.agente_dni) searchClause.push({ dni: cap.agente_dni })
+      if (cap.usuario_sistema) searchClause.push({ usuario: cap.usuario_sistema })
+
+      let agente = await prisma.agente.findFirst({ where: { OR: searchClause } })
+      if (!agente) {
+        agente = await prisma.agente.create({
+          data: {
+            dni: cap.agente_dni ?? cap.usuario_sistema,
+            usuario: cap.usuario_sistema ?? cap.agente_dni,
+            nombre: cap.agente_nombre,
+            superior: mergedData.superior,
+            segmento: mergedData.segmento,
+            horarios: mergedData.horarios,
+            estado: mergedData.estado,
+            contrato: mergedData.contrato,
+            sitio: mergedData.sitio,
+            modalidad: mergedData.modalidad,
+            jefe: mergedData.jefe,
+            servicio_id: cap.servicio_id,
+            activo: true,
+            presente_ultima_carga: false,
+          },
+        })
+      }
+      agenteId = agente.id
+    }
+
+    const nomina = await prisma.nominaMensual.findFirst({
+      where: { servicio_id: cap.servicio_id, mes, anio },
+    })
+
+    let pendienteAlta = false
+    if (nomina) {
+      const agenteData = await prisma.agente.findUnique({ where: { id: agenteId } })
+      await prisma.agenteNominaMensual.upsert({
+        where: { nomina_mensual_id_agente_id: { nomina_mensual_id: nomina.id, agente_id: agenteId } },
+        update: {
+          nombre: cap.agente_nombre,
+          usuario: agenteData?.usuario ?? cap.usuario_sistema ?? '',
+          dni: agenteData?.dni ?? cap.agente_dni ?? '',
+          ...mergedData,
+          servicio_id: cap.servicio_id,
+          presente_en_nomina: true,
+        },
+        create: {
+          nomina_mensual_id: nomina.id,
+          agente_id: agenteId,
+          nombre: cap.agente_nombre,
+          usuario: agenteData?.usuario ?? cap.usuario_sistema ?? '',
+          dni: agenteData?.dni ?? cap.agente_dni ?? '',
+          ...mergedData,
+          servicio_id: cap.servicio_id,
+          presente_en_nomina: true,
+        },
+      })
+
+      await createAuditLog({
+        usuario_id: req.user!.userId,
+        accion: 'DAR_DE_ALTA_CAPACITACION',
+        entidad: 'Capacitacion',
+        entidad_id: String(id),
+        servicio_id: cap.servicio_id ?? undefined,
+        nomina_mensual_id: nomina.id,
+        valor_nuevo: `${cap.agente_nombre} → Nómina ${mes}/${anio}`,
+      })
+    } else {
+      pendienteAlta = true
+    }
+
+    const updated = await prismaAny.capacitacion.update({
+      where: { id },
+      data: {
+        agente_id: agenteId,
+        dado_de_alta: !pendienteAlta,
+        pendiente_alta: pendienteAlta,
+        fecha_alta: fechaAltaDate,
+        ...mergedData,
+      },
+      include: {
+        servicio: { select: { id: true, nombre: true, color: true } },
+        creador: { select: { id: true, nombre: true } },
+      },
+    })
+
+    return res.json({
+      ...updated,
+      estado_calculado: calcularEstado(new Date(updated.fecha_inicio), new Date(updated.fecha_fin)),
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al dar de alta' })
+  }
+}
+
 export const deleteCapacitacion = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)

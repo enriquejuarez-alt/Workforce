@@ -104,20 +104,31 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       if (!permiso?.puede_ver) return res.status(403).json({ error: 'Sin permiso' })
     }
 
-    // Exclude agents with a baja registered for this service up to the nomina's month end
+    // Exclude agents with baja or remocion registered for this service up to the nomina's month end
     const endOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
-    const bajasEnServicio = await prisma.historicoBaja.findMany({
-      where: {
-        servicio_id: nomina.servicio_id,
-        fecha: { lte: endOfMonth },
-      },
-      select: { dni: true },
-    })
-    const dnisConBaja = bajasEnServicio.map((b) => b.dni)
+    const prismaAny = prisma as any
+
+    const [bajasEnServicio, remocionesEnServicio] = await Promise.all([
+      prisma.historicoBaja.findMany({
+        where: { servicio_id: nomina.servicio_id, fecha: { lte: endOfMonth } },
+        select: { dni: true },
+      }),
+      prismaAny.remocion.findMany({
+        where: { servicio_id: nomina.servicio_id, fecha: { lte: endOfMonth } },
+        select: { dni: true },
+      }),
+    ])
+
+    const dnisExcluidos = [
+      ...new Set([
+        ...bajasEnServicio.map((b: any) => b.dni),
+        ...remocionesEnServicio.map((r: any) => r.dni),
+      ]),
+    ]
 
     let where: any = { nomina_mensual_id: nominaId }
-    if (dnisConBaja.length > 0) {
-      where.dni = { notIn: dnisConBaja }
+    if (dnisExcluidos.length > 0) {
+      where.dni = { notIn: dnisExcluidos }
     }
 
     // Allowed segments from permission (non-admin)
@@ -190,7 +201,6 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     // Apply active contract overrides for this nomina period
     const firstOfMonth = new Date(nomina.anio, nomina.mes - 1, 1)
     const lastOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
-    const prismaAny = prisma as any
     const cambiosContrato = await prismaAny.cambioContrato.findMany({
       where: {
         servicio_id: nomina.servicio_id,
@@ -351,9 +361,58 @@ export const replicarNomina = async (req: AuthRequest, res: Response) => {
       })
     }
 
+    // Auto-add pending altas for this service/month/year
+    const primeroDeMes = new Date(nextAnio, nextMes - 1, 1)
+    const primeroMesSig = new Date(nextAnio, nextMes, 1)
+    const prismaAnyR = prisma as any
+    const pendientes = await prismaAnyR.capacitacion.findMany({
+      where: {
+        servicio_id: nomina.servicio_id,
+        pendiente_alta: true,
+        dado_de_alta: false,
+        fecha_alta: { gte: primeroDeMes, lt: primeroMesSig },
+      },
+    })
+    for (const cap of pendientes) {
+      let agenteId = cap.agente_id
+      if (!agenteId) {
+        const searchClause: any[] = []
+        if (cap.agente_dni) searchClause.push({ dni: cap.agente_dni })
+        if (cap.usuario_sistema) searchClause.push({ usuario: cap.usuario_sistema })
+        if (searchClause.length > 0) {
+          let agente = await prisma.agente.findFirst({ where: { OR: searchClause } })
+          if (!agente) {
+            agente = await prisma.agente.create({
+              data: {
+                dni: cap.agente_dni ?? cap.usuario_sistema,
+                usuario: cap.usuario_sistema ?? cap.agente_dni,
+                nombre: cap.agente_nombre,
+                superior: cap.superior, segmento: cap.segmento, horarios: cap.horarios,
+                estado: cap.estado, contrato: cap.contrato, sitio: cap.sitio,
+                modalidad: cap.modalidad, jefe: cap.jefe,
+                servicio_id: cap.servicio_id, activo: true, presente_ultima_carga: false,
+              },
+            })
+          }
+          agenteId = agente.id
+        }
+      }
+      if (!agenteId) continue
+      const agenteData = await prisma.agente.findUnique({ where: { id: agenteId } })
+      await prisma.agenteNominaMensual.upsert({
+        where: { nomina_mensual_id_agente_id: { nomina_mensual_id: nueva.id, agente_id: agenteId } },
+        update: { nombre: cap.agente_nombre, usuario: agenteData?.usuario ?? '', dni: agenteData?.dni ?? '', segmento: cap.segmento, superior: cap.superior, horarios: cap.horarios, estado: cap.estado, contrato: cap.contrato, sitio: cap.sitio, modalidad: cap.modalidad, jefe: cap.jefe, servicio_id: cap.servicio_id, presente_en_nomina: true },
+        create: { nomina_mensual_id: nueva.id, agente_id: agenteId, nombre: cap.agente_nombre, usuario: agenteData?.usuario ?? '', dni: agenteData?.dni ?? '', segmento: cap.segmento, superior: cap.superior, horarios: cap.horarios, estado: cap.estado, contrato: cap.contrato, sitio: cap.sitio, modalidad: cap.modalidad, jefe: cap.jefe, servicio_id: cap.servicio_id, presente_en_nomina: true },
+      })
+      await prismaAnyR.capacitacion.update({
+        where: { id: cap.id },
+        data: { dado_de_alta: true, pendiente_alta: false, agente_id: agenteId },
+      })
+    }
+
     await prisma.nominaMensual.update({
       where: { id: nueva.id },
-      data: { total_agentes: fuente.length },
+      data: { total_agentes: fuente.length + pendientes.length },
     })
 
     await createAuditLog({

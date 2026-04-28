@@ -15,7 +15,8 @@ import { listAuditoria } from '../controllers/auditoria'
 import { exportNomina } from '../controllers/export'
 import { listBajas, createBaja, updateBaja, deleteBaja, importBajas, getTiposBajas, getOpciones } from '../controllers/bajas'
 import { listCambiosContrato, createCambioContrato, updateCambioContrato, deleteCambioContrato } from '../controllers/cambiosContrato'
-import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion } from '../controllers/capacitaciones'
+import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
+import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
 
 const router = Router()
 
@@ -88,5 +89,11 @@ router.get('/capacitaciones', authenticate, listCapacitaciones)
 router.post('/capacitaciones', authenticate, createCapacitacion)
 router.put('/capacitaciones/:id', authenticate, updateCapacitacion)
 router.delete('/capacitaciones/:id', authenticate, requireAdmin, deleteCapacitacion)
+router.post('/capacitaciones/:id/dar-de-alta', authenticate, darDeAlta)
+
+router.get('/remociones', authenticate, listRemociones)
+router.post('/remociones', authenticate, createRemocion)
+router.put('/remociones/:id', authenticate, updateRemocion)
+router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
 
 export default router

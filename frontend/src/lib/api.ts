@@ -2,7 +2,7 @@ import api from './axios'
 import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, CambioServicioTemporal, ImportacionNomina,
-  AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion,
+  AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
 } from '../types'
 
 // Auth
@@ -129,6 +129,16 @@ export const capacitacionesApi = {
   create: (data: any) => api.post<Capacitacion>('/capacitaciones', data),
   update: (id: number, data: any) => api.put<Capacitacion>(`/capacitaciones/${id}`, data),
   delete: (id: number) => api.delete(`/capacitaciones/${id}`),
+  darDeAlta: (id: number, data: any) => api.post<Capacitacion>(`/capacitaciones/${id}/dar-de-alta`, data),
+}
+
+// Remociones
+export const remocionesApi = {
+  list: (params?: Record<string, any>) =>
+    api.get<{ total: number; page: number; limit: number; data: Remocion[] }>('/remociones', { params }),
+  create: (data: Partial<Remocion>) => api.post<Remocion>('/remociones', data),
+  update: (id: number, data: Partial<Remocion>) => api.put<Remocion>(`/remociones/${id}`, data),
+  delete: (id: number) => api.delete(`/remociones/${id}`),
 }
 
 // Cambios de contrato

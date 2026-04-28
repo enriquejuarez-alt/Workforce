@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Pencil, Trash2, X, GraduationCap, UserCheck, UserPlus } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X, GraduationCap, UserCheck, UserPlus, ArrowUpCircle, Clock } from 'lucide-react'
+import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/auth'
 import { capacitacionesApi, agentesApi, serviciosApi, bajasApi } from '../lib/api'
@@ -123,6 +124,55 @@ export default function Capacitaciones() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['capacitaciones'] }); toast.success('Capacitación eliminada') },
     onError: (e: any) => toast.error(e.response?.data?.error || 'Error al eliminar'),
   })
+
+  // Dar de alta
+  const [altaModal, setAltaModal] = useState<Capacitacion | null>(null)
+  interface AltaForm { fecha_alta: string; segmento: string; superior: string; horarios: string; estado: string; contrato: string; sitio: string; modalidad: string; jefe: string }
+  const emptyAlta = (cap: Capacitacion): AltaForm => ({
+    fecha_alta: format(new Date(), 'yyyy-MM-dd'),
+    segmento: cap.segmento ?? '',
+    superior: cap.superior ?? '',
+    horarios: cap.horarios ?? '',
+    estado: cap.estado ?? '',
+    contrato: cap.contrato ?? '',
+    sitio: cap.sitio ?? '',
+    modalidad: cap.modalidad ?? '',
+    jefe: cap.jefe ?? '',
+  })
+  const [altaForm, setAltaForm] = useState<AltaForm>({ fecha_alta: '', segmento: '', superior: '', horarios: '', estado: '', contrato: '', sitio: '', modalidad: '', jefe: '' })
+  const af = (k: keyof AltaForm, v: string) => setAltaForm((p) => ({ ...p, [k]: v }))
+
+  const altaServicioId = altaModal?.servicio_id ?? undefined
+  const { data: altaOpciones } = useQuery({
+    queryKey: ['bajas-opciones', altaServicioId],
+    queryFn: () => bajasApi.opciones(altaServicioId).then((r) => r.data),
+    enabled: !!altaModal,
+  })
+
+  const darDeAltaMut = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => capacitacionesApi.darDeAlta(id, data).then((r) => r.data),
+    onSuccess: (cap) => {
+      qc.invalidateQueries({ queryKey: ['capacitaciones'] })
+      setAltaModal(null)
+      if (cap.pendiente_alta) {
+        toast.success('Quedó PENDIENTE: se agregará cuando se cargue la nómina del mes indicado')
+      } else {
+        toast.success('Agente dado de alta en la nómina')
+      }
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || 'Error al dar de alta'),
+  })
+
+  function openAlta(c: Capacitacion) {
+    setAltaModal(c)
+    setAltaForm(emptyAlta(c))
+  }
+
+  function handleAltaSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!altaModal) return
+    darDeAltaMut.mutate({ id: altaModal.id, data: altaForm })
+  }
 
   function selectAgent(a: Agente) {
     setForm((p) => ({
@@ -318,12 +368,33 @@ export default function Capacitaciones() {
                     <td className="table-td text-sm text-gray-600">{formatDate(c.fecha_inicio)}</td>
                     <td className="table-td text-sm text-gray-600">{formatDate(c.fecha_fin)}</td>
                     <td className="table-td">
-                      <span className={`badge text-xs ${estadoClass(c.estado_calculado)}`}>
-                        {c.estado_calculado ?? '—'}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`badge text-xs ${estadoClass(c.estado_calculado)}`}>
+                          {c.estado_calculado ?? '—'}
+                        </span>
+                        {c.pendiente_alta && (
+                          <span className="inline-flex items-center gap-1 badge bg-amber-100 text-amber-700 text-xs">
+                            <Clock size={10} /> Pendiente alta
+                          </span>
+                        )}
+                        {c.dado_de_alta && (
+                          <span className="inline-flex items-center gap-1 badge bg-green-100 text-green-700 text-xs">
+                            <ArrowUpCircle size={10} /> Dado de alta
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="table-td">
                       <div className="flex items-center gap-1 justify-end">
+                        {c.estado_calculado === 'FINALIZADA' && !c.dado_de_alta && (
+                          <button
+                            onClick={() => openAlta(c)}
+                            className="p-1.5 text-gray-400 hover:text-green-600 rounded transition-colors"
+                            title="Dar de alta en nómina"
+                          >
+                            <ArrowUpCircle size={14} />
+                          </button>
+                        )}
                         <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded transition-colors" title="Editar">
                           <Pencil size={14} />
                         </button>
@@ -345,6 +416,117 @@ export default function Capacitaciones() {
           </div>
         )}
       </div>
+
+      {/* Dar de Alta Modal */}
+      {altaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2">
+                <ArrowUpCircle size={18} className="text-green-600" />
+                <div>
+                  <h2 className="font-semibold text-gray-900">Dar de alta en nómina</h2>
+                  <p className="text-xs text-gray-500">{altaModal.agente_nombre}</p>
+                </div>
+              </div>
+              <button onClick={() => setAltaModal(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAltaSubmit} className="p-5 space-y-4">
+              <div className="bg-green-50 border border-green-100 rounded-lg p-3 text-xs text-green-700">
+                Indicá en qué mes/año debe incorporarse a la nómina. Si esa nómina aún no existe, quedará <strong>pendiente</strong> y se agregará automáticamente cuando se cargue.
+              </div>
+
+              <div>
+                <label className="form-label">Fecha de incorporación <span className="text-red-400">*</span></label>
+                <input type="date" required value={altaForm.fecha_alta} onChange={(e) => af('fecha_alta', e.target.value)} className="input-field text-sm" />
+              </div>
+
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Datos de nómina (editables)</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Segmento</label>
+                  <select value={altaForm.segmento} onChange={(e) => af('segmento', e.target.value)} className="input-field text-sm">
+                    <option value="">—</option>
+                    <option value="SIN_DEFINIR">Sin definir</option>
+                    {altaOpciones?.segmentos?.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Superior</label>
+                  {altaOpciones?.superiores?.length ? (
+                    <select value={altaForm.superior} onChange={(e) => af('superior', e.target.value)} className="input-field text-sm">
+                      <option value="">—</option>
+                      {altaOpciones.superiores.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" value={altaForm.superior} onChange={(e) => af('superior', e.target.value)} className="input-field text-sm" placeholder="—" />
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">Horarios</label>
+                  <input type="text" value={altaForm.horarios} onChange={(e) => af('horarios', e.target.value)} className="input-field text-sm" placeholder="—" />
+                </div>
+                <div>
+                  <label className="form-label">Estado</label>
+                  {altaOpciones?.estados?.length ? (
+                    <select value={altaForm.estado} onChange={(e) => af('estado', e.target.value)} className="input-field text-sm">
+                      <option value="">—</option>
+                      {altaOpciones.estados.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" value={altaForm.estado} onChange={(e) => af('estado', e.target.value)} className="input-field text-sm" placeholder="—" />
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">Contrato</label>
+                  <select value={altaForm.contrato} onChange={(e) => af('contrato', e.target.value)} className="input-field text-sm">
+                    <option value="">—</option>
+                    {['30', '35', '36'].map((c) => <option key={c} value={c}>{c} hs</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Sitio</label>
+                  {altaOpciones?.sitios?.length ? (
+                    <select value={altaForm.sitio} onChange={(e) => af('sitio', e.target.value)} className="input-field text-sm">
+                      <option value="">—</option>
+                      {altaOpciones.sitios.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" value={altaForm.sitio} onChange={(e) => af('sitio', e.target.value)} className="input-field text-sm" placeholder="—" />
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">Modalidad</label>
+                  <input type="text" value={altaForm.modalidad} onChange={(e) => af('modalidad', e.target.value)} className="input-field text-sm" placeholder="—" />
+                </div>
+                <div>
+                  <label className="form-label">Jefe</label>
+                  {altaOpciones?.jefes?.length ? (
+                    <select value={altaForm.jefe} onChange={(e) => af('jefe', e.target.value)} className="input-field text-sm">
+                      <option value="">—</option>
+                      {altaOpciones.jefes.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" value={altaForm.jefe} onChange={(e) => af('jefe', e.target.value)} className="input-field text-sm" placeholder="—" />
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setAltaModal(null)} className="flex-1 btn-secondary">Cancelar</button>
+                <button type="submit" disabled={darDeAltaMut.isPending || !altaForm.fecha_alta} className="flex-1 btn-primary disabled:opacity-50 flex items-center justify-center gap-2">
+                  <ArrowUpCircle size={14} />
+                  {darDeAltaMut.isPending ? 'Procesando...' : 'Dar de alta'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (

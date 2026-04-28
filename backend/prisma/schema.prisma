@@ -36,6 +36,7 @@ model Usuario {
   licencias_registradas        Licencia[]
   cambios_registrados          CambioServicioTemporal[]
   bajas_creadas                HistoricoBaja[]          @relation("BajaCreador")
+  remociones_creadas           Remocion[]               @relation("RemocionCreador")
   cambios_contrato_creados     CambioContrato[]
   capacitaciones_creadas       Capacitacion[]
 
@@ -58,6 +59,7 @@ model Servicio {
   cambios_como_temporal   CambioServicioTemporal[] @relation("ServicioTemporal")
   snapshots               AgenteNominaMensual[]
   bajas                   HistoricoBaja[]
+  remociones              Remocion[]
   cambios_contrato        CambioContrato[]
   capacitaciones          Capacitacion[]
 
@@ -121,6 +123,7 @@ model Agente {
   capacitaciones     Capacitacion[]
   snapshots          AgenteNominaMensual[]
   bajas              HistoricoBaja[]
+  remociones         Remocion[]
 
   @@map("agentes")
 }
@@ -268,6 +271,39 @@ model HistoricoBaja {
   @@map("historico_bajas")
 }
 
+model Remocion {
+  id                  Int      @id @default(autoincrement())
+  fecha               DateTime @db.Date
+  dni                 String
+  nombre              String
+  usuario_sistema     String?
+  superior            String?
+  jefatura            String?
+  servicio_id         Int?
+  servicio_nombre     String?
+  motivo              String?
+  segmento            String?
+  horarios            String?
+  estado              String?
+  contrato            String?
+  sitio               String?
+  modalidad           String?
+  jefe                String?
+  observacion         String?
+  agente_id           Int?
+  creado_por          Int
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  agente   Agente?   @relation(fields: [agente_id], references: [id])
+  creador  Usuario   @relation("RemocionCreador", fields: [creado_por], references: [id])
+
+  @@index([dni])
+  @@index([servicio_id])
+  @@map("remociones")
+}
+
 model CambioContrato {
   id                  Int       @id @default(autoincrement())
   agente_id           Int
@@ -313,6 +349,9 @@ model Capacitacion {
   observacion         String?
   fecha_inicio        DateTime @db.Date
   fecha_fin           DateTime @db.Date
+  dado_de_alta        Boolean  @default(false)
+  pendiente_alta      Boolean  @default(false)
+  fecha_alta          DateTime?
   creado_por          Int
   fecha_creacion      DateTime @default(now())
   fecha_actualizacion DateTime @updatedAt

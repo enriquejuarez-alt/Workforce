@@ -3,6 +3,7 @@ import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
+  Vacacion, VacacionImportacion,
 } from '../types'
 
 // Auth
@@ -153,4 +154,18 @@ export const cambiosContratoApi = {
 export const exportApi = {
   nomina: (nominaId: number) =>
     api.get(`/export/nomina/${nominaId}`, { responseType: 'blob' }),
+}
+
+// Vacaciones WF
+export const vacacionesApi = {
+  list: (params?: Record<string, any>) => api.get<Vacacion[]>('/vacaciones', { params }),
+  import: (formData: FormData) =>
+    api.post<{ ok: boolean; total_dias: number; total_periodos: number; agentes_encontrados: number; agentes_no_encontrados: number }>(
+      '/vacaciones/import',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ),
+  importaciones: () => api.get<VacacionImportacion[]>('/vacaciones/importaciones'),
+  delete: (id: number) => api.delete(`/vacaciones/${id}`),
+  deleteImportacion: (id: number) => api.delete(`/vacaciones/importaciones/${id}`),
 }

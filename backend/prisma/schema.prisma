@@ -39,6 +39,7 @@ model Usuario {
   remociones_creadas           Remocion[]               @relation("RemocionCreador")
   cambios_contrato_creados     CambioContrato[]
   capacitaciones_creadas       Capacitacion[]
+  vacacion_importaciones       VacacionImportacion[]
 
   @@map("usuarios")
 }
@@ -124,6 +125,7 @@ model Agente {
   snapshots          AgenteNominaMensual[]
   bajas              HistoricoBaja[]
   remociones         Remocion[]
+  vacaciones         Vacacion[]
 
   @@map("agentes")
 }
@@ -363,6 +365,41 @@ model Capacitacion {
   @@index([agente_id])
   @@index([servicio_id])
   @@map("capacitaciones")
+}
+
+model VacacionImportacion {
+  id                     Int      @id @default(autoincrement())
+  archivo_nombre         String
+  importado_por          Int
+  fecha_importacion      DateTime @default(now())
+  total_dias             Int      @default(0)
+  total_periodos         Int      @default(0)
+  agentes_encontrados    Int      @default(0)
+  agentes_no_encontrados Int      @default(0)
+
+  importador  Usuario    @relation(fields: [importado_por], references: [id])
+  vacaciones  Vacacion[]
+
+  @@map("vacacion_importaciones")
+}
+
+model Vacacion {
+  id             Int      @id @default(autoincrement())
+  agente_id      Int?
+  agente_dni     String
+  agente_nombre  String
+  fecha_desde    DateTime @db.Date
+  fecha_hasta    DateTime @db.Date
+  site           String?
+  servicio_wf    String?
+  importacion_id Int
+  fecha_creacion DateTime @default(now())
+
+  agente      Agente?             @relation(fields: [agente_id], references: [id])
+  importacion VacacionImportacion @relation(fields: [importacion_id], references: [id])
+
+  @@index([agente_dni])
+  @@map("vacaciones")
 }
 
 model Auditoria {

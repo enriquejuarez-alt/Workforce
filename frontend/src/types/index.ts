@@ -260,6 +260,35 @@ export interface CambioContrato {
   estado_calculado?: 'PENDIENTE' | 'VIGENTE' | 'FINALIZADO'
 }
 
+export interface VacacionImportacion {
+  id: number
+  archivo_nombre: string
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  total_dias: number
+  total_periodos: number
+  agentes_encontrados: number
+  agentes_no_encontrados: number
+  _count?: { vacaciones: number }
+}
+
+export interface Vacacion {
+  id: number
+  agente_id: number | null
+  agente_dni: string
+  agente_nombre: string
+  agente?: Agente | null
+  fecha_desde: string
+  fecha_hasta: string
+  site: string | null
+  servicio_wf: string | null
+  importacion_id: number
+  importacion?: Pick<VacacionImportacion, 'id' | 'archivo_nombre' | 'fecha_importacion'>
+  fecha_creacion: string
+  estado_calculado?: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
+}
+
 export interface AuditoriaLog {
   id: number
   usuario_id: number | null

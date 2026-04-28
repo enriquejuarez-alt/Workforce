@@ -17,6 +17,7 @@ import { listBajas, createBaja, updateBaja, deleteBaja, importBajas, getTiposBaj
 import { listCambiosContrato, createCambioContrato, updateCambioContrato, deleteCambioContrato } from '../controllers/cambiosContrato'
 import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
+import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
 
 const router = Router()
 
@@ -95,5 +96,11 @@ router.get('/remociones', authenticate, listRemociones)
 router.post('/remociones', authenticate, createRemocion)
 router.put('/remociones/:id', authenticate, updateRemocion)
 router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
+
+router.post('/vacaciones/import', authenticate, requireAdmin, uploadExcel.single('file'), importVacaciones)
+router.get('/vacaciones', authenticate, listVacaciones)
+router.get('/vacaciones/importaciones', authenticate, requireAdmin, listImportacionesVacaciones)
+router.delete('/vacaciones/:id', authenticate, requireAdmin, deleteVacacion)
+router.delete('/vacaciones/importaciones/:id', authenticate, requireAdmin, deleteImportacionVacaciones)
 
 export default router

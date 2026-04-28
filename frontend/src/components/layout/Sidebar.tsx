@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX,
+  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: '/cambios-contrato', icon: FilePen, label: 'Cambios de Contrato' },
   { to: '/capacitaciones', icon: GraduationCap, label: 'Capacitaciones' },
   { to: '/remociones', icon: UserX, label: 'Remociones' },
+  { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
 ]
 

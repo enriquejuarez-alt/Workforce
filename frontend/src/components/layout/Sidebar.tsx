@@ -24,7 +24,6 @@ const ADMIN_ITEMS = [
   { to: '/carga', icon: Upload, label: 'Carga de Excel' },
   { to: '/importaciones', icon: History, label: 'Historial Importaciones' },
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
-  { to: '/permisos', icon: Shield, label: 'Permisos' },
   { to: '/servicios', icon: Building2, label: 'Servicios' },
   { to: '/auditoria', icon: Activity, label: 'Auditoría' },
 ]

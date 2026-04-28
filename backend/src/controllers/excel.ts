@@ -209,32 +209,63 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
     let creados = 0
     let actualizados = 0
 
+    // Pre-cargar todos los agentes relevantes en memoria (1 query en lugar de N)
+    const dniList = rows.map((r: any) => r.dni)
+    const usuarioList = rows.map((r: any) => r.usuario)
+    const agentesExistentes = await prisma.agente.findMany({
+      where: { OR: [{ dni: { in: dniList } }, { usuario: { in: usuarioList } }] },
+    })
+    const agentePorDni = new Map(agentesExistentes.map((a) => [a.dni, a]))
+    const agentePorUsuario = new Map(agentesExistentes.map((a) => [a.usuario, a]))
+
+    // Pre-cargar snapshots existentes de esta nómina (1 query en lugar de N)
+    const snapshotsExistentes = await prisma.agenteNominaMensual.findMany({
+      where: { nomina_mensual_id: nomina.id },
+      select: { id: true, agente_id: true },
+    })
+    const snapshotPorAgenteId = new Map(snapshotsExistentes.map((s) => [s.agente_id, s.id]))
+
+    const updateAgentesPromises: Promise<any>[] = []
+    const nuevosAgentesRows: any[] = []
+    const newSnapshots: any[] = []
+    const updateSnapshotIds: { id: number; data: any }[] = []
+
     for (const row of rows) {
       const { dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe } = row
-
-      let agente = await prisma.agente.findFirst({
-        where: { OR: [{ dni }, { usuario }] },
-      })
+      const agente = agentePorDni.get(dni) || agentePorUsuario.get(usuario)
+      const snapshotFields = { dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, presente_en_nomina: true }
 
       if (!agente) {
-        agente = await prisma.agente.create({
-          data: { dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, activo: true, presente_ultima_carga: true },
-        })
+        nuevosAgentesRows.push(row)
         creados++
       } else {
-        agente = await prisma.agente.update({
-          where: { id: agente.id },
-          data: { nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, presente_ultima_carga: true },
-        })
+        updateAgentesPromises.push(
+          prisma.agente.update({ where: { id: agente.id }, data: { nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, presente_ultima_carga: true } })
+        )
         actualizados++
+        const snapId = snapshotPorAgenteId.get(agente.id)
+        if (snapId) updateSnapshotIds.push({ id: snapId, data: snapshotFields })
+        else newSnapshots.push({ nomina_mensual_id: nomina.id, agente_id: agente.id, ...snapshotFields })
       }
-
-      await prisma.agenteNominaMensual.upsert({
-        where: { nomina_mensual_id_agente_id: { nomina_mensual_id: nomina.id, agente_id: agente.id } },
-        update: { dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, presente_en_nomina: true },
-        create: { nomina_mensual_id: nomina.id, agente_id: agente.id, dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, presente_en_nomina: true },
-      })
     }
+
+    // Ejecutar actualizaciones de agentes en paralelo
+    await Promise.all(updateAgentesPromises)
+
+    // Crear nuevos agentes secuencialmente (necesitamos el ID para el snapshot)
+    for (const row of nuevosAgentesRows) {
+      const { dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe } = row
+      const agente = await prisma.agente.create({
+        data: { dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, activo: true, presente_ultima_carga: true },
+      })
+      newSnapshots.push({ nomina_mensual_id: nomina.id, agente_id: agente.id, dni, usuario, nombre, superior, segmento, horarios, estado, contrato, sitio, modalidad, jefe, servicio_id, presente_en_nomina: true })
+    }
+
+    // Batch create snapshots nuevos y actualizar existentes en paralelo
+    await Promise.all([
+      newSnapshots.length > 0 ? prisma.agenteNominaMensual.createMany({ data: newSnapshots, skipDuplicates: true }) : Promise.resolve(),
+      ...updateSnapshotIds.map(({ id, data }) => prisma.agenteNominaMensual.update({ where: { id }, data })),
+    ])
 
     const loadedDnis = new Set(rows.map((r: any) => r.dni))
 

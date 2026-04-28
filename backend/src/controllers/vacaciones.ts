@@ -176,6 +176,18 @@ export const listVacaciones = async (req: AuthRequest, res: Response) => {
       ]
     }
 
+    if (estado) {
+      const e = (estado as string).toUpperCase()
+      if (e === 'VIGENTE') {
+        where.fecha_desde = { lte: now }
+        where.fecha_hasta = { gte: now }
+      } else if (e === 'PROGRAMADA') {
+        where.fecha_desde = { gt: now }
+      } else if (e === 'FINALIZADA') {
+        where.fecha_hasta = { lt: now }
+      }
+    }
+
     const vacaciones = await prisma.vacacion.findMany({
       where,
       include: {
@@ -183,6 +195,7 @@ export const listVacaciones = async (req: AuthRequest, res: Response) => {
         importacion: { select: { id: true, archivo_nombre: true, fecha_importacion: true } },
       },
       orderBy: [{ fecha_desde: 'asc' }, { agente_nombre: 'asc' }],
+      take: 1000,
     })
 
     const withStatus = vacaciones.map((v) => {
@@ -193,11 +206,7 @@ export const listVacaciones = async (req: AuthRequest, res: Response) => {
       return { ...v, estado_calculado: estadoCalc }
     })
 
-    const filtered = estado
-      ? withStatus.filter((v) => v.estado_calculado === (estado as string).toUpperCase())
-      : withStatus
-
-    return res.json(filtered)
+    return res.json(withStatus)
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: 'Error al listar vacaciones' })

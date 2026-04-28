@@ -54,9 +54,22 @@ async function syncAgenteActivo(agenteId: number) {
 export const listLicencias = async (req: AuthRequest, res: Response) => {
   try {
     const { agente_id, servicio_id, estado } = req.query
-    let where: any = {}
+    const hoy = startOfToday()
+    const where: any = {}
 
     if (agente_id) where.agente_id = parseInt(agente_id as string)
+
+    if (estado) {
+      const e = (estado as string).toUpperCase()
+      if (e === 'VIGENTE') {
+        where.fecha_desde = { lte: hoy }
+        where.fecha_hasta = { gte: hoy }
+      } else if (e === 'PROGRAMADA') {
+        where.fecha_desde = { gt: hoy }
+      } else if (e === 'FINALIZADA') {
+        where.fecha_hasta = { lt: hoy }
+      }
+    }
 
     const licencias = await prisma.licencia.findMany({
       where,
@@ -65,9 +78,9 @@ export const listLicencias = async (req: AuthRequest, res: Response) => {
         creador: { select: { id: true, nombre: true, email: true } },
       },
       orderBy: { fecha_desde: 'desc' },
+      take: 1000,
     })
 
-    const hoy = startOfToday()
     const withStatus = licencias.map((l) => {
       let estadoCalc: string
       if (hoy < l.fecha_desde) estadoCalc = 'PROGRAMADA'
@@ -76,11 +89,7 @@ export const listLicencias = async (req: AuthRequest, res: Response) => {
       return { ...l, estado_calculado: estadoCalc }
     })
 
-    const filtered = estado
-      ? withStatus.filter((l) => l.estado_calculado === (estado as string).toUpperCase())
-      : withStatus
-
-    return res.json(filtered)
+    return res.json(withStatus)
   } catch {
     return res.status(500).json({ error: 'Error al listar licencias' })
   }

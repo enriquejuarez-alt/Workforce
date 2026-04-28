@@ -217,6 +217,9 @@ model Licencia {
   creador     Usuario              @relation(fields: [creado_por], references: [id])
   importacion LicenciaImportacion? @relation(fields: [importacion_id], references: [id])
 
+  @@index([agente_id])
+  @@index([importacion_id])
+  @@index([fecha_desde, fecha_hasta])
   @@map("licencias")
 }
 
@@ -289,6 +292,7 @@ model HistoricoBaja {
 
   @@index([dni])
   @@index([servicio_id])
+  @@index([servicio_id, fecha])
   @@map("historico_bajas")
 }
 
@@ -322,6 +326,7 @@ model Remocion {
 
   @@index([dni])
   @@index([servicio_id])
+  @@index([servicio_id, fecha])
   @@map("remociones")
 }
 
@@ -418,6 +423,7 @@ model Vacacion {
   importacion VacacionImportacion @relation(fields: [importacion_id], references: [id])
 
   @@index([agente_dni])
+  @@index([importacion_id])
   @@map("vacaciones")
 }
 

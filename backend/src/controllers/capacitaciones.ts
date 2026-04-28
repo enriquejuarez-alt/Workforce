@@ -13,10 +13,23 @@ function calcularEstado(fechaInicio: Date, fechaFin: Date): string {
 export const listCapacitaciones = async (req: AuthRequest, res: Response) => {
   try {
     const { servicio_id, segmento, estado_cap } = req.query
+    const now = new Date()
     const where: any = {}
     if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
     if (segmento) {
       where.segmento = segmento === 'SIN_DEFINIR' ? null : { equals: segmento as string, mode: 'insensitive' }
+    }
+
+    if (estado_cap) {
+      const e = (estado_cap as string).toUpperCase()
+      if (e === 'VIGENTE') {
+        where.fecha_inicio = { lte: now }
+        where.fecha_fin = { gte: now }
+      } else if (e === 'PROGRAMADA') {
+        where.fecha_inicio = { gt: now }
+      } else if (e === 'FINALIZADA') {
+        where.fecha_fin = { lt: now }
+      }
     }
 
     const prismaAny = prisma as any
@@ -27,6 +40,7 @@ export const listCapacitaciones = async (req: AuthRequest, res: Response) => {
         creador: { select: { id: true, nombre: true } },
       },
       orderBy: { fecha_fin: 'asc' },
+      take: 1000,
     })
 
     const withStatus = items.map((c: any) => {
@@ -34,11 +48,7 @@ export const listCapacitaciones = async (req: AuthRequest, res: Response) => {
       return { ...c, estado_calculado }
     })
 
-    const filtered = estado_cap
-      ? withStatus.filter((c: any) => c.estado_calculado === estado_cap)
-      : withStatus
-
-    return res.json(filtered)
+    return res.json(withStatus)
   } catch {
     return res.status(500).json({ error: 'Error al listar capacitaciones' })
   }

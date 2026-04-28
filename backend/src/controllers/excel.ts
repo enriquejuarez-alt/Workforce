@@ -123,11 +123,16 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
       return { ...row, _status: isNew ? 'NUEVO' : 'ACTUALIZAR' }
     })
 
-    const allDnisPrev = await prisma.agente.findMany({
-      where: { servicio_id: parseInt(servicio_id) },
-      select: { id: true, dni: true, nombre: true },
+    // No presentes = solo los que ya estaban en esta nómina y no aparecen en el archivo nuevo
+    const nominaExistente = await prisma.nominaMensual.findFirst({
+      where: { servicio_id: parseInt(servicio_id), mes: parseInt(mes), anio: parseInt(anio) },
     })
-    const noPresentes = allDnisPrev.filter((a) => !dnis.includes(a.dni))
+    const noPresentes = nominaExistente
+      ? await prisma.agenteNominaMensual.findMany({
+          where: { nomina_mensual_id: nominaExistente.id, dni: { notIn: dnis }, presente_en_nomina: true },
+          select: { agente_id: true, dni: true, nombre: true },
+        })
+      : []
 
     const token = uuidv4()
     pendingPreviews.set(token, {
@@ -231,25 +236,30 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
       })
     }
 
-    const allAgentes = await prisma.agente.findMany({
+    const loadedDnis = new Set(rows.map((r: any) => r.dni))
+
+    // Actualizar presente_ultima_carga en Agente para los que no están en el archivo
+    const agentesServicio = await prisma.agente.findMany({
       where: { servicio_id },
       select: { id: true, dni: true },
     })
-    const loadedDnis = new Set(rows.map((r: any) => r.dni))
-    const noPresentes = allAgentes.filter((a) => !loadedDnis.has(a.dni))
-
-    for (const a of noPresentes) {
-      await prisma.agente.update({ where: { id: a.id }, data: { presente_ultima_carga: false } })
-      const existing = await prisma.agenteNominaMensual.findFirst({
-        where: { nomina_mensual_id: nomina.id, agente_id: a.id },
-      })
-      if (existing) {
-        await prisma.agenteNominaMensual.update({
-          where: { id: existing.id },
-          data: { presente_en_nomina: false },
-        })
-      }
+    const idsFuera = agentesServicio.filter((a) => !loadedDnis.has(a.dni)).map((a) => a.id)
+    if (idsFuera.length > 0) {
+      await prisma.agente.updateMany({ where: { id: { in: idsFuera } }, data: { presente_ultima_carga: false } })
     }
+
+    // Marcar como no presente SOLO los snapshots que ya estaban en esta nómina
+    const snapshotsAMarcar = await prisma.agenteNominaMensual.findMany({
+      where: { nomina_mensual_id: nomina.id, dni: { notIn: [...loadedDnis] } },
+      select: { id: true },
+    })
+    if (snapshotsAMarcar.length > 0) {
+      await prisma.agenteNominaMensual.updateMany({
+        where: { id: { in: snapshotsAMarcar.map((s) => s.id) } },
+        data: { presente_en_nomina: false },
+      })
+    }
+    const noPresentes = snapshotsAMarcar
 
     // Auto-add pending altas for this service/month/year
     const primeroDeMes = new Date(anio, mes - 1, 1)

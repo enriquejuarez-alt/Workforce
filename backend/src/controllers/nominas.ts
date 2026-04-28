@@ -59,6 +59,32 @@ export const getNomina = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const deleteNomina = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const nomina = await prisma.nominaMensual.findUnique({ where: { id }, include: { servicio: true } })
+    if (!nomina) return res.status(404).json({ error: 'Nómina no encontrada' })
+
+    await prisma.agenteNominaMensual.deleteMany({ where: { nomina_mensual_id: id } })
+    await prisma.importacionNomina.deleteMany({ where: { nomina_mensual_id: id } })
+    await prisma.auditoria.updateMany({ where: { nomina_mensual_id: id }, data: { nomina_mensual_id: null } })
+    await prisma.nominaMensual.delete({ where: { id } })
+
+    await createAuditLog({
+      usuario_id: req.user!.userId,
+      accion: 'ELIMINAR_NOMINA',
+      entidad: 'NominaMensual',
+      entidad_id: String(id),
+      servicio_id: nomina.servicio_id,
+      valor_anterior: `${nomina.servicio?.nombre} - ${nomina.mes}/${nomina.anio}`,
+    })
+
+    return res.json({ ok: true })
+  } catch {
+    return res.status(500).json({ error: 'Error al eliminar nómina' })
+  }
+}
+
 export const updateNominaStatus = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)

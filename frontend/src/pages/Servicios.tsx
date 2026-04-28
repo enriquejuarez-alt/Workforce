@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Building2 } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import Header from '../components/layout/Header'
 import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { serviciosApi } from '../lib/api'
 import type { Servicio } from '../types'
 import { PageLoading } from '../components/ui/LoadingSpinner'
@@ -16,6 +17,7 @@ export default function Servicios() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editServicio, setEditServicio] = useState<Servicio | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const { data: servicios = [], isLoading } = useQuery({
     queryKey: ['servicios-admin'],
@@ -25,6 +27,12 @@ export default function Servicios() {
   const toggleMutation = useMutation({
     mutationFn: (id: number) => serviciosApi.toggle(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['servicios-admin'] }); toast.success('Estado actualizado') },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => serviciosApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['servicios-admin'] }); toast.success('Servicio eliminado'); setDeleteId(null) },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Error al eliminar'),
   })
 
   if (isLoading) return <PageLoading />
@@ -78,6 +86,9 @@ export default function Servicios() {
                   >
                     {s.activo ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                   </button>
+                  <button className="btn-ghost py-1 px-2 text-red-500" onClick={() => setDeleteId(s.id)}>
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -92,6 +103,17 @@ export default function Servicios() {
           onSaved={() => { setShowForm(false); setEditServicio(null); qc.invalidateQueries({ queryKey: ['servicios-admin'] }) }}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        title="Eliminar servicio"
+        message="¿Seguro querés eliminar este servicio? Solo se puede eliminar si no tiene agentes ni nóminas asociadas."
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

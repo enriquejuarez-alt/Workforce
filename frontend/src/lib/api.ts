@@ -33,6 +33,7 @@ export const serviciosApi = {
   create: (data: Partial<Servicio>) => api.post<Servicio>('/servicios', data),
   update: (id: number, data: Partial<Servicio>) => api.put<Servicio>(`/servicios/${id}`, data),
   toggle: (id: number) => api.patch<{ activo: boolean }>(`/servicios/${id}/estado`),
+  delete: (id: number) => api.delete(`/servicios/${id}`),
   metricas: (id: number) => api.get(`/servicios/${id}/metricas`),
   segmentos: (id: number) => api.get<string[]>(`/servicios/${id}/segmentos`),
 }
@@ -59,6 +60,7 @@ export const nominasApi = {
     api.get('/nominas/comparar', { params }),
   replicar: (id: number) =>
     api.post<{ message: string; nomina: NominaMensual }>(`/nominas/${id}/replicar`),
+  delete: (id: number) => api.delete(`/nominas/${id}`),
   deleteAgente: (snapshotId: number) =>
     api.delete(`/nominas/agentes/${snapshotId}`),
 }

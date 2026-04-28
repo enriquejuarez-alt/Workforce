@@ -109,6 +109,33 @@ export const toggleService = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const deleteService = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const servicio = await prisma.servicio.findUnique({
+      where: { id },
+      include: { _count: { select: { agentes: true, nominas: true } } },
+    })
+    if (!servicio) return res.status(404).json({ error: 'Servicio no encontrado' })
+    if (servicio._count.agentes > 0) return res.status(409).json({ error: `No se puede eliminar: tiene ${servicio._count.agentes} agente(s) asociado(s)` })
+    if (servicio._count.nominas > 0) return res.status(409).json({ error: `No se puede eliminar: tiene ${servicio._count.nominas} nómina(s) asociada(s)` })
+
+    await prisma.servicio.delete({ where: { id } })
+
+    await createAuditLog({
+      usuario_id: req.user!.userId,
+      accion: 'ELIMINAR_SERVICIO',
+      entidad: 'Servicio',
+      entidad_id: String(id),
+      valor_anterior: servicio.nombre,
+    })
+
+    return res.json({ ok: true })
+  } catch {
+    return res.status(500).json({ error: 'Error al eliminar servicio' })
+  }
+}
+
 export const getServiceSegmentos = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)

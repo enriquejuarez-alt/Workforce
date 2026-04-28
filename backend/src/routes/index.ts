@@ -4,9 +4,9 @@ import { uploadExcel } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission } from '../controllers/users'
-import { listServices, createService, updateService, toggleService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
+import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent } from '../controllers/agents'
-import { listNominas, getNomina, updateNominaStatus, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
+import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
 import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias } from '../controllers/licencias'
 import { listCambios, createCambio, updateCambio, deleteCambio } from '../controllers/cambios'
@@ -37,6 +37,7 @@ router.get('/servicios', authenticate, listServices)
 router.post('/servicios', authenticate, requireAdmin, createService)
 router.put('/servicios/:id', authenticate, requireAdmin, updateService)
 router.patch('/servicios/:id/estado', authenticate, requireAdmin, toggleService)
+router.delete('/servicios/:id', authenticate, requireAdmin, deleteService)
 router.get('/servicios/:id/metricas', authenticate, getServiceMetrics)
 router.get('/servicios/:id/segmentos', authenticate, requireAdmin, getServiceSegmentos)
 
@@ -50,6 +51,7 @@ router.get('/nominas/comparar', authenticate, compareNominas)
 router.get('/nominas', authenticate, listNominas)
 router.get('/nominas/:id', authenticate, getNomina)
 router.patch('/nominas/:id/estado', authenticate, requireAdmin, updateNominaStatus)
+router.delete('/nominas/:id', authenticate, requireAdmin, deleteNomina)
 router.post('/nominas/:id/replicar', authenticate, requireAdmin, replicarNomina)
 router.get('/nominas/:nominaId/agentes', authenticate, listAgentesNomina)
 router.patch('/nominas/agentes/:snapshotId', authenticate, editAgentNomina)

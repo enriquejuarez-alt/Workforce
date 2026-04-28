@@ -24,6 +24,7 @@ import LicenciaModal from '../components/agents/LicenciaModal'
 import CambioTemporalModal from '../components/agents/CambioTemporalModal'
 import { usePermissions } from '../hooks/usePermissions'
 import EmptyState from '../components/ui/EmptyState'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 
 const currentYear = new Date().getFullYear()
 const currentMonth = new Date().getMonth() + 1
@@ -54,6 +55,7 @@ export default function Nomina() {
   const [editAgent, setEditAgent] = useState<AgenteNominaMensual | null>(null)
   const [licenciaAgent, setLicenciaAgent] = useState<AgenteNominaMensual | null>(null)
   const [cambioAgent, setCambioAgent] = useState<AgenteNominaMensual | null>(null)
+  const [showDeleteNomina, setShowDeleteNomina] = useState(false)
 
   const { data: servicios = [] } = useQuery({
     queryKey: ['servicios'],
@@ -107,6 +109,16 @@ export default function Nomina() {
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Error al eliminar agente')
     },
+  })
+
+  const deleteNominaMutation = useMutation({
+    mutationFn: () => nominasApi.delete(nomina!.id),
+    onSuccess: () => {
+      toast.success('Nómina eliminada')
+      qc.invalidateQueries({ queryKey: ['nominas'] })
+      setShowDeleteNomina(false)
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Error al eliminar nómina'),
   })
 
   const handleExport = async () => {
@@ -268,6 +280,11 @@ export default function Nomina() {
             {nomina && selectedServicioId && canExport(selectedServicioId as number, !isCurrentMonth) && (
               <button className="btn-secondary" onClick={handleExport}>
                 <Download size={14} /> Exportar
+              </button>
+            )}
+            {isAdmin && nomina && (
+              <button className="btn-ghost text-red-500 hover:bg-red-50" onClick={() => setShowDeleteNomina(true)}>
+                <Trash2 size={14} /> Eliminar nómina
               </button>
             )}
             <button className="btn-ghost" onClick={() => refetch()}>
@@ -546,6 +563,17 @@ export default function Nomina() {
           onSaved={() => { setCambioAgent(null); toast.success('Cambio temporal registrado') }}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteNomina}
+        onClose={() => setShowDeleteNomina(false)}
+        onConfirm={() => deleteNominaMutation.mutate()}
+        title="Eliminar nómina"
+        message={`¿Seguro querés eliminar la nómina de ${nomina ? `${MESES[nomina.mes - 1]} ${nomina.anio}` : ''}? Se eliminarán todos los agentes y registros asociados. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteNominaMutation.isPending}
+      />
     </div>
   )
 }

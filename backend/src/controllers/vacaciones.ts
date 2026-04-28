@@ -5,6 +5,10 @@ import { AuthRequest } from '../middleware/auth'
 import * as XLSX from 'xlsx'
 import fs from 'fs'
 
+function normalizeDni(val: any): string {
+  return String(val || '').replace(/\D/g, '').trim()
+}
+
 function parseWfDate(val: any): Date | null {
   if (val === null || val === undefined || val === '') return null
   if (typeof val === 'number') {
@@ -67,7 +71,7 @@ export const importVacaciones = async (req: AuthRequest, res: Response) => {
       const motivo = String(row[5] || '').trim().toUpperCase()
       if (motivo !== 'VACACIONES') continue
 
-      const dni = String(row[4] || '').trim()
+      const dni = normalizeDni(row[4])
       if (!dni) continue
 
       const desde = parseWfDate(row[10])
@@ -87,6 +91,10 @@ export const importVacaciones = async (req: AuthRequest, res: Response) => {
       byDni.get(dni)!.ranges.push({ desde, hasta })
     }
 
+    // Mapa normalizado de todos los agentes para el cruce
+    const todosAgentes = await prisma.agente.findMany({ select: { id: true, dni: true } })
+    const agenteByDni = new Map(todosAgentes.map((a) => [normalizeDni(a.dni), a]))
+
     const importacion = await prisma.vacacionImportacion.create({
       data: {
         archivo_nombre: req.file.originalname,
@@ -104,7 +112,8 @@ export const importVacaciones = async (req: AuthRequest, res: Response) => {
 
     for (const [dni, info] of byDni.entries()) {
       const merged = mergeRanges(info.ranges)
-      const agente = await prisma.agente.findFirst({ where: { dni } })
+      await prisma.vacacion.deleteMany({ where: { agente_dni: dni } })
+      const agente = agenteByDni.get(dni) ?? null
 
       if (agente) encontrados++
       else noEncontrados++

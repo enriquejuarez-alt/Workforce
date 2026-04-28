@@ -6,6 +6,10 @@ import { AuthRequest } from '../middleware/auth'
 import * as XLSX from 'xlsx'
 import fs from 'fs'
 
+function normalizeDni(val: any): string {
+  return String(val || '').replace(/\D/g, '').trim()
+}
+
 function parseWfDate(val: any): Date | null {
   if (val === null || val === undefined || val === '') return null
   if (typeof val === 'number') {
@@ -31,10 +35,25 @@ function mergeRanges(ranges: Array<{ desde: Date; hasta: Date }>): Array<{ desde
   return merged
 }
 
+function startOfToday(): Date {
+  const d = new Date()
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+}
+
+async function syncAgenteActivo(agenteId: number) {
+  const hoy = startOfToday()
+  const vigente = await prisma.licencia.findFirst({
+    where: { agente_id: agenteId, fecha_desde: { lte: hoy }, fecha_hasta: { gte: hoy } },
+  })
+  const baja = await prisma.historicoBaja.findFirst({ where: { agente_id: agenteId } })
+  if (!baja) {
+    await prisma.agente.update({ where: { id: agenteId }, data: { activo: !vigente } })
+  }
+}
+
 export const listLicencias = async (req: AuthRequest, res: Response) => {
   try {
     const { agente_id, servicio_id, estado } = req.query
-    const now = new Date()
     let where: any = {}
 
     if (agente_id) where.agente_id = parseInt(agente_id as string)
@@ -48,10 +67,11 @@ export const listLicencias = async (req: AuthRequest, res: Response) => {
       orderBy: { fecha_desde: 'desc' },
     })
 
+    const hoy = startOfToday()
     const withStatus = licencias.map((l) => {
       let estadoCalc: string
-      if (now < l.fecha_desde) estadoCalc = 'PROGRAMADA'
-      else if (now > l.fecha_hasta) estadoCalc = 'FINALIZADA'
+      if (hoy < l.fecha_desde) estadoCalc = 'PROGRAMADA'
+      else if (hoy > l.fecha_hasta) estadoCalc = 'FINALIZADA'
       else estadoCalc = 'VIGENTE'
       return { ...l, estado_calculado: estadoCalc }
     })
@@ -90,6 +110,8 @@ export const createLicencia = async (req: AuthRequest, res: Response) => {
       data: { agente_id, fecha_desde: desde, fecha_hasta: hasta, motivo, observacion, creado_por: req.user!.userId },
       include: { agente: true, creador: { select: { id: true, nombre: true } } },
     })
+
+    await syncAgenteActivo(agente_id)
 
     await createAuditLog({
       usuario_id: req.user!.userId,
@@ -131,7 +153,9 @@ export const updateLicencia = async (req: AuthRequest, res: Response) => {
 export const deleteLicencia = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)
+    const licencia = await prisma.licencia.findUnique({ where: { id } })
     await prisma.licencia.delete({ where: { id } })
+    if (licencia) await syncAgenteActivo(licencia.agente_id)
     return res.json({ message: 'Licencia eliminada' })
   } catch {
     return res.status(500).json({ error: 'Error al eliminar licencia' })
@@ -163,7 +187,7 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
       const motivo = String(row[5] || '').trim().toUpperCase()
       if (!motivo || motivo === 'VACACIONES') continue
 
-      const dni = String(row[4] || '').trim()
+      const dni = normalizeDni(row[4])
       if (!dni) continue
 
       const desde = parseWfDate(row[10])
@@ -177,6 +201,10 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
       }
       byKey.get(key)!.ranges.push({ desde, hasta })
     }
+
+    // Mapa normalizado de todos los agentes para el cruce
+    const todosAgentes = await prisma.agente.findMany({ select: { id: true, dni: true } })
+    const agenteByDni = new Map(todosAgentes.map((a) => [normalizeDni(a.dni), a]))
 
     const importacion = await prisma.licenciaImportacion.create({
       data: {
@@ -196,7 +224,11 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
 
     for (const info of byKey.values()) {
       const merged = mergeRanges(info.ranges)
-      const agente = await prisma.agente.findFirst({ where: { dni: info.dni } })
+      const agente = agenteByDni.get(info.dni) ?? null
+
+      if (agente) {
+        await prisma.licencia.deleteMany({ where: { agente_id: agente.id, importacion_id: { not: null } } })
+      }
 
       for (const { desde, hasta } of merged) {
         const dias = Math.round((hasta.getTime() - desde.getTime()) / 86400000) + 1
@@ -217,6 +249,8 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
         })
         totalPeriodos++
       }
+
+      if (agente) await syncAgenteActivo(agente.id)
     }
 
     await prisma.licenciaImportacion.update({

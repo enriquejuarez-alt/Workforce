@@ -22,7 +22,7 @@ const NAV_ITEMS = [
 ]
 
 const ADMIN_ITEMS = [
-  { to: '/carga', icon: Upload, label: 'Carga de Excel' },
+  { to: '/carga', icon: Upload, label: 'Carga de Nómina' },
   { to: '/importaciones', icon: History, label: 'Historial Importaciones' },
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
   { to: '/servicios', icon: Building2, label: 'Servicios' },

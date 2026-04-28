@@ -8,7 +8,7 @@ import { listServices, createService, updateService, toggleService, getServiceMe
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent } from '../controllers/agents'
 import { listNominas, getNomina, updateNominaStatus, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
-import { listLicencias, createLicencia, updateLicencia, deleteLicencia } from '../controllers/licencias'
+import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias } from '../controllers/licencias'
 import { listCambios, createCambio, updateCambio, deleteCambio } from '../controllers/cambios'
 import { getDashboard } from '../controllers/dashboard'
 import { listAuditoria } from '../controllers/auditoria'
@@ -63,6 +63,9 @@ router.get('/licencias', authenticate, listLicencias)
 router.post('/licencias', authenticate, createLicencia)
 router.put('/licencias/:id', authenticate, updateLicencia)
 router.delete('/licencias/:id', authenticate, requireAdmin, deleteLicencia)
+router.post('/licencias/import-wf', authenticate, requireAdmin, uploadExcel.single('file'), importLicenciasWF)
+router.get('/licencias/importaciones', authenticate, requireAdmin, listImportacionesLicencias)
+router.delete('/licencias/importaciones/:id', authenticate, requireAdmin, deleteImportacionLicencias)
 
 router.get('/cambios', authenticate, listCambios)
 router.post('/cambios', authenticate, createCambio)

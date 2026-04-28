@@ -34,6 +34,7 @@ model Usuario {
   importaciones        ImportacionNomina[]
   auditorias           Auditoria[]
   licencias_registradas        Licencia[]
+  licencia_importaciones       LicenciaImportacion[]
   cambios_registrados          CambioServicioTemporal[]
   bajas_creadas                HistoricoBaja[]          @relation("BajaCreador")
   remociones_creadas           Remocion[]               @relation("RemocionCreador")
@@ -185,18 +186,36 @@ model AgenteNominaMensual {
   @@map("agente_nomina_mensual")
 }
 
-model Licencia {
-  id             Int      @id @default(autoincrement())
-  agente_id      Int
-  fecha_desde    DateTime
-  fecha_hasta    DateTime
-  motivo         String?
-  observacion    String?
-  creado_por     Int
-  fecha_creacion DateTime @default(now())
+model LicenciaImportacion {
+  id                     Int      @id @default(autoincrement())
+  archivo_nombre         String
+  importado_por          Int
+  fecha_importacion      DateTime @default(now())
+  total_dias             Int      @default(0)
+  total_periodos         Int      @default(0)
+  agentes_encontrados    Int      @default(0)
+  agentes_no_encontrados Int      @default(0)
 
-  agente  Agente  @relation(fields: [agente_id], references: [id])
-  creador Usuario @relation(fields: [creado_por], references: [id])
+  importador Usuario    @relation(fields: [importado_por], references: [id])
+  licencias  Licencia[]
+
+  @@map("licencia_importaciones")
+}
+
+model Licencia {
+  id               Int      @id @default(autoincrement())
+  agente_id        Int
+  fecha_desde      DateTime
+  fecha_hasta      DateTime
+  motivo           String?
+  observacion      String?
+  creado_por       Int
+  importacion_id   Int?
+  fecha_creacion   DateTime @default(now())
+
+  agente      Agente               @relation(fields: [agente_id], references: [id])
+  creador     Usuario              @relation(fields: [creado_por], references: [id])
+  importacion LicenciaImportacion? @relation(fields: [importacion_id], references: [id])
 
   @@map("licencias")
 }

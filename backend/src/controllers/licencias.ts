@@ -3,6 +3,33 @@ import prisma from '../prisma'
 import { createAuditLog } from '../utils/audit'
 import { getUserPermission } from '../utils/permissions'
 import { AuthRequest } from '../middleware/auth'
+import * as XLSX from 'xlsx'
+import fs from 'fs'
+
+function parseWfDate(val: any): Date | null {
+  if (val === null || val === undefined || val === '') return null
+  if (typeof val === 'number') {
+    return new Date(Math.floor(val - 25569) * 86400 * 1000)
+  }
+  const str = String(val).trim()
+  const match = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (match) return new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z`)
+  const d = new Date(str)
+  return isNaN(d.getTime()) ? null : d
+}
+
+function mergeRanges(ranges: Array<{ desde: Date; hasta: Date }>): Array<{ desde: Date; hasta: Date }> {
+  if (ranges.length === 0) return []
+  const sorted = [...ranges].sort((a, b) => a.desde.getTime() - b.desde.getTime())
+  const merged = [{ desde: sorted[0].desde, hasta: sorted[0].hasta }]
+  for (let i = 1; i < sorted.length; i++) {
+    const cur = merged[merged.length - 1]
+    const gap = (sorted[i].desde.getTime() - cur.hasta.getTime()) / 86400000
+    if (gap <= 3) cur.hasta = new Date(Math.max(cur.hasta.getTime(), sorted[i].hasta.getTime()))
+    else merged.push({ desde: sorted[i].desde, hasta: sorted[i].hasta })
+  }
+  return merged
+}
 
 export const listLicencias = async (req: AuthRequest, res: Response) => {
   try {
@@ -108,5 +135,140 @@ export const deleteLicencia = async (req: AuthRequest, res: Response) => {
     return res.json({ message: 'Licencia eliminada' })
   } catch {
     return res.status(500).json({ error: 'Error al eliminar licencia' })
+  }
+}
+
+export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' })
+
+    const wb = XLSX.readFile(req.file.path)
+    fs.unlinkSync(req.file.path)
+
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+    const dataRows = rows.slice(1).filter((r) => r && r.length > 11)
+
+    // Agrupar por DNI+Motivo, excluyendo VACACIONES
+    const byKey = new Map<string, {
+      dni: string
+      nombre: string
+      motivo: string
+      ranges: Array<{ desde: Date; hasta: Date }>
+    }>()
+
+    let totalDias = 0
+
+    for (const row of dataRows) {
+      const motivo = String(row[5] || '').trim().toUpperCase()
+      if (!motivo || motivo === 'VACACIONES') continue
+
+      const dni = String(row[4] || '').trim()
+      if (!dni) continue
+
+      const desde = parseWfDate(row[10])
+      const hasta = parseWfDate(row[11])
+      if (!desde || !hasta) continue
+
+      totalDias++
+      const key = `${dni}__${motivo}`
+      if (!byKey.has(key)) {
+        byKey.set(key, { dni, nombre: String(row[3] || '').trim(), motivo, ranges: [] })
+      }
+      byKey.get(key)!.ranges.push({ desde, hasta })
+    }
+
+    const importacion = await prisma.licenciaImportacion.create({
+      data: {
+        archivo_nombre: req.file.originalname,
+        importado_por: req.user!.userId,
+        total_dias: totalDias,
+        total_periodos: 0,
+        agentes_encontrados: 0,
+        agentes_no_encontrados: 0,
+      },
+    })
+
+    let totalPeriodos = 0
+    let encontrados = 0
+    let noEncontrados = 0
+    let saltados14 = 0
+
+    for (const info of byKey.values()) {
+      const merged = mergeRanges(info.ranges)
+      const agente = await prisma.agente.findFirst({ where: { dni: info.dni } })
+
+      for (const { desde, hasta } of merged) {
+        const dias = Math.round((hasta.getTime() - desde.getTime()) / 86400000) + 1
+        if (dias <= 14) { saltados14++; continue }
+
+        if (!agente) { noEncontrados++; continue }
+
+        encontrados++
+        await prisma.licencia.create({
+          data: {
+            agente_id: agente.id,
+            fecha_desde: desde,
+            fecha_hasta: hasta,
+            motivo: info.motivo,
+            importacion_id: importacion.id,
+            creado_por: req.user!.userId,
+          },
+        })
+        totalPeriodos++
+      }
+    }
+
+    await prisma.licenciaImportacion.update({
+      where: { id: importacion.id },
+      data: { total_periodos: totalPeriodos, agentes_encontrados: encontrados, agentes_no_encontrados: noEncontrados },
+    })
+
+    await createAuditLog({
+      usuario_id: req.user!.userId,
+      accion: 'IMPORTAR_LICENCIAS_WF',
+      entidad: 'LicenciaImportacion',
+      entidad_id: String(importacion.id),
+      valor_nuevo: `${totalPeriodos} licencias, ${saltados14} saltadas (<14 días), ${noEncontrados} sin match`,
+    })
+
+    return res.json({
+      ok: true,
+      total_dias: totalDias,
+      total_periodos: totalPeriodos,
+      agentes_encontrados: encontrados,
+      agentes_no_encontrados: noEncontrados,
+      saltados_menos_14: saltados14,
+      importacion_id: importacion.id,
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al importar licencias' })
+  }
+}
+
+export const listImportacionesLicencias = async (req: AuthRequest, res: Response) => {
+  try {
+    const importaciones = await prisma.licenciaImportacion.findMany({
+      include: {
+        importador: { select: { id: true, nombre: true } },
+        _count: { select: { licencias: true } },
+      },
+      orderBy: { fecha_importacion: 'desc' },
+    })
+    return res.json(importaciones)
+  } catch {
+    return res.status(500).json({ error: 'Error al listar importaciones' })
+  }
+}
+
+export const deleteImportacionLicencias = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    await prisma.licencia.deleteMany({ where: { importacion_id: id } })
+    await prisma.licenciaImportacion.delete({ where: { id } })
+    return res.json({ ok: true })
+  } catch {
+    return res.status(500).json({ error: 'Error al eliminar importación' })
   }
 }

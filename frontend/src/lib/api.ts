@@ -1,7 +1,7 @@
 import api from './axios'
 import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
-  AgenteNominaMensual, Licencia, CambioServicioTemporal, ImportacionNomina,
+  AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
   Vacacion, VacacionImportacion,
 } from '../types'
@@ -80,6 +80,14 @@ export const licenciasApi = {
   create: (data: Partial<Licencia>) => api.post<Licencia>('/licencias', data),
   update: (id: number, data: Partial<Licencia>) => api.put<Licencia>(`/licencias/${id}`, data),
   delete: (id: number) => api.delete(`/licencias/${id}`),
+  importWF: (formData: FormData) =>
+    api.post<{ ok: boolean; total_dias: number; total_periodos: number; agentes_encontrados: number; agentes_no_encontrados: number; saltados_menos_14: number }>(
+      '/licencias/import-wf',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ),
+  importaciones: () => api.get<LicenciaImportacion[]>('/licencias/importaciones'),
+  deleteImportacion: (id: number) => api.delete(`/licencias/importaciones/${id}`),
 }
 
 // Cambios temporales

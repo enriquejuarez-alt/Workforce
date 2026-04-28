@@ -112,6 +112,19 @@ export interface AgenteNominaMensual {
   observaciones: string | null
 }
 
+export interface LicenciaImportacion {
+  id: number
+  archivo_nombre: string
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  total_dias: number
+  total_periodos: number
+  agentes_encontrados: number
+  agentes_no_encontrados: number
+  _count?: { licencias: number }
+}
+
 export interface Licencia {
   id: number
   agente_id: number
@@ -121,6 +134,8 @@ export interface Licencia {
   motivo: string | null
   observacion: string | null
   creado_por: number
+  importacion_id: number | null
+  importacion?: Pick<LicenciaImportacion, 'id' | 'archivo_nombre' | 'fecha_importacion'>
   creador?: Pick<Usuario, 'id' | 'nombre' | 'email'>
   fecha_creacion: string
   estado_calculado?: EstadoLicencia

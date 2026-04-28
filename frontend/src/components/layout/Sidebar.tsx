@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
+  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -104,6 +104,23 @@ export default function Sidebar() {
             ))}
           </div>
         )}
+
+        <div className="mt-4">
+          <p className="section-title text-white/30 px-3 mb-2">Walt</p>
+          <NavLink
+            to="/planificacion"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 group ${
+                isActive
+                  ? 'bg-konecta text-white'
+                  : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
+              }`
+            }
+          >
+            <BarChart3 size={16} className="shrink-0" />
+            <span className="flex-1">Planificación</span>
+          </NavLink>
+        </div>
       </nav>
 
       {/* User footer */}

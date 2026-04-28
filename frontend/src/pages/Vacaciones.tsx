@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Trash2, Search, Calendar, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Upload, Trash2, Search, Calendar, X } from 'lucide-react'
 import { format, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -31,8 +31,8 @@ export default function Vacaciones() {
   const [search, setSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('')
   const [showImport, setShowImport] = useState(false)
-  const [showImportaciones, setShowImportaciones] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleteImportId, setDeleteImportId] = useState<number | null>(null)
 
   const { data: vacaciones = [], isLoading } = useQuery({
     queryKey: ['vacaciones', search, estadoFilter],
@@ -41,6 +41,12 @@ export default function Vacaciones() {
         search: search || undefined,
         estado: estadoFilter || undefined,
       }).then((r) => r.data),
+  })
+
+  const { data: importaciones = [] } = useQuery({
+    queryKey: ['vacaciones-importaciones'],
+    queryFn: () => vacacionesApi.importaciones().then((r) => r.data),
+    enabled: isAdmin,
   })
 
   const deleteMutation = useMutation({
@@ -53,6 +59,17 @@ export default function Vacaciones() {
     onError: () => toast.error('Error al eliminar'),
   })
 
+  const deleteImportMutation = useMutation({
+    mutationFn: (id: number) => vacacionesApi.deleteImportacion(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vacaciones'] })
+      qc.invalidateQueries({ queryKey: ['vacaciones-importaciones'] })
+      toast.success('Archivo eliminado')
+      setDeleteImportId(null)
+    },
+    onError: () => toast.error('Error al eliminar'),
+  })
+
   if (isLoading) return <PageLoading />
 
   return (
@@ -61,22 +78,41 @@ export default function Vacaciones() {
         title="Vacaciones"
         subtitle={`${vacaciones.length} períodos registrados`}
         actions={
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <button className="btn-secondary text-xs" onClick={() => setShowImportaciones(true)}>
-                Historial de importaciones
-              </button>
-            )}
-            {isAdmin && (
-              <button className="btn-primary" onClick={() => setShowImport(true)}>
-                <Upload size={14} /> Importar archivo WF
-              </button>
-            )}
-          </div>
+          isAdmin && (
+            <button className="btn-primary" onClick={() => setShowImport(true)}>
+              <Upload size={14} /> Importar archivo WF
+            </button>
+          )
         }
       />
 
       <div className="flex-1 overflow-y-auto p-6">
+
+        {/* Archivos importados */}
+        {isAdmin && importaciones.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Archivos importados</p>
+            <div className="flex flex-wrap gap-2">
+              {importaciones.map((imp) => (
+                <div key={imp.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow-sm">
+                  <Calendar size={13} className="text-gray-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-700 truncate max-w-[200px]">{imp.archivo_nombre}</p>
+                    <p className="text-gray-400">{format(new Date(imp.fecha_importacion), 'dd/MM/yyyy HH:mm', { locale: es })} · {imp.total_periodos} períodos</p>
+                  </div>
+                  <button
+                    className="ml-1 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Eliminar archivo"
+                    onClick={() => setDeleteImportId(imp.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Filtros */}
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <div className="relative">
@@ -200,12 +236,9 @@ export default function Vacaciones() {
           onSaved={() => {
             setShowImport(false)
             qc.invalidateQueries({ queryKey: ['vacaciones'] })
+            qc.invalidateQueries({ queryKey: ['vacaciones-importaciones'] })
           }}
         />
-      )}
-
-      {showImportaciones && (
-        <ImportacionesModal onClose={() => setShowImportaciones(false)} />
       )}
 
       <ConfirmDialog
@@ -217,6 +250,17 @@ export default function Vacaciones() {
         confirmLabel="Eliminar"
         variant="danger"
         loading={deleteMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteImportId}
+        onClose={() => setDeleteImportId(null)}
+        onConfirm={() => deleteImportId && deleteImportMutation.mutate(deleteImportId)}
+        title="Eliminar archivo importado"
+        message="Esto eliminará todos los períodos de vacaciones de este archivo. ¿Continuar?"
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteImportMutation.isPending}
       />
     </div>
   )
@@ -335,97 +379,3 @@ function ImportModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   )
 }
 
-function ImportacionesModal({ onClose }: { onClose: () => void }) {
-  const qc = useQueryClient()
-  const [deleteId, setDeleteId] = useState<number | null>(null)
-  const [expanded, setExpanded] = useState<number | null>(null)
-
-  const { data: importaciones = [], isLoading } = useQuery({
-    queryKey: ['vacaciones-importaciones'],
-    queryFn: () => vacacionesApi.importaciones().then((r) => r.data),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => vacacionesApi.deleteImportacion(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['vacaciones-importaciones'] })
-      qc.invalidateQueries({ queryKey: ['vacaciones'] })
-      toast.success('Importación eliminada')
-      setDeleteId(null)
-    },
-    onError: () => toast.error('Error al eliminar'),
-  })
-
-  return (
-    <>
-      <Modal isOpen title="Historial de importaciones" onClose={onClose} size="lg"
-        footer={<button className="btn-secondary" onClick={onClose}>Cerrar</button>}
-      >
-        {isLoading ? (
-          <p className="text-sm text-gray-500 text-center py-4">Cargando...</p>
-        ) : importaciones.length === 0 ? (
-          <EmptyState icon={Calendar} title="Sin importaciones" description="Todavía no se importó ningún archivo WF." />
-        ) : (
-          <div className="space-y-2">
-            {importaciones.map((imp) => (
-              <div key={imp.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                <div
-                  className="flex items-center gap-3 px-4 py-3 bg-gray-50 cursor-pointer"
-                  onClick={() => setExpanded(expanded === imp.id ? null : imp.id)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{imp.archivo_nombre}</p>
-                    <p className="text-xs text-gray-500">
-                      {format(new Date(imp.fecha_importacion), "dd/MM/yyyy HH:mm", { locale: es })} · por {imp.importador?.nombre}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-gray-500">{imp.total_periodos} períodos</span>
-                    <button
-                      className="btn-ghost py-1 px-2 text-red-500"
-                      onClick={(e) => { e.stopPropagation(); setDeleteId(imp.id) }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                    {expanded === imp.id ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
-                  </div>
-                </div>
-                {expanded === imp.id && (
-                  <div className="px-4 py-3 grid grid-cols-4 gap-3 text-center">
-                    <div>
-                      <p className="text-lg font-bold text-gray-800">{imp.total_dias}</p>
-                      <p className="text-xs text-gray-500">Días procesados</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-gray-800">{imp.total_periodos}</p>
-                      <p className="text-xs text-gray-500">Períodos</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-green-600">{imp.agentes_encontrados}</p>
-                      <p className="text-xs text-gray-500">En el sistema</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-yellow-600">{imp.agentes_no_encontrados}</p>
-                      <p className="text-xs text-gray-500">Sin match</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
-
-      <ConfirmDialog
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        title="Eliminar importación"
-        message="Esto eliminará todos los períodos de vacaciones de esta importación. ¿Continuar?"
-        confirmLabel="Eliminar"
-        variant="danger"
-        loading={deleteMutation.isPending}
-      />
-    </>
-  )
-}

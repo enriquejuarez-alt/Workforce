@@ -1,181 +1,292 @@
-import { useState, useRef } from 'react'
-import { LifeBuoy, X, Send, Paperclip, CheckCircle, ChevronDown } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { X, Send, ChevronDown, CheckCircle, ChevronRight, MessageCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { soporteApi } from '../../lib/api'
 
-const CATEGORIAS = ['Bug / Error', 'Problema de acceso', 'Dato incorrecto', 'Consulta', 'Otro']
+type Message = { from: 'bot' | 'user'; text: string; time: string }
+
+const QUICK_ACTIONS = [
+  { label: 'No puedo ingresar al sistema', asunto: 'No puedo ingresar al sistema', categoria: 'Problema de acceso' },
+  { label: 'Error de contraseña', asunto: 'Error con mi contraseña', categoria: 'Credenciales' },
+  { label: 'Dato incorrecto en nómina', asunto: 'Dato incorrecto en la nómina', categoria: 'Dato incorrecto' },
+  { label: 'Problema con mi usuario', asunto: 'Problema con mi usuario', categoria: 'Problema de acceso' },
+  { label: 'Otra consulta', asunto: 'Consulta o reclamo', categoria: 'Consulta' },
+]
+
+function nowTime() {
+  return new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+}
+
+const INITIAL_MESSAGES: Message[] = [
+  { from: 'bot', text: 'Hola, soy tu asistente virtual 👋', time: nowTime() },
+  { from: 'bot', text: 'Te ayudo con tu reclamo por error de acceso u otro problema del sistema.', time: nowTime() },
+]
 
 export default function SoporteWidget() {
   const [open, setOpen] = useState(false)
-  const [asunto, setAsunto] = useState('')
-  const [descripcion, setDescripcion] = useState('')
-  const [categoria, setCategoria] = useState('')
-  const [archivo, setArchivo] = useState<File | null>(null)
+  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
+  const [selectedAction, setSelectedAction] = useState<typeof QUICK_ACTIONS[0] | null>(null)
+  const [inputText, setInputText] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [enviado, setEnviado] = useState(false)
+  const [archivo, setArchivo] = useState<File | null>(null)
+  const [done, setDone] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    if (selectedAction && open) {
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [selectedAction, open])
+
+  const addMsg = (msg: Omit<Message, 'time'>) =>
+    setMessages((prev) => [...prev, { ...msg, time: nowTime() }])
+
+  const handleSelectAction = (action: typeof QUICK_ACTIONS[0]) => {
+    setSelectedAction(action)
+    addMsg({ from: 'user', text: action.label })
+    setTimeout(() => {
+      addMsg({ from: 'bot', text: 'Contame qué sucede para ayudarte mejor. Podés escribirlo acá abajo 👇' })
+    }, 400)
+  }
+
+  const handleSend = async () => {
+    const texto = inputText.trim()
+    if (!texto) return
+    if (!selectedAction) {
+      toast.error('Primero seleccioná el tipo de problema')
+      return
+    }
+    addMsg({ from: 'user', text: texto })
+    setInputText('')
+    setEnviando(true)
+    try {
+      const form = new FormData()
+      form.append('asunto', selectedAction.asunto)
+      form.append('descripcion', texto)
+      form.append('categoria', selectedAction.categoria)
+      if (archivo) form.append('captura', archivo)
+      await soporteApi.enviarReporte(form)
+      setDone(true)
+      setTimeout(() => {
+        addMsg({ from: 'bot', text: '✅ Tu reporte fue enviado. El equipo lo revisará a la brevedad. ¡Gracias!' })
+      }, 300)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Error al enviar el reporte')
+      addMsg({ from: 'bot', text: '❌ Hubo un error al enviar el reporte. Intentá de nuevo.' })
+    } finally {
+      setEnviando(false)
+      setArchivo(null)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
     if (f.size > 5 * 1024 * 1024) { toast.error('Máx. 5 MB'); return }
     setArchivo(f)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!asunto.trim() || !descripcion.trim()) {
-      toast.error('Completá el asunto y la descripción')
-      return
-    }
-    setEnviando(true)
-    try {
-      const form = new FormData()
-      form.append('asunto', asunto.trim())
-      form.append('descripcion', descripcion.trim())
-      if (categoria) form.append('categoria', categoria)
-      if (archivo) form.append('captura', archivo)
-      await soporteApi.enviarReporte(form)
-      setEnviado(true)
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Error al enviar el reporte')
-    } finally {
-      setEnviando(false)
-    }
+    addMsg({ from: 'user', text: `📎 Adjunté: ${f.name}` })
   }
 
   const handleClose = () => {
     setOpen(false)
     setTimeout(() => {
-      setAsunto(''); setDescripcion(''); setCategoria('')
-      setArchivo(null); setEnviado(false)
+      setMessages(INITIAL_MESSAGES)
+      setSelectedAction(null)
+      setInputText('')
+      setArchivo(null)
+      setDone(false)
       if (fileRef.current) fileRef.current.value = ''
     }, 300)
   }
 
+  const handleNewReport = () => {
+    setMessages(INITIAL_MESSAGES)
+    setSelectedAction(null)
+    setInputText('')
+    setArchivo(null)
+    setDone(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const showActions = !selectedAction && !done
+
   return (
     <>
-      {/* Panel flotante */}
+      {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-24 right-6 z-50 w-[360px] max-h-[580px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
+          style={{ animation: 'slideUp 0.2s ease-out' }}>
+
           {/* Header */}
-          <div className="bg-konecta px-4 py-3 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <LifeBuoy size={18} className="text-white" />
-              <div>
-                <p className="text-white font-bold text-sm">Soporte</p>
-                <p className="text-white/70 text-xs">Reportá un problema al equipo</p>
+          <div className="flex items-center gap-3 px-4 py-3 shrink-0"
+            style={{ background: 'linear-gradient(135deg, #001540 0%, #0054A6 100%)' }}>
+            {/* Bot avatar */}
+            <div className="relative shrink-0">
+              <div className="w-10 h-10 rounded-full bg-white/15 border-2 border-white/25 flex items-center justify-center">
+                <span className="text-xl leading-none">🤖</span>
               </div>
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
             </div>
-            <button onClick={handleClose} className="text-white/70 hover:text-white p-1 rounded transition-colors">
-              <X size={16} />
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold text-sm leading-tight">Asistente Virtual</p>
+              <p className="text-white/60 text-xs">● En línea · Soporte al sistema</p>
+            </div>
+            <button onClick={handleClose} className="text-white/50 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10">
+              <X size={15} />
             </button>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {enviado ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle size={28} className="text-green-600" />
+          {/* Messages area */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50/60" style={{ minHeight: 0 }}>
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.from === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
+                {msg.from === 'bot' && (
+                  <div className="w-6 h-6 rounded-full bg-konecta/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-sm">🤖</span>
+                  </div>
+                )}
+                <div className={`max-w-[78%] ${msg.from === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
+                  <div className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
+                    msg.from === 'bot'
+                      ? 'bg-white text-gray-800 rounded-tl-sm shadow-sm border border-gray-100'
+                      : 'bg-konecta text-white rounded-tr-sm'
+                  }`}>
+                    {msg.text}
+                  </div>
+                  <span className="text-[10px] text-gray-400 px-1">{msg.time}</span>
                 </div>
-                <div>
-                  <p className="font-bold text-gray-800">Reporte enviado</p>
-                  <p className="text-xs text-gray-500 mt-1">El equipo lo revisará a la brevedad.</p>
-                </div>
-                <button
-                  className="btn-primary text-xs mt-2"
-                  onClick={() => {
-                    setAsunto(''); setDescripcion(''); setCategoria('')
-                    setArchivo(null); setEnviado(false)
-                    if (fileRef.current) fileRef.current.value = ''
-                  }}
-                >
-                  Enviar otro reporte
+              </div>
+            ))}
+
+            {/* Quick action buttons */}
+            {showActions && (
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[11px] text-gray-400 font-medium px-1 mb-2">Describí tu problema</p>
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    onClick={() => handleSelectAction(action)}
+                    className="w-full flex items-center justify-between gap-2 bg-white hover:bg-konecta/5 border border-gray-200 hover:border-konecta/30 rounded-xl px-3 py-2.5 text-left transition-all group"
+                  >
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-konecta">
+                      {action.label}
+                    </span>
+                    <ChevronRight size={14} className="text-gray-300 group-hover:text-konecta shrink-0 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* New report button after done */}
+            {done && (
+              <div className="flex justify-center pt-2">
+                <button onClick={handleNewReport} className="text-xs text-konecta hover:underline font-medium">
+                  + Reportar otro problema
                 </button>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div>
-                  <label className="label-base text-xs">Categoría</label>
-                  <select className="input-base text-xs" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                    <option value="">Sin categoría</option>
-                    {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="label-base text-xs">Asunto <span className="text-red-500">*</span></label>
-                  <input
-                    className="input-base text-xs"
-                    placeholder="Describí brevemente el problema..."
-                    value={asunto}
-                    onChange={(e) => setAsunto(e.target.value)}
-                    maxLength={150}
-                  />
-                </div>
-
-                <div>
-                  <label className="label-base text-xs">Descripción <span className="text-red-500">*</span></label>
-                  <textarea
-                    className="input-base text-xs min-h-[90px] resize-none"
-                    placeholder="¿Qué pasó? ¿Qué estabas haciendo?"
-                    value={descripcion}
-                    onChange={(e) => setDescripcion(e.target.value)}
-                    maxLength={2000}
-                  />
-                </div>
-
-                {/* Adjunto */}
-                <div>
-                  <label className="label-base text-xs">Captura (opcional)</label>
-                  <div
-                    className="border border-dashed border-gray-300 rounded-lg p-3 text-center cursor-pointer hover:border-konecta/50 transition-colors"
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    {archivo ? (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-600 truncate max-w-[200px] flex items-center gap-1">
-                          <Paperclip size={11} className="text-konecta shrink-0" /> {archivo.name}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-gray-400 hover:text-red-500 p-1"
-                          onClick={(e) => { e.stopPropagation(); setArchivo(null); if (fileRef.current) fileRef.current.value = '' }}
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 flex items-center justify-center gap-1">
-                        <Paperclip size={12} /> Adjuntar imagen o PDF
-                      </p>
-                    )}
-                  </div>
-                  <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf" className="hidden" onChange={handleFile} />
-                </div>
-
-                <button type="submit" className="btn-primary w-full text-xs" disabled={enviando}>
-                  <Send size={12} />
-                  {enviando ? 'Enviando...' : 'Enviar reporte'}
-                </button>
-              </form>
             )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input area */}
+          {selectedAction && !done && (
+            <div className="border-t border-gray-100 bg-white shrink-0">
+              {archivo && (
+                <div className="flex items-center gap-2 px-4 pt-2">
+                  <span className="text-xs text-konecta bg-konecta/10 px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                    📎 {archivo.name}
+                  </span>
+                  <button
+                    className="text-gray-400 hover:text-red-500"
+                    onClick={() => { setArchivo(null); if (fileRef.current) fileRef.current.value = '' }}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-end gap-2 px-3 py-2.5">
+                <button
+                  type="button"
+                  title="Adjuntar captura"
+                  className="text-gray-300 hover:text-konecta transition-colors mb-1 shrink-0"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                </button>
+                <textarea
+                  ref={inputRef}
+                  className="flex-1 resize-none text-sm text-gray-800 placeholder:text-gray-400 border-0 focus:outline-none bg-transparent min-h-[36px] max-h-[100px] leading-relaxed"
+                  placeholder="Escribí tu mensaje..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={enviando || !inputText.trim()}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 mb-0.5 disabled:opacity-40"
+                  style={{ background: inputText.trim() ? '#0054A6' : '#E5E7EB' }}
+                  title="Enviar"
+                >
+                  {enviando
+                    ? <div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                    : <Send size={15} className={inputText.trim() ? 'text-white' : 'text-gray-400'} />
+                  }
+                </button>
+              </div>
+              <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf" className="hidden" onChange={handleFile} />
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="bg-gray-50 border-t border-gray-100 px-4 py-2 flex items-center justify-center gap-1.5 shrink-0">
+            <CheckCircle size={12} className="text-green-500" />
+            <p className="text-[11px] text-gray-400">Estamos para ayudarte · Tu tranquilidad es nuestra prioridad</p>
           </div>
         </div>
       )}
 
-      {/* Botón flotante */}
+      {/* Floating button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-konecta shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-150 flex items-center justify-center"
-        title="Soporte"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-150 flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #001540 0%, #0054A6 100%)' }}
+        title="Asistente Virtual"
       >
         {open
           ? <ChevronDown size={22} className="text-white" />
-          : <LifeBuoy size={22} className="text-white" />
+          : <MessageCircle size={22} className="text-white" />
         }
+        {/* Pulse ring when closed */}
+        {!open && (
+          <span className="absolute inset-0 rounded-full bg-konecta opacity-30 animate-ping" />
+        )}
       </button>
+
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(16px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)    scale(1); }
+        }
+      `}</style>
     </>
   )
 }

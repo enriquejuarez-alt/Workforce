@@ -186,7 +186,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       }
     }
     if (horarios) where.horarios = { contains: horarios as string, mode: 'insensitive' }
-    if (estado) where.estado = { equals: estado as string, mode: 'insensitive' }
+    // NOTE: 'estado' filter is applied in post-processing (after computing LICENCIA/LP override)
     if (contrato) where.contrato = { equals: contrato as string, mode: 'insensitive' }
     if (sitio) where.sitio = { equals: sitio as string, mode: 'insensitive' }
     if (modalidad) where.modalidad = { equals: modalidad as string, mode: 'insensitive' }
@@ -249,6 +249,10 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       }
     })
 
+    if (estado) {
+      const estadoBuscar = (estado as string).toLowerCase().trim()
+      result = result.filter((a) => (a.estado || '').toLowerCase() === estadoBuscar)
+    }
     if (con_licencia === 'true') {
       result = result.filter((a) => a.agente.licencias.length > 0)
     }

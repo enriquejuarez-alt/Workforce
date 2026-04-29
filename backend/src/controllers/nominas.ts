@@ -201,36 +201,47 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     })
 
     const agenteIds = snapshots.map((a) => a.agente_id)
-    const now = new Date()
 
-    const [licenciasVigentes, cambiosActivos] = await Promise.all([
+    // Usar el período de la nómina para cruzar licencias y cambios,
+    // no la fecha de hoy — así las licencias históricas también aparecen
+    const inicioPeriodo = new Date(Date.UTC(nomina.anio, nomina.mes - 1, 1))
+    const finPeriodo = new Date(Date.UTC(nomina.anio, nomina.mes, 0, 23, 59, 59))
+
+    const [licenciasEnPeriodo, cambiosEnPeriodo] = await Promise.all([
       prisma.licencia.findMany({
-        where: { agente_id: { in: agenteIds }, fecha_hasta: { gte: now } },
+        where: {
+          agente_id: { in: agenteIds },
+          fecha_desde: { lte: finPeriodo },
+          fecha_hasta: { gte: inicioPeriodo },
+        },
         orderBy: { fecha_desde: 'asc' },
         select: { agente_id: true, id: true, fecha_desde: true, fecha_hasta: true, motivo: true },
       }),
       prisma.cambioServicioTemporal.findMany({
-        where: { agente_id: { in: agenteIds }, fecha_desde: { lte: now }, fecha_hasta: { gte: now } },
+        where: {
+          agente_id: { in: agenteIds },
+          fecha_desde: { lte: finPeriodo },
+          fecha_hasta: { gte: inicioPeriodo },
+        },
         include: { servicio_temporal: { select: { id: true, nombre: true } } },
       }),
     ])
 
-    const licenciaMap = new Map<number, (typeof licenciasVigentes)[0]>()
-    for (const l of licenciasVigentes) {
+    const licenciaMap = new Map<number, (typeof licenciasEnPeriodo)[0]>()
+    for (const l of licenciasEnPeriodo) {
       if (!licenciaMap.has(l.agente_id)) licenciaMap.set(l.agente_id, l)
     }
-    const cambioMap = new Map<number, (typeof cambiosActivos)[0]>()
-    for (const c of cambiosActivos) {
+    const cambioMap = new Map<number, (typeof cambiosEnPeriodo)[0]>()
+    for (const c of cambiosEnPeriodo) {
       if (!cambioMap.has(c.agente_id)) cambioMap.set(c.agente_id, c)
     }
 
     let result: any[] = snapshots.map((a) => {
       const licencia = licenciaMap.get(a.agente_id)
       const cambio = cambioMap.get(a.agente_id)
-      const licenciaVigenteHoy = licencia && licencia.fecha_desde <= now
       return {
         ...a,
-        estado: licenciaVigenteHoy || a.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : a.estado,
+        estado: licencia || a.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : a.estado,
         agente: {
           licencias: licencia ? [licencia] : [],
           cambios_temporales: cambio ? [cambio] : [],

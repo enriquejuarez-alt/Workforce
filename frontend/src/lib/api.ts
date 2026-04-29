@@ -166,6 +166,16 @@ export const exportApi = {
     api.get(`/export/nomina/${nominaId}`, { responseType: 'blob' }),
 }
 
+// Soporte
+export const soporteApi = {
+  enviarReporte: (formData: FormData) =>
+    api.post<{ ok: boolean; message: string }>(
+      '/soporte/reporte',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ),
+}
+
 // Vacaciones WF
 export const vacacionesApi = {
   list: (params?: Record<string, any>) => api.get<Vacacion[]>('/vacaciones', { params }),

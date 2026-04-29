@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authenticate, requireAdmin } from '../middleware/auth'
-import { uploadExcel } from '../middleware/upload'
+import { uploadExcel, uploadImagen } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission } from '../controllers/users'
@@ -18,6 +18,7 @@ import { listCambiosContrato, createCambioContrato, updateCambioContrato, delete
 import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
+import { enviarReporte } from '../controllers/soporte'
 
 const router = Router()
 
@@ -101,6 +102,8 @@ router.get('/remociones', authenticate, listRemociones)
 router.post('/remociones', authenticate, createRemocion)
 router.put('/remociones/:id', authenticate, updateRemocion)
 router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
+
+router.post('/soporte/reporte', authenticate, uploadImagen.single('captura'), enviarReporte)
 
 router.post('/vacaciones/import', authenticate, requireAdmin, uploadExcel.single('file'), importVacaciones)
 router.get('/vacaciones', authenticate, listVacaciones)

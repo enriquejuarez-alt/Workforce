@@ -30,3 +30,19 @@ export const uploadExcel = multer({
   fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 },
 })
+
+const imageFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf']
+  const ext = path.extname(file.originalname).toLowerCase()
+  if (allowed.includes(ext)) {
+    cb(null, true)
+  } else {
+    cb(new Error('Solo se permiten imágenes o PDF'))
+  }
+}
+
+export const uploadImagen = multer({
+  storage,
+  fileFilter: imageFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+})

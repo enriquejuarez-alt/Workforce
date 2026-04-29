@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3,
+  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3, LifeBuoy,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { to: '/remociones', icon: UserX, label: 'Remociones' },
   { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
+  { to: '/soporte', icon: LifeBuoy, label: 'Soporte' },
 ]
 
 const ADMIN_ITEMS = [

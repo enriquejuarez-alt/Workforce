@@ -40,7 +40,7 @@ function startOfToday(): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
-async function syncAgenteActivo(agenteId: number) {
+export async function syncAgenteActivo(agenteId: number) {
   const hoy = startOfToday()
   const vigente = await prisma.licencia.findFirst({
     where: { agente_id: agenteId, fecha_desde: { lte: hoy }, fecha_hasta: { gte: hoy } },

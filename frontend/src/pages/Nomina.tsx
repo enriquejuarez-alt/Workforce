@@ -174,9 +174,20 @@ export default function Nomina() {
         const licencia = row.original.agente?.licencias?.[0]
         const cambio = row.original.agente?.cambios_temporales?.[0]
         const noPresente = !row.original.presente_en_nomina
+        const now = new Date()
+        const tipoLicencia = licencia
+          ? new Date(licencia.fecha_desde) > now ? 'PROGRAMADA' as const
+            : new Date(licencia.fecha_hasta) < now ? 'FINALIZADA' as const
+            : 'VIGENTE' as const
+          : null
         return (
-          <div className="flex flex-wrap gap-1">
-            {licencia && <LicenciaBadge tipo="VIGENTE" />}
+          <div className="flex flex-col gap-1">
+            {licencia && tipoLicencia && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <LicenciaBadge tipo={tipoLicencia} />
+                <span className="text-xs text-gray-400">hasta {format(new Date(licencia.fecha_hasta), 'dd/MM/yy')}</span>
+              </div>
+            )}
             {cambio && <CambioTemporalBadge servicio={cambio.servicio_temporal?.nombre} />}
             {noPresente && <span className="text-xs text-red-500 font-medium">No presente</span>}
           </div>

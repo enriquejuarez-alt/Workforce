@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import routes from './routes'
+import { initLicenciasVencimientoJob } from './jobs/licenciasVencimiento'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -34,6 +35,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`)
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
+  initLicenciasVencimientoJob()
 })
 
 export default app

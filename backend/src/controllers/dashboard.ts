@@ -39,6 +39,7 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       totalUsuarios,
       ultimaCarga,
       estadoBreakdown,
+      agentesConLicenciaEnNomina,
     ] = await Promise.all([
       prisma.agente.count({ where: agenteWhere }),
       prisma.agente.count({ where: { ...agenteWhere, activo: false } }),
@@ -96,6 +97,17 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         },
         _count: { estado: true },
       }),
+      prisma.agenteNominaMensual.count({
+        where: {
+          nomina_mensual: nominaWhere,
+          presente_en_nomina: true,
+          agente: {
+            licencias: {
+              some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } },
+            },
+          },
+        },
+      }),
     ])
 
     const porServicio = await prisma.servicio.findMany({
@@ -114,15 +126,31 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         .filter((e) => e.estado && keywords.some((k) => e.estado!.toLowerCase().includes(k)))
         .reduce((sum, e) => sum + e._count.estado, 0)
 
-    const agentesActivos = countByEstado(['activo', 'activa'])
-    const agentesLP = countByEstado(['lp', 'licencia prolongada'])
+    const agentesActivosRaw = countByEstado(['activo', 'activa'])
+    const agentesActivos = Math.max(0, agentesActivosRaw - agentesConLicenciaEnNomina)
+
+    // Ajustar el breakdown: restar licencias de ACTIVO y agregar grupo LICENCIA
+    const breakdownAjustado = estadoBreakdown
+      .map((e) => {
+        const cantidad = e._count.estado
+        const esActivo = e.estado && ['activo', 'activa'].some((k) => e.estado!.toLowerCase().includes(k))
+        return {
+          estado: e.estado,
+          cantidad: esActivo ? Math.max(0, cantidad - agentesConLicenciaEnNomina) : cantidad,
+        }
+      })
+      .filter((e) => e.cantidad > 0)
+
+    if (agentesConLicenciaEnNomina > 0) {
+      breakdownAjustado.push({ estado: 'LICENCIA', cantidad: agentesConLicenciaEnNomina })
+    }
 
     return res.json({
       total_agentes: totalAgentes,
       agentes_activos: agentesActivos,
-      agentes_lp: agentesLP,
+      agentes_lp: agentesConLicenciaEnNomina,
       agentes_inactivos: agentesInactivos,
-      estado_breakdown: estadoBreakdown.map((e) => ({ estado: e.estado, cantidad: e._count.estado })),
+      estado_breakdown: breakdownAjustado,
       licencias_vigentes: licenciasVigentes,
       licencias_programadas: licenciasProgramadas,
       cambios_activos: cambiosActivos,

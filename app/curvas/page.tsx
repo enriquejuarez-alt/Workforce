@@ -33,15 +33,15 @@ export default function CurvasPage() {
   const matriz = matrices.get(servicioActivo);
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto">
+    <div className="px-6 py-6 max-w-7xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-zinc-100 mb-1">Curvas</h2>
-          <p className="text-sm text-zinc-500">
+          <h2 className="text-xl font-bold text-gray-900 mb-0.5">Curvas</h2>
+          <p className="text-sm text-gray-500">
             Personas requeridas vs. disponibles por franja y por período
           </p>
         </div>
@@ -61,29 +61,33 @@ export default function CurvasPage() {
           {SERVICIOS_KEYS.map((k) => (
             <TabsContent key={k} value={k}>
               {resultadoServicio && matriz ? (
-                <div className="space-y-6">
-                  {/* KPIs */}
+                <div className="space-y-5">
+                  {/* KPIs mini */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 text-center">
-                      <p className="text-xs text-zinc-500">Personas activas</p>
-                      <p className="text-xl font-bold text-zinc-100">
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-center">
+                      <p className="text-xs text-gray-500 mb-1">Personas activas</p>
+                      <p className="text-2xl font-bold text-gray-900 tabular-nums">
                         {resultadoServicio.hcActivos}
                       </p>
                     </div>
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 text-center">
-                      <p className="text-xs text-zinc-500">Cumplimiento</p>
-                      <p className="text-xl font-bold text-emerald-400">
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 text-center">
+                      <p className="text-xs text-gray-500 mb-1">Cumplimiento</p>
+                      <p className={cn(
+                        "text-2xl font-bold tabular-nums",
+                        resultadoServicio.cumplimiento >= 100 ? "text-emerald-600" :
+                        resultadoServicio.cumplimiento >= 90 ? "text-amber-600" : "text-red-600"
+                      )}>
                         {resultadoServicio.cumplimiento.toFixed(1)}%
                       </p>
                     </div>
                   </div>
 
                   {/* Curva por franja */}
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-                    <h3 className="text-sm font-semibold text-zinc-300 mb-1">
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-5">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-1">
                       Curva por franja horaria
                     </h3>
-                    <p className="text-xs text-zinc-600 mb-4">
+                    <p className="text-xs text-gray-400 mb-4">
                       Distribución uniforme por turno (aproximación)
                     </p>
                     <CurvaFranjaChart
@@ -92,14 +96,14 @@ export default function CurvasPage() {
                     />
                   </div>
 
-                  {/* Curva temporal con toggle */}
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+                  {/* Curva temporal */}
+                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-5">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-sm font-semibold text-zinc-300">
+                        <h3 className="text-sm font-semibold text-gray-700">
                           Curva temporal
                         </h3>
-                        <p className="text-xs text-zinc-600 mt-0.5">
+                        <p className="text-xs text-gray-400 mt-0.5">
                           {granularity === "dias" && "Vista día a día — puntos amarillos = feriados"}
                           {granularity === "semanas" && "Horas agrupadas por semana calendario"}
                           {granularity === "mes" && "Totales del mes completo"}
@@ -107,7 +111,7 @@ export default function CurvasPage() {
                       </div>
 
                       {/* Toggle granularidad */}
-                      <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+                      <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1">
                         {GRANULARIDADES.map(({ key, label }) => (
                           <button
                             key={key}
@@ -115,8 +119,8 @@ export default function CurvasPage() {
                             className={cn(
                               "rounded-md px-3 py-1 text-xs font-medium transition-colors",
                               granularity === key
-                                ? "bg-zinc-700 text-zinc-100"
-                                : "text-zinc-500 hover:text-zinc-300"
+                                ? "bg-white text-gray-900 shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
                             )}
                           >
                             {label}
@@ -134,7 +138,7 @@ export default function CurvasPage() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 text-center text-zinc-500 text-sm">
+                <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-400 text-sm">
                   Sin datos para {k}
                 </div>
               )}

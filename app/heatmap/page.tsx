@@ -25,15 +25,15 @@ export default function HeatmapPage() {
   const coverage = coverages.get(servicioActivo);
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto">
+    <div className="px-6 py-6 max-w-7xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-zinc-100 mb-1">Heatmap de cobertura</h2>
-          <p className="text-sm text-zinc-500">
+          <h2 className="text-xl font-bold text-gray-900 mb-0.5">Heatmap de cobertura</h2>
+          <p className="text-sm text-gray-500">
             Personas disponibles vs. requeridas por franja horaria y día del mes
           </p>
         </div>
@@ -63,7 +63,7 @@ export default function HeatmapPage() {
                   hsSemanalPromedio={resultadoServicio.hsSemanalPromedio}
                 />
               ) : (
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 text-center text-zinc-500 text-sm">
+                <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-400 text-sm">
                   Sin datos para {k}
                 </div>
               )}

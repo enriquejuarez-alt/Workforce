@@ -123,7 +123,6 @@ export default function SimuladorPage() {
 
   if (!resultado) return null;
 
-  // KPIs del escenario simulado
   const totalPersonasBase = resultado.resultados.reduce((a, r) => a + r.hcActivos, 0);
   const totalPersonasSim  = resultadosSimulados.reduce((a, r) => a + r.hcActivos, 0);
   const cumplBase   = resultado.resultados.reduce((a, r) => a + r.hsNetas, 0) / Math.max(resultado.totalHsRequeridas, 1) * 100;
@@ -133,14 +132,13 @@ export default function SimuladorPage() {
   const serviciosEnDeficit = resultadosSimulados.filter((r) => r.deltaHC103 > 0).length;
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto">
+    <div className="px-6 py-6 max-w-7xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-zinc-100 mb-1">Simulador de dotación</h2>
-            <p className="text-sm text-zinc-500">
+            <h2 className="text-xl font-bold text-gray-900 mb-0.5">Simulador de dotación</h2>
+            <p className="text-sm text-gray-500">
               {resultado.mes} · {resultado.diasDelMes} días · Construí un escenario y ve el impacto al instante
             </p>
           </div>
@@ -156,8 +154,8 @@ export default function SimuladorPage() {
           </div>
         </div>
 
-        {/* KPIs resumen del escenario */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        {/* KPIs del escenario */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <KpiScenario
             label="Personas en escenario"
             valor={String(totalPersonasSim)}
@@ -184,7 +182,6 @@ export default function SimuladorPage() {
           />
         </div>
 
-        {/* Tabla con builder integrado */}
         <SimuladorTable
           resultadosBase={resultado.resultados}
           resultadosSimulados={resultadosSimulados}
@@ -197,15 +194,15 @@ export default function SimuladorPage() {
 
 function KpiScenario({ label, valor, sub, trend }: { label: string; valor: string; sub: string; trend: "up" | "down" | "flat" }) {
   const Icon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
-  const color = trend === "up" ? "text-emerald-400" : trend === "down" ? "text-rose-400" : "text-zinc-500";
-  const bar   = trend === "up" ? "bg-emerald-500" : trend === "down" ? "bg-rose-500" : "bg-zinc-700";
+  const color = trend === "up" ? "text-emerald-600" : trend === "down" ? "text-red-600" : "text-gray-400";
+  const bar   = trend === "up" ? "bg-emerald-500" : trend === "down" ? "bg-red-500" : "bg-gray-300";
 
   return (
-    <div className="relative rounded-xl border border-zinc-800 bg-zinc-900 p-4 overflow-hidden">
+    <div className="relative rounded-xl border border-gray-200 bg-white shadow-sm p-4 overflow-hidden">
       <div className={cn("absolute top-0 left-0 right-0 h-0.5", bar)} />
-      <p className="text-xs text-zinc-500 mb-2 uppercase tracking-wider font-medium pt-0.5">{label}</p>
+      <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider font-medium pt-0.5">{label}</p>
       <div className="flex items-end justify-between gap-2">
-        <span className="text-2xl font-bold text-zinc-100 tabular-nums leading-tight">{valor}</span>
+        <span className="text-2xl font-bold text-gray-900 tabular-nums leading-tight">{valor}</span>
         <Icon className={cn("h-4 w-4 mb-0.5 shrink-0", color)} />
       </div>
       <p className={cn("text-xs mt-1.5 tabular-nums", color)}>{sub}</p>

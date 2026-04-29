@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const criticas = alertas.filter((a) => a.severidad === "critical");
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto">
+    <div className="px-6 py-6 max-w-7xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -71,16 +71,16 @@ export default function DashboardPage() {
       >
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-zinc-100 mb-1">Resumen</h2>
-            <p className="text-sm text-zinc-500">
+            <h2 className="text-xl font-bold text-gray-900 mb-0.5">Resumen</h2>
+            <p className="text-sm text-gray-500">
               {resultado.mes} · {resultado.diasDelMes} días
-              {filtrado && <span className="ml-2 text-emerald-500">· Filtrado</span>}
+              {filtrado && <span className="ml-2 text-[#0054A6] font-medium">· Filtrado</span>}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Tope de facturación */}
-            <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5">
-              <span className="text-xs text-zinc-500">Tope</span>
+            <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
+              <span className="text-xs text-gray-500">Tope</span>
               <input
                 type="number"
                 min={100}
@@ -88,12 +88,12 @@ export default function DashboardPage() {
                 step={0.5}
                 value={topeFacturacion}
                 onChange={(e) => setTopeFacturacion(parseFloat(e.target.value) || 103)}
-                className="w-14 bg-transparent text-xs text-zinc-100 tabular-nums text-right focus:outline-none"
+                className="w-14 bg-transparent text-xs text-gray-700 tabular-nums text-right focus:outline-none"
               />
-              <span className="text-xs text-zinc-500">%</span>
+              <span className="text-xs text-gray-500">%</span>
             </div>
             {/* Modo reductor toggle */}
-            <div className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+            <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1">
               {(["multiplicativo", "aditivo"] as const).map((m) => (
                 <button
                   key={m}
@@ -101,8 +101,8 @@ export default function DashboardPage() {
                   className={cn(
                     "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
                     modoReductor === m
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-300"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   )}
                 >
                   {m}
@@ -192,8 +192,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Gráfico de barras */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 mb-6">
-          <h3 className="text-sm font-semibold text-zinc-300 mb-4">
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">
             Cumplimiento % por servicio
           </h3>
           <CumplimientoBarChart resultados={resultadoMostrado.resultados} />
@@ -201,7 +201,7 @@ export default function DashboardPage() {
 
         {/* Tabla detallada */}
         <div className="mb-8">
-          <h3 className="text-sm font-semibold text-zinc-300 mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
             Detalle por servicio
           </h3>
           <ResumenTable resultados={resultadoMostrado.resultados} />
@@ -210,7 +210,7 @@ export default function DashboardPage() {
         {/* Todas las alertas */}
         {alertas.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-zinc-300 mb-3">Alertas</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Alertas</h3>
             <AlertsPanel alertas={alertas} />
           </div>
         )}

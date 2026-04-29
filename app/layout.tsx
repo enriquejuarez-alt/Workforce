@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { Header } from "@/components/Header";
+import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Planificador — Konecta Soporte",
@@ -16,9 +15,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full">
       <body className="h-full bg-[#F8F9FA] text-gray-800 antialiased">
-        <Sidebar />
-        <Header />
-        <main className="ml-56 pt-14 min-h-screen">{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

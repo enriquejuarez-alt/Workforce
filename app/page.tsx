@@ -17,7 +17,6 @@ import {
 } from "@/lib/parsers/parseNomina";
 import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
-import { buildAllCoverage } from "@/lib/domain/coverageEngine";
 import { generarAlertas } from "@/lib/domain/alertEngine";
 import {
   Select,
@@ -58,7 +57,6 @@ export default function UploadPage() {
     setAgentes,
     setReductores,
     setDiasDelMes,
-    setCoverages,
     setAlertas,
     setProcesando,
     setErrores,
@@ -185,16 +183,14 @@ export default function UploadPage() {
       const agentes = aplicarDiasAlMes(agentesConPases, diasDelMes);
       const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion);
 
-      setPasoActual("Generando alertas y cobertura…");
-      const coverages = buildAllCoverage(matrices, agentes);
-      const alertas = generarAlertas(resultado, coverages);
+      setPasoActual("Generando alertas…");
+      const alertas = generarAlertas(resultado);
 
       setMatrices(matrices);
       setAgentes(agentes);
       setReductores(reductores);
       setDiasDelMes(diasDelMes);
       setResultado(resultado);
-      setCoverages(coverages);
       setAlertas(alertas);
       setAgentesExcluidos(excl, segs);
 
@@ -220,7 +216,6 @@ export default function UploadPage() {
     setAgentes,
     setReductores,
     setDiasDelMes,
-    setCoverages,
     setAlertas,
     setProcesando,
     setErrores,

@@ -9,7 +9,6 @@ import type {
   MappingOverride,
   Pase,
   ResultadoGeneral,
-  ServicioCoverage,
   ServicioKey,
 } from "@/lib/domain/types";
 import { FILTROS_VACIOS } from "@/lib/domain/types";
@@ -25,18 +24,9 @@ interface ResultadosState {
   errores: string[];
   agentesExcluidos: number;
   segmentosNoReconocidos: string[];
-
-  // Punto 2/3: coverage y alertas
-  coverages: Map<ServicioKey, ServicioCoverage>;
   alertas: Alerta[];
-
-  // Punto 4: filtros activos
   activeFilters: ActiveFilters;
-
-  // Punto 6: mapeo configurable de segmentos
   mappingOverrides: MappingOverride[];
-
-  // Pases entre servicios
   pases: Pase[];
 
   setResultado: (r: ResultadoGeneral) => void;
@@ -47,7 +37,6 @@ interface ResultadosState {
   setProcesando: (v: boolean) => void;
   setErrores: (e: string[]) => void;
   setAgentesExcluidos: (n: number, segs: string[]) => void;
-  setCoverages: (c: Map<ServicioKey, ServicioCoverage>) => void;
   setAlertas: (a: Alerta[]) => void;
   setFilter: (campo: keyof ActiveFilters, valor: string) => void;
   clearFilters: () => void;
@@ -69,7 +58,6 @@ export const useResultados = create<ResultadosState>((set) => ({
   errores: [],
   agentesExcluidos: 0,
   segmentosNoReconocidos: [],
-  coverages: new Map(),
   alertas: [],
   activeFilters: { ...FILTROS_VACIOS },
   mappingOverrides: [],
@@ -83,7 +71,6 @@ export const useResultados = create<ResultadosState>((set) => ({
   setProcesando: (v) => set({ procesando: v }),
   setErrores: (e) => set({ errores: e }),
   setAgentesExcluidos: (n, segs) => set({ agentesExcluidos: n, segmentosNoReconocidos: segs }),
-  setCoverages: (c) => set({ coverages: c }),
   setAlertas: (a) => set({ alertas: a }),
   setFilter: (campo, valor) =>
     set((state) => ({
@@ -117,11 +104,11 @@ export const useResultados = create<ResultadosState>((set) => ({
       diasDelMes: 31,
       procesando: false,
       errores: [],
-      coverages: new Map(),
       alertas: [],
       activeFilters: { ...FILTROS_VACIOS },
       agentesExcluidos: 0,
       segmentosNoReconocidos: [],
+      mappingOverrides: [],
       pases: [],
     }),
 }));

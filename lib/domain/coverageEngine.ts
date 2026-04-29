@@ -145,10 +145,6 @@ export function buildServicioCoverage(
     };
   });
 
-  console.log(
-    `[coverage] ${servicio}: ${franjasCriticas.length} franjas críticas de ${numFranjas}`
-  );
-
   return { servicio, dias, franjasCriticas, coveragePorFranja };
 }
 

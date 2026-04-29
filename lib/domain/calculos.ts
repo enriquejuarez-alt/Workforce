@@ -29,7 +29,7 @@ export function calcularFactorProductivo(
   if (modo === "multiplicativo") {
     return (1 - deslogueo) * (1 - ausentismo) * (1 - rotacion);
   }
-  return 1 - (deslogueo + ausentismo + rotacion);
+  return Math.max(0, 1 - (deslogueo + ausentismo + rotacion));
 }
 
 export function calcularCumplimiento(

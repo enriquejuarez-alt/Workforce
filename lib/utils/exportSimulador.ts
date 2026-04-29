@@ -62,7 +62,7 @@ const C = {
 export async function exportarSimulacion(
   mes: string,
   base: ResultadoServicio[],
-  sim: ResultadoServicio[]
+  sim: ResultadoServicio[] = base
 ): Promise<void> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Planificador Konecta";

@@ -29,10 +29,8 @@ export default function Login() {
     try {
       const res = await authApi.login(data.email, data.password)
       setAuth(res.data.user, res.data.token)
-
       const meRes = await authApi.me()
       setAuth(meRes.data, res.data.token)
-
       toast.success(`Bienvenido, ${res.data.user.nombre}`)
       navigate('/dashboard')
     } catch (err: any) {
@@ -45,56 +43,73 @@ export default function Login() {
   return (
     <div className="min-h-screen flex bg-gray-50">
       {/* Left panel */}
-      <div className="hidden lg:flex w-1/2 bg-sidebar-bg flex-col items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-konecta blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-48 h-48 rounded-full bg-konecta-light blur-3xl" />
-        </div>
-        <div className="relative z-10 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-konecta flex items-center justify-center mx-auto mb-6">
-            <span className="text-white font-black text-3xl">K</span>
+      <div
+        className="hidden lg:flex w-5/12 flex-col items-center justify-center p-12 relative overflow-hidden"
+        style={{ background: 'linear-gradient(160deg, #000E28 0%, #001540 50%, #001E52 100%)' }}
+      >
+        {/* Decorative blobs */}
+        <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-10 blur-3xl"
+          style={{ background: 'radial-gradient(circle, #0054A6 0%, transparent 70%)' }} />
+        <div className="absolute bottom-10 left-0 w-64 h-64 rounded-full opacity-8 blur-3xl"
+          style={{ background: 'radial-gradient(circle, #1A6EC2 0%, transparent 70%)' }} />
+
+        <div className="relative z-10 text-center max-w-xs">
+          {/* Logo */}
+          <div className="mb-8">
+            <img
+              src="/logo.jpg"
+              alt="Logo"
+              className="w-20 h-20 rounded-2xl object-cover mx-auto shadow-2xl ring-4 ring-white/10"
+            />
           </div>
-          <h1 className="text-4xl font-black text-white mb-3">Konecta</h1>
-          <p className="text-konecta-light text-lg font-medium mb-2">Sistema de Gestión de Nómina</p>
-          <p className="text-white/50 text-sm max-w-xs">
-            Administrá nóminas mensuales de agentes de call center con control total de permisos e histórico.
+
+          <h1 className="text-3xl font-black text-white mb-2 tracking-tight">
+            Gestión de Nómina
+          </h1>
+          <p className="text-white/50 text-sm leading-relaxed mb-10">
+            Control total de nóminas mensuales, licencias, cambios y permisos por servicio.
           </p>
-          <div className="mt-10 grid grid-cols-3 gap-4 text-center">
+
+          <div className="grid grid-cols-3 gap-3 text-center">
             {[
               { label: 'Servicios', value: 'Multi' },
               { label: 'Roles', value: 'Granular' },
               { label: 'Histórico', value: 'Completo' },
             ].map((item) => (
-              <div key={item.label} className="bg-white/10 rounded-xl p-3">
-                <p className="text-white font-bold text-lg">{item.value}</p>
-                <p className="text-white/50 text-xs">{item.label}</p>
+              <div key={item.label} className="bg-white/6 rounded-xl p-3 border border-white/8">
+                <p className="text-white font-bold text-base">{item.value}</p>
+                <p className="text-white/40 text-xs mt-0.5">{item.label}</p>
               </div>
             ))}
           </div>
+
+          <p className="mt-10 text-white/20 text-xs font-medium tracking-wide uppercase">
+            Proyecto Walt · v2
+          </p>
         </div>
       </div>
 
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8">
-            <div className="flex items-center gap-2 lg:hidden mb-6">
-              <div className="w-8 h-8 rounded-lg bg-konecta flex items-center justify-center">
-                <span className="text-white font-black text-sm">K</span>
-              </div>
-              <span className="text-lg font-bold text-gray-900">Konecta Nómina</span>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">Iniciar sesión</h2>
+        <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2.5 lg:hidden mb-8">
+            <img src="/logo.jpg" alt="Logo" className="w-9 h-9 rounded-xl object-cover shadow" />
+            <span className="text-base font-bold text-gray-900">Gestión de Nómina</span>
+          </div>
+
+          <div className="mb-7">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Iniciar sesión</h2>
             <p className="text-gray-500 text-sm mt-1">Ingresá tus credenciales para continuar</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label className="label-base">Email</label>
               <input
                 {...register('email')}
                 type="email"
-                placeholder="usuario@konecta.com"
+                placeholder="usuario@empresa.com"
                 className="input-base"
                 autoFocus
               />
@@ -121,17 +136,21 @@ export default function Login() {
               {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
             </div>
 
-            <button type="submit" className="btn-primary w-full justify-center py-2.5" disabled={loading}>
+            <button
+              type="submit"
+              className="btn-primary w-full justify-center py-2.5 mt-2"
+              disabled={loading}
+            >
               <LogIn size={16} />
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
 
-          <div className="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Credenciales de prueba:</p>
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Credenciales de prueba</p>
             <div className="space-y-1 text-xs text-gray-600">
-              <p><span className="font-mono bg-white px-1 rounded">admin@konecta.com</span> / admin123 (Admin)</p>
-              <p><span className="font-mono bg-white px-1 rounded">supervisor.soporte@konecta.com</span> / supervisor123</p>
+              <p><span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200">admin@konecta.com</span> · admin123</p>
+              <p><span className="font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200">supervisor.soporte@konecta.com</span> · supervisor123</p>
             </div>
           </div>
         </div>

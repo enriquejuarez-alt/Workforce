@@ -1,8 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3,
+  LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -29,123 +29,130 @@ const ADMIN_ITEMS = [
   { to: '/auditoria', icon: Activity, label: 'Auditoría' },
 ]
 
+const navClass = (isActive: boolean) =>
+  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 ${
+    isActive
+      ? 'bg-white/12 text-white shadow-sm'
+      : 'text-sidebar-text hover:bg-white/6 hover:text-white'
+  }`
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-[10px] font-bold text-white/30 px-3 mb-1.5 mt-1 uppercase tracking-[0.12em]">
+    {children}
+  </p>
+)
+
 export default function Sidebar() {
   const { user, clearAuth } = useAuthStore()
   const isAdmin = user?.rol === 'ADMINISTRADOR'
-  const location = useLocation()
 
   const handleLogout = async () => {
-    try {
-      await authApi.logout()
-    } catch {}
+    try { await authApi.logout() } catch {}
     clearAuth()
     toast.success('Sesión cerrada')
   }
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar-bg flex flex-col overflow-hidden">
+    <aside
+      className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col overflow-hidden"
+      style={{ background: 'linear-gradient(160deg, #000E28 0%, #001540 40%, #001E52 100%)' }}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
-        <div className="w-9 h-9 rounded-lg bg-konecta flex items-center justify-center shrink-0">
-          <span className="text-white font-black text-sm">K</span>
-        </div>
-        <div>
-          <p className="text-white font-bold text-sm leading-tight">Konecta</p>
-          <p className="text-sidebar-text text-xs">Gestión de Nómina</p>
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/8 shrink-0">
+        <img
+          src="/logo.jpg"
+          alt="Logo"
+          className="w-9 h-9 rounded-xl object-cover shrink-0 shadow-md"
+        />
+        <div className="min-w-0">
+          <p className="text-white font-bold text-sm leading-tight tracking-tight">Gestión de Nómina</p>
+          <p className="text-white/40 text-[11px] mt-0.5 font-medium">Proyecto Walt</p>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <div className="mb-1">
-          <p className="section-title text-white/30 px-3 mb-2">Principal</p>
+      <nav className="flex-1 overflow-y-auto py-3 px-2.5 scrollbar-thin">
+        <div>
+          <SectionLabel>Principal</SectionLabel>
           {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 group ${
-                  isActive
-                    ? 'bg-konecta text-white'
-                    : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
-                }`
-              }
-            >
-              <Icon size={16} className="shrink-0" />
-              <span className="flex-1">{label}</span>
-              <ChevronRight
-                size={12}
-                className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                  location.pathname === to ? 'opacity-100' : ''
-                }`}
-              />
+            <NavLink key={to} to={to} className={({ isActive }) => navClass(isActive)}>
+              {({ isActive }) => (
+                <>
+                  <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
+                    <Icon size={15} />
+                  </span>
+                  <span className="flex-1 truncate">{label}</span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+                  )}
+                </>
+              )}
             </NavLink>
           ))}
         </div>
 
         {isAdmin && (
           <div className="mt-4">
-            <p className="section-title text-white/30 px-3 mb-2">Administración</p>
+            <SectionLabel>Administración</SectionLabel>
             {ADMIN_ITEMS.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 group ${
-                    isActive
-                      ? 'bg-konecta text-white'
-                      : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
-                  }`
-                }
-              >
-                <Icon size={16} className="shrink-0" />
-                <span className="flex-1">{label}</span>
+              <NavLink key={to} to={to} className={({ isActive }) => navClass(isActive)}>
+                {({ isActive }) => (
+                  <>
+                    <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
+                      <Icon size={15} />
+                    </span>
+                    <span className="flex-1 truncate">{label}</span>
+                    {isActive && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+                    )}
+                  </>
+                )}
               </NavLink>
             ))}
           </div>
         )}
 
         <div className="mt-4">
-          <p className="section-title text-white/30 px-3 mb-2">Walt</p>
-          <NavLink
-            to="/planificacion"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 group ${
-                isActive
-                  ? 'bg-konecta text-white'
-                  : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
-              }`
-            }
-          >
-            <BarChart3 size={16} className="shrink-0" />
-            <span className="flex-1">Planificación</span>
+          <SectionLabel>Walt</SectionLabel>
+          <NavLink to="/planificacion" className={({ isActive }) => navClass(isActive)}>
+            {({ isActive }) => (
+              <>
+                <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
+                  <BarChart3 size={15} />
+                </span>
+                <span className="flex-1 truncate">Planificación</span>
+                {isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+                )}
+              </>
+            )}
           </NavLink>
         </div>
       </nav>
 
       {/* User footer */}
-      <div className="border-t border-white/10 p-3">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-sidebar-hover transition-colors">
-          <div className="w-8 h-8 rounded-full bg-konecta flex items-center justify-center shrink-0">
+      <div className="border-t border-white/8 p-3 shrink-0">
+        <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-white/6 transition-colors cursor-default">
+          <div className="w-8 h-8 rounded-full bg-konecta/80 ring-2 ring-white/10 flex items-center justify-center shrink-0">
             <span className="text-white text-xs font-bold">
               {user?.nombre?.charAt(0).toUpperCase()}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-semibold truncate">{user?.nombre}</p>
-            <p className="text-sidebar-text text-xs truncate">{user?.email}</p>
+            <p className="text-white text-xs font-semibold truncate leading-tight">{user?.nombre}</p>
+            <p className="text-white/40 text-[11px] truncate mt-0.5">{user?.email}</p>
           </div>
           <button
             onClick={handleLogout}
-            className="text-sidebar-text hover:text-red-400 transition-colors p-1 rounded"
+            className="text-white/30 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-white/5"
             title="Cerrar sesión"
           >
             <LogOut size={14} />
           </button>
         </div>
         {isAdmin && (
-          <div className="mt-1 px-2">
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-konecta">
+          <div className="mt-1.5 px-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-konecta-light/80">
               <Shield size={10} /> Administrador
             </span>
           </div>

@@ -52,13 +52,14 @@ export function NominaEstadoBadge({ estado }: { estado: EstadoNomina }) {
 
 export function EstadoAgenteBadge({ estado }: { estado: string | null }) {
   if (!estado) return null
-  const s = estado.toLowerCase()
+  const s = estado.toLowerCase().trim()
+  const normalizado = s === 'lp' ? 'LICENCIA' : estado
   const variant =
     s.includes('activ') ? 'success' :
+    s === 'lp' || s.includes('licencia') ? 'danger' :
     s.includes('inactiv') || s.includes('baja') ? 'danger' :
-    s.includes('licencia') ? 'warning' :
     'default'
-  return <Badge variant={variant}>{estado}</Badge>
+  return <Badge variant={variant}>{normalizado}</Badge>
 }
 
 export function LicenciaBadge({ tipo }: { tipo: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA' }) {

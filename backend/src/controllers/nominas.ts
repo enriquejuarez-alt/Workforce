@@ -230,7 +230,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       const licenciaVigenteHoy = licencia && licencia.fecha_desde <= now
       return {
         ...a,
-        estado: licenciaVigenteHoy ? 'LICENCIA' : a.estado,
+        estado: licenciaVigenteHoy || a.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : a.estado,
         agente: {
           licencias: licencia ? [licencia] : [],
           cambios_temporales: cambio ? [cambio] : [],

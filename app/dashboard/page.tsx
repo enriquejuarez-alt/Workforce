@@ -141,7 +141,7 @@ export default function DashboardPage() {
             label="Personas activas"
             value={fmtNumero(resultadoMostrado.totalHCActivos)}
             sublabel={filtrado ? "Filtradas por criterio" : "Agentes activos en nómina"}
-            accent="zinc"
+            accent="gray"
           />
           <KpiCard
             label="En licencia"
@@ -175,7 +175,7 @@ export default function DashboardPage() {
             label="Tope facturable"
             value={fmtHoras(resultadoMostrado.resultados.reduce((a, r) => a + r.tope, 0))}
             sublabel={`Cap. al ${topeFacturacion}% del requerido`}
-            accent="zinc"
+            accent="gray"
           />
           <KpiCard
             label="Teórico a facturar"

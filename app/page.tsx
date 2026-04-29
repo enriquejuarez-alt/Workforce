@@ -7,7 +7,6 @@ import { AlertCircle, ArrowRight, ChevronDown, AlertTriangle, Loader2 } from "lu
 import { DropZone } from "@/components/upload/DropZone";
 import { FilePreview } from "@/components/upload/FilePreview";
 import { Button } from "@/components/ui/button";
-import { ServiceMappingPanel } from "@/components/mapping/ServiceMappingPanel";
 import { useUploads } from "@/store/useUploads";
 import { useResultados } from "@/store/useResultados";
 import { getSheetNames, parseCP, validarHojasCP } from "@/lib/parsers/parseCP";
@@ -331,9 +330,6 @@ export default function UploadPage() {
             </div>
           </div>
 
-          <div className="border-t border-gray-100 pt-4">
-            <ServiceMappingPanel />
-          </div>
         </div>
 
         {errores.length > 0 && (

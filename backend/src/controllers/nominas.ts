@@ -193,29 +193,42 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     if (jefe) where.jefe = { contains: jefe as string, mode: 'insensitive' }
     if (no_presente === 'true') where.presente_en_nomina = false
 
-    const agentes = await prisma.agenteNominaMensual.findMany({
+    const snapshots = await prisma.agenteNominaMensual.findMany({
       where,
-      include: {
-        agente: {
-          include: {
-            licencias: {
-              where: { fecha_hasta: { gte: new Date() } },
-              orderBy: { fecha_desde: 'asc' },
-              take: 1,
-            },
-            cambios_temporales: {
-              where: { fecha_hasta: { gte: new Date() }, fecha_desde: { lte: new Date() } },
-              include: { servicio_temporal: true },
-              take: 1,
-            },
-          },
-        },
-        servicio: true,
-      },
       orderBy: { nombre: 'asc' },
     })
 
-    let result = agentes
+    const agenteIds = snapshots.map((a) => a.agente_id)
+    const now = new Date()
+
+    const [licenciasVigentes, cambiosActivos] = await Promise.all([
+      prisma.licencia.findMany({
+        where: { agente_id: { in: agenteIds }, fecha_hasta: { gte: now } },
+        orderBy: { fecha_desde: 'asc' },
+        select: { agente_id: true, id: true, fecha_desde: true, fecha_hasta: true, motivo: true },
+      }),
+      prisma.cambioServicioTemporal.findMany({
+        where: { agente_id: { in: agenteIds }, fecha_desde: { lte: now }, fecha_hasta: { gte: now } },
+        include: { servicio_temporal: { select: { id: true, nombre: true } } },
+      }),
+    ])
+
+    const licenciaMap = new Map<number, (typeof licenciasVigentes)[0]>()
+    for (const l of licenciasVigentes) {
+      if (!licenciaMap.has(l.agente_id)) licenciaMap.set(l.agente_id, l)
+    }
+    const cambioMap = new Map<number, (typeof cambiosActivos)[0]>()
+    for (const c of cambiosActivos) {
+      if (!cambioMap.has(c.agente_id)) cambioMap.set(c.agente_id, c)
+    }
+
+    let result: any[] = snapshots.map((a) => ({
+      ...a,
+      agente: {
+        licencias: licenciaMap.has(a.agente_id) ? [licenciaMap.get(a.agente_id)] : [],
+        cambios_temporales: cambioMap.has(a.agente_id) ? [cambioMap.get(a.agente_id)] : [],
+      },
+    }))
 
     if (con_licencia === 'true') {
       result = result.filter((a) => a.agente.licencias.length > 0)

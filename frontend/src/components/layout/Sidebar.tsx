@@ -2,7 +2,8 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3,
+  LogOut, ChevronRight, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
+  BarChart3, Sliders, Calculator, TrendingUp, UploadCloud,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -29,6 +30,15 @@ const ADMIN_ITEMS = [
   { to: '/auditoria', icon: Activity, label: 'Auditoría' },
 ]
 
+const WALT_ITEMS = [
+  { page: 'carga',       icon: UploadCloud, label: 'Carga de archivos' },
+  { page: 'dashboard',   icon: LayoutDashboard, label: 'Resumen' },
+  { page: 'analisis',    icon: BarChart3,    label: 'Análisis' },
+  { page: 'curvas',      icon: TrendingUp,   label: 'Curvas' },
+  { page: 'simulador',   icon: Sliders,      label: 'Simulador' },
+  { page: 'calculadora', icon: Calculator,   label: 'Calculadora' },
+]
+
 export default function Sidebar() {
   const { user, clearAuth } = useAuthStore()
   const isAdmin = user?.rol === 'ADMINISTRADOR'
@@ -41,6 +51,11 @@ export default function Sidebar() {
     clearAuth()
     toast.success('Sesión cerrada')
   }
+
+  // Which Walt sub-page is active
+  const searchParams = new URLSearchParams(location.search)
+  const activePage = searchParams.get('page') ?? 'carga'
+  const inWalt = location.pathname === '/planificacion'
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar-bg flex flex-col overflow-hidden">
@@ -105,21 +120,26 @@ export default function Sidebar() {
           </div>
         )}
 
+        {/* Walt section */}
         <div className="mt-4">
-          <p className="section-title text-white/30 px-3 mb-2">Walt</p>
-          <NavLink
-            to="/planificacion"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 group ${
-                isActive
-                  ? 'bg-konecta text-white'
-                  : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
-              }`
-            }
-          >
-            <BarChart3 size={16} className="shrink-0" />
-            <span className="flex-1">Planificación</span>
-          </NavLink>
+          <p className="section-title text-white/30 px-3 mb-2">Walt · Planificación</p>
+          {WALT_ITEMS.map(({ page, icon: Icon, label }) => {
+            const isActive = inWalt && activePage === page
+            return (
+              <NavLink
+                key={page}
+                to={`/planificacion?page=${page}`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mb-0.5 group ${
+                  isActive
+                    ? 'bg-konecta text-white'
+                    : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
+                }`}
+              >
+                <Icon size={16} className="shrink-0" style={{ color: isActive ? 'white' : undefined }} />
+                <span className="flex-1">{label}</span>
+              </NavLink>
+            )
+          })}
         </div>
       </nav>
 

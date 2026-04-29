@@ -224,13 +224,19 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       if (!cambioMap.has(c.agente_id)) cambioMap.set(c.agente_id, c)
     }
 
-    let result: any[] = snapshots.map((a) => ({
-      ...a,
-      agente: {
-        licencias: licenciaMap.has(a.agente_id) ? [licenciaMap.get(a.agente_id)] : [],
-        cambios_temporales: cambioMap.has(a.agente_id) ? [cambioMap.get(a.agente_id)] : [],
-      },
-    }))
+    let result: any[] = snapshots.map((a) => {
+      const licencia = licenciaMap.get(a.agente_id)
+      const cambio = cambioMap.get(a.agente_id)
+      const licenciaVigenteHoy = licencia && licencia.fecha_desde <= now
+      return {
+        ...a,
+        estado: licenciaVigenteHoy ? (licencia!.motivo || 'LP') : a.estado,
+        agente: {
+          licencias: licencia ? [licencia] : [],
+          cambios_temporales: cambio ? [cambio] : [],
+        },
+      }
+    })
 
     if (con_licencia === 'true') {
       result = result.filter((a) => a.agente.licencias.length > 0)

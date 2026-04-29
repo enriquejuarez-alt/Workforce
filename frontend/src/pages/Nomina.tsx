@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   useReactTable, getCoreRowModel, getFilteredRowModel,
@@ -87,6 +87,8 @@ export default function Nomina() {
     queryKey: ['nomina-agentes', nomina?.id, filters],
     queryFn: () => nominasApi.agentes(nomina!.id, filters).then((r) => r.data),
     enabled: !!nomina?.id,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
 
   const replicarMutation = useMutation({
@@ -110,6 +112,12 @@ export default function Nomina() {
       toast.error(err.response?.data?.error || 'Error al eliminar agente')
     },
   })
+
+  const handleDeleteAgente = useCallback((snapshotId: number, nombre: string) => {
+    if (confirm(`¿Eliminar a ${nombre} de esta nómina?\n\nEsta acción no se puede deshacer.`)) {
+      deleteMutation.mutate(snapshotId)
+    }
+  }, [deleteMutation.mutate])
 
   const deleteNominaMutation = useMutation({
     mutationFn: () => nominasApi.delete(nomina!.id),
@@ -207,11 +215,7 @@ export default function Nomina() {
           )}
           {nominaEditable && (
             <button
-              onClick={() => {
-                if (confirm(`¿Eliminar a ${row.original.nombre} de esta nómina?\n\nEsta acción no se puede deshacer.`)) {
-                  deleteMutation.mutate(row.original.id)
-                }
-              }}
+              onClick={() => handleDeleteAgente(row.original.id, row.original.nombre)}
               className="btn-ghost px-2 py-1 text-xs text-red-500 hover:bg-red-50"
               title="Eliminar de la nómina"
             >
@@ -221,7 +225,7 @@ export default function Nomina() {
         </div>
       ),
     },
-  ], [nominaEditable, selectedServicioId, navigate, deleteMutation])
+  ], [nominaEditable, selectedServicioId, navigate, handleDeleteAgente, canRegisterLicencia])
 
   const table = useReactTable({
     data: agentes,

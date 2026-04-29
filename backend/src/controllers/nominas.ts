@@ -152,7 +152,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       ]),
     ]
 
-    let where: any = { nomina_mensual_id: nominaId }
+    let where: any = { nomina_mensual_id: nominaId, presente_en_nomina: true }
     if (dnisExcluidos.length > 0) {
       where.dni = { notIn: dnisExcluidos }
     }
@@ -191,7 +191,9 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     if (sitio) where.sitio = { equals: sitio as string, mode: 'insensitive' }
     if (modalidad) where.modalidad = { equals: modalidad as string, mode: 'insensitive' }
     if (jefe) where.jefe = { contains: jefe as string, mode: 'insensitive' }
-    if (no_presente === 'true') where.presente_en_nomina = false
+    if (no_presente === 'true') {
+      where.presente_en_nomina = false
+    }
 
     const snapshots = await prisma.agenteNominaMensual.findMany({
       where,

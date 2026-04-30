@@ -21,6 +21,7 @@ import Remociones from './pages/Remociones'
 import Vacaciones from './pages/Vacaciones'
 import Planificacion from './pages/Planificacion'
 import Soporte from './pages/Soporte'
+import Calendario from './pages/Calendario'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="comparacion" element={<Comparacion />} />
           <Route path="planificacion" element={<Planificacion />} />
           <Route path="soporte" element={<Soporte />} />
+          <Route path="calendario" element={<Calendario />} />
           <Route path="carga" element={<AdminRoute><CargaExcel /></AdminRoute>} />
           <Route path="importaciones" element={<AdminRoute><Importaciones /></AdminRoute>} />
           <Route path="usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />

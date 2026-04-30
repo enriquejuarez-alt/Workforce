@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3,
+  LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree, BarChart3, CalendarDays,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/nomina', icon: FileSpreadsheet, label: 'Nómina' },
   { to: '/licencias', icon: ClipboardList, label: 'Licencias' },
+  { to: '/calendario', icon: CalendarDays, label: 'Calendario' },
   { to: '/cambios', icon: ArrowLeftRight, label: 'Cambios Temporales' },
   { to: '/bajas', icon: UserMinus, label: 'Bajas' },
   { to: '/cambios-contrato', icon: FilePen, label: 'Cambios de Contrato' },

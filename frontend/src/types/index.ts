@@ -141,6 +141,16 @@ export interface Licencia {
   estado_calculado?: EstadoLicencia
 }
 
+export interface CalendarioEvento {
+  fecha: string
+  tipo: 'VENCIMIENTO' | 'INICIO'
+  agente_id: number
+  agente_nombre: string
+  servicio_nombre: string | null
+  servicio_id: number | null
+  motivo: string | null
+}
+
 export interface CambioServicioTemporal {
   id: number
   agente_id: number

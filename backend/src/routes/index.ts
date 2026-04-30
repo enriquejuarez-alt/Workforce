@@ -8,7 +8,7 @@ import { listServices, createService, updateService, toggleService, deleteServic
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent } from '../controllers/agents'
 import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
-import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias } from '../controllers/licencias'
+import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias, getCalendarioLicencias } from '../controllers/licencias'
 import { listCambios, createCambio, updateCambio, deleteCambio } from '../controllers/cambios'
 import { getDashboard } from '../controllers/dashboard'
 import { listAuditoria } from '../controllers/auditoria'
@@ -63,6 +63,7 @@ router.post('/excel/validar', authenticate, uploadExcel.single('file'), validate
 router.post('/excel/confirmar', authenticate, confirmExcel)
 router.get('/importaciones', authenticate, listImportaciones)
 
+router.get('/licencias/calendario', authenticate, getCalendarioLicencias)
 router.get('/licencias', authenticate, listLicencias)
 router.post('/licencias', authenticate, createLicencia)
 router.put('/licencias/:id', authenticate, updateLicencia)

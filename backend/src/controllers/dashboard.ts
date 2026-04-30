@@ -39,7 +39,8 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       totalUsuarios,
       ultimaCarga,
       estadoBreakdown,
-      agentesConLicenciaEnNomina,
+      agentesConLicencia,
+      agentesConLicenciaRecord,
     ] = await Promise.all([
       prisma.agente.count({ where: agenteWhere }),
       prisma.agente.count({ where: { ...agenteWhere, activo: false } }),
@@ -97,15 +98,23 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         },
         _count: { estado: true },
       }),
+      // Total en licencia: LP del Excel O tiene registro Licencia activo hoy
       prisma.agenteNominaMensual.count({
         where: {
           nomina_mensual: nominaWhere,
           presente_en_nomina: true,
-          agente: {
-            licencias: {
-              some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } },
-            },
-          },
+          OR: [
+            { estado: { equals: 'LP', mode: 'insensitive' } },
+            { agente: { licencias: { some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } } } } },
+          ],
+        },
+      }),
+      // Solo registros Licencia (para ajustar el contador ACTIVO del breakdown)
+      prisma.agenteNominaMensual.count({
+        where: {
+          nomina_mensual: nominaWhere,
+          presente_en_nomina: true,
+          agente: { licencias: { some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } } } },
         },
       }),
     ])
@@ -127,28 +136,30 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         .reduce((sum, e) => sum + e._count.estado, 0)
 
     const agentesActivosRaw = countByEstado(['activo', 'activa'])
-    const agentesActivos = Math.max(0, agentesActivosRaw - agentesConLicenciaEnNomina)
+    // agentesConLicenciaRecord solo resta de ACTIVO (LP ya está excluido del grupo activo)
+    const agentesActivos = Math.max(0, agentesActivosRaw - agentesConLicenciaRecord)
 
-    // Ajustar el breakdown: restar licencias de ACTIVO y agregar grupo LICENCIA
+    // Ajustar breakdown: quitar grupo LP, restar Licencia-record del ACTIVO, agregar LICENCIA unificado
     const breakdownAjustado = estadoBreakdown
+      .filter((e) => e.estado?.toLowerCase().trim() !== 'lp')
       .map((e) => {
         const cantidad = e._count.estado
         const esActivo = e.estado && ['activo', 'activa'].some((k) => e.estado!.toLowerCase().includes(k))
         return {
           estado: e.estado,
-          cantidad: esActivo ? Math.max(0, cantidad - agentesConLicenciaEnNomina) : cantidad,
+          cantidad: esActivo ? Math.max(0, cantidad - agentesConLicenciaRecord) : cantidad,
         }
       })
       .filter((e) => e.cantidad > 0)
 
-    if (agentesConLicenciaEnNomina > 0) {
-      breakdownAjustado.push({ estado: 'LICENCIA', cantidad: agentesConLicenciaEnNomina })
+    if (agentesConLicencia > 0) {
+      breakdownAjustado.push({ estado: 'LICENCIA', cantidad: agentesConLicencia })
     }
 
     return res.json({
       total_agentes: totalAgentes,
       agentes_activos: agentesActivos,
-      agentes_lp: agentesConLicenciaEnNomina,
+      agentes_lp: agentesConLicencia,
       agentes_inactivos: agentesInactivos,
       estado_breakdown: breakdownAjustado,
       licencias_vigentes: licenciasVigentes,

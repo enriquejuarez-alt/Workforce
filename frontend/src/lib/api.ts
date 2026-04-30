@@ -3,7 +3,7 @@ import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
-  Vacacion, VacacionImportacion,
+  Vacacion, VacacionImportacion, CalendarioEvento,
 } from '../types'
 
 // Auth
@@ -78,6 +78,8 @@ export const excelApi = {
 
 // Licencias
 export const licenciasApi = {
+  calendario: (mes: number, anio: number) =>
+    api.get<CalendarioEvento[]>('/licencias/calendario', { params: { mes, anio } }),
   list: (params?: Record<string, any>) => api.get<Licencia[]>('/licencias', { params }),
   create: (data: Partial<Licencia>) => api.post<Licencia>('/licencias', data),
   update: (id: number, data: Partial<Licencia>) => api.put<Licencia>(`/licencias/${id}`, data),
@@ -164,6 +166,21 @@ export const cambiosContratoApi = {
 export const exportApi = {
   nomina: (nominaId: number) =>
     api.get(`/export/nomina/${nominaId}`, { responseType: 'blob' }),
+}
+
+// Notificaciones
+export const notificacionesApi = {
+  get: () => api.get('/notificaciones'),
+}
+
+// Soporte
+export const soporteApi = {
+  enviarReporte: (formData: FormData) =>
+    api.post<{ ok: boolean; message: string }>(
+      '/soporte/reporte',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ),
 }
 
 // Vacaciones WF

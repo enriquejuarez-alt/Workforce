@@ -40,7 +40,7 @@ function startOfToday(): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
-async function syncAgenteActivo(agenteId: number) {
+export async function syncAgenteActivo(agenteId: number) {
   const hoy = startOfToday()
   const vigente = await prisma.licencia.findFirst({
     where: { agente_id: agenteId, fecha_desde: { lte: hoy }, fecha_hasta: { gte: hoy } },
@@ -48,6 +48,71 @@ async function syncAgenteActivo(agenteId: number) {
   const baja = await prisma.historicoBaja.findFirst({ where: { agente_id: agenteId } })
   if (!baja) {
     await prisma.agente.update({ where: { id: agenteId }, data: { activo: !vigente } })
+  }
+}
+
+export const getCalendarioLicencias = async (req: AuthRequest, res: Response) => {
+  try {
+    const mes = parseInt(req.query.mes as string) || new Date().getMonth() + 1
+    const anio = parseInt(req.query.anio as string) || new Date().getFullYear()
+
+    const inicioMes = new Date(Date.UTC(anio, mes - 1, 1))
+    const finMes = new Date(Date.UTC(anio, mes, 0, 23, 59, 59))
+
+    const adminUser = req.user?.rol === 'ADMINISTRADOR'
+    let agenteWhere: any = {}
+    if (!adminUser) {
+      const permisos = await prisma.usuarioServicioPermiso.findMany({
+        where: { usuario_id: req.user!.userId, puede_ver: true },
+        select: { servicio_id: true },
+      })
+      agenteWhere = { servicio_id: { in: permisos.map((p) => p.servicio_id) } }
+    }
+
+    const include = {
+      agente: { select: { id: true, nombre: true, servicio: { select: { id: true, nombre: true } } } },
+    }
+
+    const [vencimientos, inicios] = await Promise.all([
+      prisma.licencia.findMany({
+        where: { fecha_hasta: { gte: inicioMes, lte: finMes }, agente: agenteWhere },
+        include,
+        orderBy: { fecha_hasta: 'asc' },
+      }),
+      prisma.licencia.findMany({
+        where: { fecha_desde: { gte: inicioMes, lte: finMes }, agente: agenteWhere },
+        include,
+        orderBy: { fecha_desde: 'asc' },
+      }),
+    ])
+
+    const eventos: any[] = []
+    for (const l of vencimientos) {
+      eventos.push({
+        fecha: l.fecha_hasta.toISOString().substring(0, 10),
+        tipo: 'VENCIMIENTO',
+        agente_id: l.agente.id,
+        agente_nombre: l.agente.nombre,
+        servicio_nombre: l.agente.servicio?.nombre ?? null,
+        servicio_id: l.agente.servicio?.id ?? null,
+        motivo: l.motivo,
+      })
+    }
+    for (const l of inicios) {
+      eventos.push({
+        fecha: l.fecha_desde.toISOString().substring(0, 10),
+        tipo: 'INICIO',
+        agente_id: l.agente.id,
+        agente_nombre: l.agente.nombre,
+        servicio_nombre: l.agente.servicio?.nombre ?? null,
+        servicio_id: l.agente.servicio?.id ?? null,
+        motivo: l.motivo,
+      })
+    }
+    return res.json(eventos)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al obtener calendario' })
   }
 }
 

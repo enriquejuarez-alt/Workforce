@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authenticate, requireAdmin } from '../middleware/auth'
-import { uploadExcel } from '../middleware/upload'
+import { uploadExcel, uploadImagen } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission } from '../controllers/users'
@@ -8,7 +8,7 @@ import { listServices, createService, updateService, toggleService, deleteServic
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent } from '../controllers/agents'
 import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
-import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias } from '../controllers/licencias'
+import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias, getCalendarioLicencias } from '../controllers/licencias'
 import { listCambios, createCambio, updateCambio, deleteCambio } from '../controllers/cambios'
 import { getDashboard } from '../controllers/dashboard'
 import { listAuditoria } from '../controllers/auditoria'
@@ -18,6 +18,8 @@ import { listCambiosContrato, createCambioContrato, updateCambioContrato, delete
 import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
+import { enviarReporte } from '../controllers/soporte'
+import { getNotificaciones } from '../controllers/notificaciones'
 
 const router = Router()
 
@@ -61,6 +63,7 @@ router.post('/excel/validar', authenticate, uploadExcel.single('file'), validate
 router.post('/excel/confirmar', authenticate, confirmExcel)
 router.get('/importaciones', authenticate, listImportaciones)
 
+router.get('/licencias/calendario', authenticate, getCalendarioLicencias)
 router.get('/licencias', authenticate, listLicencias)
 router.post('/licencias', authenticate, createLicencia)
 router.put('/licencias/:id', authenticate, updateLicencia)
@@ -75,6 +78,7 @@ router.put('/cambios/:id', authenticate, updateCambio)
 router.delete('/cambios/:id', authenticate, requireAdmin, deleteCambio)
 
 router.get('/dashboard', authenticate, getDashboard)
+router.get('/notificaciones', authenticate, getNotificaciones)
 router.get('/auditoria', authenticate, requireAdmin, listAuditoria)
 router.get('/export/nomina/:nominaId', authenticate, exportNomina)
 
@@ -101,6 +105,8 @@ router.get('/remociones', authenticate, listRemociones)
 router.post('/remociones', authenticate, createRemocion)
 router.put('/remociones/:id', authenticate, updateRemocion)
 router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
+
+router.post('/soporte/reporte', authenticate, uploadImagen.single('captura'), enviarReporte)
 
 router.post('/vacaciones/import', authenticate, requireAdmin, uploadExcel.single('file'), importVacaciones)
 router.get('/vacaciones', authenticate, listVacaciones)

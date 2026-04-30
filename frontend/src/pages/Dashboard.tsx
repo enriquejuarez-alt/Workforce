@@ -37,8 +37,8 @@ export default function Dashboard() {
             <KpiCard title="Total en nómina" value={data?.total_agentes ?? 0} icon={Users} color="blue" />
             <KpiCard title="Activos" value={data?.agentes_activos ?? 0} icon={UserCheck} color="green"
               subtitle="Estado ACTIVO en nómina" />
-            <KpiCard title="LP" value={data?.agentes_lp ?? 0} icon={Clock} color="yellow"
-              subtitle="Licencias prolongadas" />
+            <KpiCard title="Licencia" value={data?.agentes_lp ?? 0} icon={Clock} color="yellow"
+              subtitle="Con licencia vigente hoy" />
             <KpiCard title="Dados de baja" value={data?.agentes_inactivos ?? 0} icon={UserX} color="red"
               subtitle="Desactivados del sistema" />
             <KpiCard title="No presentes" value={data?.agentes_no_presentes ?? 0} icon={AlertCircle} color="gray"

@@ -152,7 +152,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       ]),
     ]
 
-    let where: any = { nomina_mensual_id: nominaId }
+    let where: any = { nomina_mensual_id: nominaId, presente_en_nomina: true }
     if (dnisExcluidos.length > 0) {
       where.dni = { notIn: dnisExcluidos }
     }
@@ -186,12 +186,14 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       }
     }
     if (horarios) where.horarios = { contains: horarios as string, mode: 'insensitive' }
-    if (estado) where.estado = { equals: estado as string, mode: 'insensitive' }
+    // NOTE: 'estado' filter is applied in post-processing (after computing LICENCIA/LP override)
     if (contrato) where.contrato = { equals: contrato as string, mode: 'insensitive' }
     if (sitio) where.sitio = { equals: sitio as string, mode: 'insensitive' }
     if (modalidad) where.modalidad = { equals: modalidad as string, mode: 'insensitive' }
     if (jefe) where.jefe = { contains: jefe as string, mode: 'insensitive' }
-    if (no_presente === 'true') where.presente_en_nomina = false
+    if (no_presente === 'true') {
+      where.presente_en_nomina = false
+    }
 
     const snapshots = await prisma.agenteNominaMensual.findMany({
       where,
@@ -199,37 +201,58 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     })
 
     const agenteIds = snapshots.map((a) => a.agente_id)
-    const now = new Date()
 
-    const [licenciasVigentes, cambiosActivos] = await Promise.all([
+    // Usar el período de la nómina para cruzar licencias y cambios,
+    // no la fecha de hoy — así las licencias históricas también aparecen
+    const inicioPeriodo = new Date(Date.UTC(nomina.anio, nomina.mes - 1, 1))
+    const finPeriodo = new Date(Date.UTC(nomina.anio, nomina.mes, 0, 23, 59, 59))
+
+    const [licenciasEnPeriodo, cambiosEnPeriodo] = await Promise.all([
       prisma.licencia.findMany({
-        where: { agente_id: { in: agenteIds }, fecha_hasta: { gte: now } },
+        where: {
+          agente_id: { in: agenteIds },
+          fecha_desde: { lte: finPeriodo },
+          fecha_hasta: { gte: inicioPeriodo },
+        },
         orderBy: { fecha_desde: 'asc' },
         select: { agente_id: true, id: true, fecha_desde: true, fecha_hasta: true, motivo: true },
       }),
       prisma.cambioServicioTemporal.findMany({
-        where: { agente_id: { in: agenteIds }, fecha_desde: { lte: now }, fecha_hasta: { gte: now } },
+        where: {
+          agente_id: { in: agenteIds },
+          fecha_desde: { lte: finPeriodo },
+          fecha_hasta: { gte: inicioPeriodo },
+        },
         include: { servicio_temporal: { select: { id: true, nombre: true } } },
       }),
     ])
 
-    const licenciaMap = new Map<number, (typeof licenciasVigentes)[0]>()
-    for (const l of licenciasVigentes) {
+    const licenciaMap = new Map<number, (typeof licenciasEnPeriodo)[0]>()
+    for (const l of licenciasEnPeriodo) {
       if (!licenciaMap.has(l.agente_id)) licenciaMap.set(l.agente_id, l)
     }
-    const cambioMap = new Map<number, (typeof cambiosActivos)[0]>()
-    for (const c of cambiosActivos) {
+    const cambioMap = new Map<number, (typeof cambiosEnPeriodo)[0]>()
+    for (const c of cambiosEnPeriodo) {
       if (!cambioMap.has(c.agente_id)) cambioMap.set(c.agente_id, c)
     }
 
-    let result: any[] = snapshots.map((a) => ({
-      ...a,
-      agente: {
-        licencias: licenciaMap.has(a.agente_id) ? [licenciaMap.get(a.agente_id)] : [],
-        cambios_temporales: cambioMap.has(a.agente_id) ? [cambioMap.get(a.agente_id)] : [],
-      },
-    }))
+    let result: any[] = snapshots.map((a) => {
+      const licencia = licenciaMap.get(a.agente_id)
+      const cambio = cambioMap.get(a.agente_id)
+      return {
+        ...a,
+        estado: licencia || a.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : a.estado,
+        agente: {
+          licencias: licencia ? [licencia] : [],
+          cambios_temporales: cambio ? [cambio] : [],
+        },
+      }
+    })
 
+    if (estado) {
+      const estadoBuscar = (estado as string).toLowerCase().trim()
+      result = result.filter((a) => (a.estado || '').toLowerCase() === estadoBuscar)
+    }
     if (con_licencia === 'true') {
       result = result.filter((a) => a.agente.licencias.length > 0)
     }

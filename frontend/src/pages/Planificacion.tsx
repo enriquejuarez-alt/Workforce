@@ -21,7 +21,7 @@ export default function Planificacion() {
   const searchParams = new URLSearchParams(location.search)
   const page = searchParams.get('page') ?? 'carga'
   const path = PAGE_MAP[page] ?? '/'
-  const iframeSrc = `${PLANI_BASE}${path}`
+  const iframeSrc = `${PLANI_BASE}${path}?embedded=1`
 
   // When the page param changes, navigate the iframe instead of reloading it
   // (preserves state when switching between Walt tabs)
@@ -31,7 +31,7 @@ export default function Planificacion() {
     prevPage.current = page
     setError(false)
     try {
-      iframeRef.current?.contentWindow?.location.replace(path)
+      iframeRef.current?.contentWindow?.location.replace(`${path}?embedded=1`)
     } catch {
       // cross-origin reload fallback — shouldn't happen on localhost
       iframeRef.current?.setAttribute('src', iframeSrc)

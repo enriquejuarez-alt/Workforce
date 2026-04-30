@@ -19,6 +19,7 @@ import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapac
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
 import { enviarReporte } from '../controllers/soporte'
+import { getNotificaciones } from '../controllers/notificaciones'
 
 const router = Router()
 
@@ -76,6 +77,7 @@ router.put('/cambios/:id', authenticate, updateCambio)
 router.delete('/cambios/:id', authenticate, requireAdmin, deleteCambio)
 
 router.get('/dashboard', authenticate, getDashboard)
+router.get('/notificaciones', authenticate, getNotificaciones)
 router.get('/auditoria', authenticate, requireAdmin, listAuditoria)
 router.get('/export/nomina/:nominaId', authenticate, exportNomina)
 

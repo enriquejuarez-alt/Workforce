@@ -166,6 +166,11 @@ export const exportApi = {
     api.get(`/export/nomina/${nominaId}`, { responseType: 'blob' }),
 }
 
+// Notificaciones
+export const notificacionesApi = {
+  get: () => api.get('/notificaciones'),
+}
+
 // Soporte
 export const soporteApi = {
   enviarReporte: (formData: FormData) =>

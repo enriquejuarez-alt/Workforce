@@ -13,6 +13,10 @@ const PAGE_MAP: Record<string, string> = {
   calculadora: '/calculadora',
 }
 
+function buildSrc(page: string) {
+  return `${PLANI_BASE}${PAGE_MAP[page] ?? '/'}?embedded=1`
+}
+
 export default function Planificacion() {
   const location = useLocation()
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -20,27 +24,33 @@ export default function Planificacion() {
 
   const searchParams = new URLSearchParams(location.search)
   const page = searchParams.get('page') ?? 'carga'
-  const path = PAGE_MAP[page] ?? '/'
-  const iframeSrc = `${PLANI_BASE}${path}?embedded=1`
 
-  // When the page param changes, navigate the iframe instead of reloading it
-  // (preserves state when switching between Walt tabs)
-  const prevPage = useRef(page)
+  // Fixed src: only used on mount — never changes reactively.
+  // Changing the src prop causes a full iframe reload which races with
+  // the embedded detection in AppShell. Navigation after mount uses
+  // contentWindow.location.replace (allowed cross-origin).
+  const initialSrc = useRef(buildSrc(page))
+
+  const prevPage = useRef<string | null>(null)
+
   useEffect(() => {
+    // First mount: iframe already loaded the right page via initialSrc
+    if (prevPage.current === null) {
+      prevPage.current = page
+      return
+    }
     if (prevPage.current === page) return
     prevPage.current = page
     setError(false)
-    try {
-      iframeRef.current?.contentWindow?.location.replace(`${path}?embedded=1`)
-    } catch {
-      // cross-origin reload fallback — shouldn't happen on localhost
-      iframeRef.current?.setAttribute('src', iframeSrc)
-    }
-  }, [page, path, iframeSrc])
+
+    // location.replace is allowed for cross-origin iframes (write-only access)
+    iframeRef.current?.contentWindow?.location.replace(buildSrc(page))
+  }, [page])
+
+  const currentSrc = buildSrc(page)
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
-      {/* Slim toolbar — replaces the full Header for Walt */}
       <div className="h-11 bg-white border-b border-gray-200 flex items-center justify-between px-5 shrink-0">
         <span className="text-sm font-semibold text-gray-700">
           Walt · <span className="text-gray-400 font-normal capitalize">{page}</span>
@@ -48,13 +58,13 @@ export default function Planificacion() {
         <div className="flex items-center gap-1">
           <button
             className="btn-ghost py-1 px-2.5 text-xs"
-            onClick={() => { setError(false); iframeRef.current?.setAttribute('src', iframeSrc) }}
+            onClick={() => { setError(false); iframeRef.current?.setAttribute('src', currentSrc) }}
             title="Recargar"
           >
             <RefreshCw size={13} />
           </button>
           <a
-            href={iframeSrc}
+            href={currentSrc}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-ghost py-1 px-2.5 text-xs flex items-center gap-1.5"
@@ -84,7 +94,7 @@ export default function Planificacion() {
             </div>
             <button
               className="btn-primary"
-              onClick={() => { setError(false); iframeRef.current?.setAttribute('src', iframeSrc) }}
+              onClick={() => { setError(false); iframeRef.current?.setAttribute('src', currentSrc) }}
             >
               <RefreshCw size={14} /> Reintentar
             </button>
@@ -92,7 +102,7 @@ export default function Planificacion() {
         ) : (
           <iframe
             ref={iframeRef}
-            src={iframeSrc}
+            src={initialSrc.current}
             className="w-full h-full border-0"
             title="Walt — Planificación HC"
             onError={() => setError(true)}

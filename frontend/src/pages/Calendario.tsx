@@ -134,24 +134,7 @@ export default function Calendario() {
                         {format(day, 'd')}
                       </span>
 
-                      {/* Event dots */}
-                      {hasEvents && (
-                        <div className="flex flex-wrap justify-center gap-0.5 px-1">
-                          {venc.slice(0, 3).map((_, i) => (
-                            <span key={`v${i}`} className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          ))}
-                          {inic.slice(0, 3).map((_, i) => (
-                            <span key={`i${i}`} className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Overflow badge */}
-                      {dayEvents.length > 6 && (
-                        <span className="text-[9px] text-gray-400 font-semibold mt-0.5">+{dayEvents.length - 6}</span>
-                      )}
-
-                      {/* Count chips for days with many events */}
+                      {/* Event indicators */}
                       {hasEvents && (
                         <div className="flex gap-1 mt-0.5 flex-wrap justify-center">
                           {venc.length > 0 && (
@@ -215,7 +198,7 @@ export default function Calendario() {
                     return (
                       <div key={tipo}>
                         <p className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 ${cfg.light} ${cfg.text}`}>
-                          {cfg.label === 'Vence' ? '🔴 Vencen hoy' : '🟢 Inician hoy'}
+                          {tipo === 'VENCIMIENTO' ? '🔴 Vencimientos' : '🟢 Inicios'}
                         </p>
                         {group.map((e, i) => (
                           <button
@@ -271,11 +254,16 @@ export default function Calendario() {
                 </div>
               </div>
 
-              {/* Próximos vencimientos */}
+              {/* Vencimientos del mes */}
               {eventos.filter((e) => e.tipo === 'VENCIMIENTO').length > 0 && (
                 <div className="card p-4 flex-1 overflow-hidden flex flex-col">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Vencimientos del mes</p>
-                  <div className="flex-1 overflow-y-auto space-y-2">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                      Vencimientos del mes
+                    </span>
+                  </p>
+                  <div className="flex-1 overflow-y-auto space-y-1">
                     {[...eventosByDay.entries()]
                       .flatMap(([fecha, evs]) =>
                         evs
@@ -294,6 +282,45 @@ export default function Calendario() {
                           className="w-full flex items-center gap-2.5 text-left hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-colors group"
                         >
                           <span className="text-[11px] font-bold text-red-500 w-12 shrink-0">
+                            {format(new Date(e.fechaKey + 'T12:00:00'), 'dd/MM')}
+                          </span>
+                          <span className="text-xs text-gray-700 truncate group-hover:text-konecta">
+                            {e.agente_nombre}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Inicios del mes */}
+              {eventos.filter((e) => e.tipo === 'INICIO').length > 0 && (
+                <div className="card p-4 flex-1 overflow-hidden flex flex-col">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                      Inicios del mes
+                    </span>
+                  </p>
+                  <div className="flex-1 overflow-y-auto space-y-1">
+                    {[...eventosByDay.entries()]
+                      .flatMap(([fecha, evs]) =>
+                        evs
+                          .filter((e) => e.tipo === 'INICIO')
+                          .map((e) => ({ ...e, fechaKey: fecha }))
+                      )
+                      .sort((a, b) => a.fechaKey.localeCompare(b.fechaKey))
+                      .map((e, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            const d = new Date(e.fechaKey + 'T12:00:00')
+                            setSelectedDay(d)
+                            setBase(d)
+                          }}
+                          className="w-full flex items-center gap-2.5 text-left hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-colors group"
+                        >
+                          <span className="text-[11px] font-bold text-green-600 w-12 shrink-0">
                             {format(new Date(e.fechaKey + 'T12:00:00'), 'dd/MM')}
                           </span>
                           <span className="text-xs text-gray-700 truncate group-hover:text-konecta">

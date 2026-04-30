@@ -55,6 +55,7 @@ export const getCalendarioLicencias = async (req: AuthRequest, res: Response) =>
   try {
     const mes = parseInt(req.query.mes as string) || new Date().getMonth() + 1
     const anio = parseInt(req.query.anio as string) || new Date().getFullYear()
+    const servicioIdParam = req.query.servicio_id ? parseInt(req.query.servicio_id as string) : null
 
     const inicioMes = new Date(Date.UTC(anio, mes - 1, 1))
     const finMes = new Date(Date.UTC(anio, mes, 0, 23, 59, 59))
@@ -66,7 +67,12 @@ export const getCalendarioLicencias = async (req: AuthRequest, res: Response) =>
         where: { usuario_id: req.user!.userId, puede_ver: true },
         select: { servicio_id: true },
       })
-      agenteWhere = { servicio_id: { in: permisos.map((p) => p.servicio_id) } }
+      const allowedIds = permisos.map((p) => p.servicio_id)
+      agenteWhere = servicioIdParam
+        ? { servicio_id: allowedIds.includes(servicioIdParam) ? servicioIdParam : -1 }
+        : { servicio_id: { in: allowedIds } }
+    } else if (servicioIdParam) {
+      agenteWhere = { servicio_id: servicioIdParam }
     }
 
     const include = {
@@ -378,5 +384,83 @@ export const deleteImportacionLicencias = async (req: AuthRequest, res: Response
     return res.json({ ok: true })
   } catch {
     return res.status(500).json({ error: 'Error al eliminar importación' })
+  }
+}
+
+export const exportCalendarioLicencias = async (req: AuthRequest, res: Response) => {
+  try {
+    const mes = parseInt(req.query.mes as string) || new Date().getMonth() + 1
+    const anio = parseInt(req.query.anio as string) || new Date().getFullYear()
+    const servicioIdParam = req.query.servicio_id ? parseInt(req.query.servicio_id as string) : null
+
+    const inicioMes = new Date(Date.UTC(anio, mes - 1, 1))
+    const finMes = new Date(Date.UTC(anio, mes, 0, 23, 59, 59))
+
+    const adminUser = req.user?.rol === 'ADMINISTRADOR'
+    let agenteWhere: any = {}
+    if (!adminUser) {
+      const permisos = await prisma.usuarioServicioPermiso.findMany({
+        where: { usuario_id: req.user!.userId, puede_ver: true },
+        select: { servicio_id: true },
+      })
+      const allowedIds = permisos.map((p) => p.servicio_id)
+      agenteWhere = servicioIdParam
+        ? { servicio_id: allowedIds.includes(servicioIdParam) ? servicioIdParam : -1 }
+        : { servicio_id: { in: allowedIds } }
+    } else if (servicioIdParam) {
+      agenteWhere = { servicio_id: servicioIdParam }
+    }
+
+    const include = {
+      agente: { select: { id: true, nombre: true, servicio: { select: { id: true, nombre: true } } } },
+    }
+
+    const [vencimientos, inicios] = await Promise.all([
+      prisma.licencia.findMany({
+        where: { fecha_hasta: { gte: inicioMes, lte: finMes }, agente: agenteWhere },
+        include,
+        orderBy: { fecha_hasta: 'asc' },
+      }),
+      prisma.licencia.findMany({
+        where: { fecha_desde: { gte: inicioMes, lte: finMes }, agente: agenteWhere },
+        include,
+        orderBy: { fecha_desde: 'asc' },
+      }),
+    ])
+
+    const rows: any[] = []
+    for (const l of vencimientos) {
+      rows.push({
+        Fecha: l.fecha_hasta.toISOString().substring(0, 10),
+        Tipo: 'VENCIMIENTO',
+        Agente: l.agente.nombre,
+        Servicio: l.agente.servicio?.nombre ?? '',
+        Motivo: l.motivo ?? '',
+      })
+    }
+    for (const l of inicios) {
+      rows.push({
+        Fecha: l.fecha_desde.toISOString().substring(0, 10),
+        Tipo: 'INICIO',
+        Agente: l.agente.nombre,
+        Servicio: l.agente.servicio?.nombre ?? '',
+        Motivo: l.motivo ?? '',
+      })
+    }
+    rows.sort((a, b) => a.Fecha.localeCompare(b.Fecha))
+
+    const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(rows)
+    XLSX.utils.book_append_sheet(wb, ws, 'Licencias')
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+
+    const fileName = `Licencias_${MESES_ES[mes - 1]}_${anio}.xlsx`
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return res.send(buf)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al exportar calendario' })
   }
 }

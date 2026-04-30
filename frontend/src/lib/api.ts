@@ -3,7 +3,7 @@ import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
-  Vacacion, VacacionImportacion, CalendarioEvento,
+  Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
 } from '../types'
 
 // Auth
@@ -45,6 +45,7 @@ export const agentesApi = {
   create: (data: Partial<Agente>) => api.post<Agente>('/agentes', data),
   update: (id: number, data: Partial<Agente>) => api.put<Agente>(`/agentes/${id}`, data),
   toggle: (id: number) => api.patch<{ activo: boolean }>(`/agentes/${id}/estado`),
+  timeline: (id: number) => api.get<TimelineEvento[]>(`/agentes/${id}/timeline`),
 }
 
 // Nóminas
@@ -78,8 +79,10 @@ export const excelApi = {
 
 // Licencias
 export const licenciasApi = {
-  calendario: (mes: number, anio: number) =>
-    api.get<CalendarioEvento[]>('/licencias/calendario', { params: { mes, anio } }),
+  calendario: (mes: number, anio: number, servicioId?: number | null) =>
+    api.get<CalendarioEvento[]>('/licencias/calendario', { params: { mes, anio, ...(servicioId ? { servicio_id: servicioId } : {}) } }),
+  exportCalendario: (mes: number, anio: number, servicioId?: number | null) =>
+    api.get('/licencias/calendario/export', { params: { mes, anio, ...(servicioId ? { servicio_id: servicioId } : {}) }, responseType: 'blob' }),
   list: (params?: Record<string, any>) => api.get<Licencia[]>('/licencias', { params }),
   create: (data: Partial<Licencia>) => api.post<Licencia>('/licencias', data),
   update: (id: number, data: Partial<Licencia>) => api.put<Licencia>(`/licencias/${id}`, data),

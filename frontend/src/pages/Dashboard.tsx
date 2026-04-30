@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   Users, UserCheck, UserX, FileSpreadsheet, Upload,
-  ArrowLeftRight, AlertCircle, Clock, CheckCircle, Building2,
+  ArrowLeftRight, AlertCircle, Clock, CheckCircle, Building2, CalendarDays,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { dashboardApi } from '../lib/api'
+import { useNavigate } from 'react-router-dom'
 import Header from '../components/layout/Header'
 import KpiCard from '../components/ui/KpiCard'
 import { PageLoading } from '../components/ui/LoadingSpinner'
@@ -14,6 +15,7 @@ import { useAuthStore } from '../store/auth'
 
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user)
+  const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.get().then((r) => r.data),
@@ -152,6 +154,50 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard title="Usuarios activos" value={data?.usuarios_activos ?? 0} icon={Users} color="purple" />
             <KpiCard title="Nóminas cerradas" value={data?.nominas_cerradas ?? 0} icon={FileSpreadsheet} color="gray" />
+          </div>
+        )}
+
+        {/* Ausentes hoy */}
+        {(data?.licencias_hoy?.length ?? 0) > 0 && (
+          <div>
+            <p className="section-title mb-3">Ausentes hoy</p>
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarDays size={16} className="text-yellow-500" />
+                <p className="text-sm font-bold text-gray-700">Agentes con licencia vigente</p>
+                <span className="ml-auto text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200">
+                  {data!.licencias_hoy.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {data!.licencias_hoy.map((a) => (
+                  <button
+                    key={a.agente_id}
+                    onClick={() => navigate(`/nomina/agente/${a.agente_id}`)}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left group border border-gray-100"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-bold"
+                      style={{ backgroundColor: a.servicio_color || '#6366f1' }}
+                    >
+                      {a.agente_nombre.trim().split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate group-hover:text-konecta transition-colors">
+                        {a.agente_nombre}
+                      </p>
+                      <p className="text-[10px] text-gray-400 truncate">
+                        {a.servicio_nombre ?? '—'}
+                        {a.motivo ? ` · ${a.motivo}` : ''}
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-red-400 font-semibold shrink-0">
+                      hasta {format(new Date(a.fecha_hasta + 'T12:00:00'), 'dd/MM')}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

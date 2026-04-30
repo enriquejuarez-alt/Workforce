@@ -130,6 +130,25 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       orderBy: { nombre: 'asc' },
     })
 
+    const licenciasHoy = await prisma.licencia.findMany({
+      where: {
+        fecha_desde: { lte: now },
+        fecha_hasta: { gte: now },
+        agente: agenteWhere,
+      },
+      include: {
+        agente: {
+          select: {
+            id: true,
+            nombre: true,
+            servicio: { select: { nombre: true, color: true } },
+          },
+        },
+      },
+      orderBy: { agente: { nombre: 'asc' } },
+      take: 30,
+    })
+
     const countByEstado = (keywords: string[]) =>
       estadoBreakdown
         .filter((e) => e.estado && keywords.some((k) => e.estado!.toLowerCase().includes(k)))
@@ -175,6 +194,14 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         nombre: s.nombre,
         color: s.color,
         total_agentes: s._count.agentes,
+      })),
+      licencias_hoy: licenciasHoy.map((l) => ({
+        agente_id: l.agente.id,
+        agente_nombre: l.agente.nombre,
+        servicio_nombre: l.agente.servicio?.nombre ?? null,
+        servicio_color: l.agente.servicio?.color ?? null,
+        fecha_hasta: l.fecha_hasta.toISOString().substring(0, 10),
+        motivo: l.motivo,
       })),
     })
   } catch (err) {

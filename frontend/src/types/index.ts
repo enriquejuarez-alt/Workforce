@@ -346,6 +346,22 @@ export interface DashboardData {
   usuarios_activos: number | null
   ultima_carga: ImportacionNomina | null
   por_servicio: Array<{ id: number; nombre: string; color: string; total_agentes: number }>
+  licencias_hoy: Array<{
+    agente_id: number
+    agente_nombre: string
+    servicio_nombre: string | null
+    servicio_color: string | null
+    fecha_hasta: string
+    motivo: string | null
+  }>
+}
+
+export interface TimelineEvento {
+  tipo: 'LICENCIA' | 'CAMBIO_TEMPORAL' | 'CAMBIO_CONTRATO' | 'CAPACITACION' | 'REMOCION' | 'VACACION'
+  fecha_inicio: string
+  fecha_fin: string | null
+  descripcion: string
+  detalle: string | null
 }
 
 export interface ExcelPreview {

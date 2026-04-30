@@ -10,7 +10,6 @@ const PAGE_MAP: Record<string, string> = {
   analisis:    '/analisis',
   curvas:      '/curvas',
   simulador:   '/simulador',
-  calculadora: '/calculadora',
 }
 
 function buildSrc(page: string) {

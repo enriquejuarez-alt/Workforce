@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
-  BarChart3, CalendarDays, Sliders, Calculator, TrendingUp, UploadCloud,
+  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -37,7 +37,6 @@ const WALT_ITEMS = [
   { page: 'analisis',    icon: BarChart3,        label: 'Análisis' },
   { page: 'curvas',      icon: TrendingUp,       label: 'Curvas' },
   { page: 'simulador',   icon: Sliders,          label: 'Simulador' },
-  { page: 'calculadora', icon: Calculator,       label: 'Calculadora' },
 ]
 
 const navClass = (isActive: boolean) =>

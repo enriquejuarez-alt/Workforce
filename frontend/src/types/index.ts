@@ -382,9 +382,10 @@ export interface ProgramacionMensual {
 export interface RequeridoHorario {
   id: number
   programacion_id: number
+  fecha: string
   intervalo: string
   requeridos: number
-  tipo_dia: 'SEMANA' | 'SABADO' | 'DOMINGO'
+  es_feriado: boolean
 }
 
 export interface FactorReduccion {
@@ -406,13 +407,38 @@ export interface SimulacionResultado {
   agentes: string[]
 }
 
+export interface MovimientoSugerido {
+  nombre: string
+  de: string
+  hacia: string
+  agente_id: number
+}
+
+export interface CupoFeriado {
+  intervalo: string
+  isla: string
+  asignados: number
+  cupo: number
+}
+
 export interface SimulacionResponse {
   programacion: ProgramacionMensual
-  resultados: SimulacionResultado[]
+  nomina: SimulacionResultado[]
+  simulacion: SimulacionResultado[]
+  movimientos: MovimientoSugerido[]
+  cupos_feriado: CupoFeriado[]
   intervalos: string[]
   fechas: { fecha: string; dia_num: number; dia_semana: string }[]
   total_agentes: number
   agentes_sin_ingreso: number
+  stats: {
+    nomina_under: number
+    nomina_ok: number
+    nomina_over: number
+    sim_under: number
+    sim_ok: number
+    sim_over: number
+  }
 }
 
 export interface ExcelPreview {

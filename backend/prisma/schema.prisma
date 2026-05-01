@@ -450,15 +450,16 @@ model ProgramacionMensual {
 }
 
 model RequeridoHorario {
-  id              Int    @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   programacion_id Int
-  intervalo       String // "08:00"
+  fecha           DateTime @db.Date
+  intervalo       String   // "08:00"
   requeridos      Int
-  tipo_dia        String @default("SEMANA") // SEMANA | SABADO | DOMINGO
+  es_feriado      Boolean  @default(false)
 
   programacion ProgramacionMensual @relation(fields: [programacion_id], references: [id], onDelete: Cascade)
 
-  @@unique([programacion_id, intervalo, tipo_dia])
+  @@unique([programacion_id, fecha, intervalo])
   @@map("requeridos_horario")
 }
 

@@ -4,7 +4,7 @@ import type {
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
-  ProgramacionMensual, RequeridoHorario, FactorReduccion, SimulacionResponse,
+  ProgramacionMensual, FactorReduccion, SimulacionResponse,
 } from '../types'
 
 // Auth
@@ -197,8 +197,12 @@ export const programacionApi = {
     api.get<ProgramacionMensual>(`/programacion/${id}`),
   delete: (id: number) =>
     api.delete(`/programacion/${id}`),
-  upsertRequeridos: (id: number, requeridos: Omit<RequeridoHorario, 'id' | 'programacion_id'>[]) =>
-    api.put(`/programacion/${id}/requeridos`, { requeridos }),
+  upsertRequeridos: (id: number, values: { tipo_dia: 'SEMANA' | 'SABADO' | 'DOMINGO'; intervalo: string; requeridos: number }[]) =>
+    api.put(`/programacion/${id}/requeridos`, { values }),
+  uploadRequeridos: (id: number, formData: FormData) =>
+    api.post<{ ok: boolean; total: number }>(`/programacion/${id}/upload-requeridos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
   upsertFactor: (id: number, factor: Omit<FactorReduccion, 'id' | 'programacion_id'>) =>
     api.put(`/programacion/${id}/factor`, factor),
   simular: (id: number) =>

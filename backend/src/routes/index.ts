@@ -20,6 +20,7 @@ import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
+import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, upsertFactor, simularProgramacion, exportProgramacion } from '../controllers/programacion'
 
 const router = Router()
 
@@ -109,6 +110,15 @@ router.put('/remociones/:id', authenticate, updateRemocion)
 router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
 
 router.post('/soporte/reporte', authenticate, uploadImagen.single('captura'), enviarReporte)
+
+router.get('/programacion/:id/export', authenticate, exportProgramacion)
+router.get('/programacion/:id/simular', authenticate, simularProgramacion)
+router.get('/programacion/:id', authenticate, getProgramacion)
+router.delete('/programacion/:id', authenticate, requireAdmin, deleteProgramacion)
+router.put('/programacion/:id/requeridos', authenticate, upsertRequeridos)
+router.put('/programacion/:id/factor', authenticate, upsertFactor)
+router.get('/programacion', authenticate, listProgramaciones)
+router.post('/programacion', authenticate, createProgramacion)
 
 router.post('/vacaciones/import', authenticate, requireAdmin, uploadExcel.single('file'), importVacaciones)
 router.get('/vacaciones', authenticate, listVacaciones)

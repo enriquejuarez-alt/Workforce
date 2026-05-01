@@ -364,6 +364,57 @@ export interface TimelineEvento {
   detalle: string | null
 }
 
+export interface ProgramacionMensual {
+  id: number
+  servicio_id: number
+  mes: number
+  anio: number
+  semana: number  // 0 = mes completo, 1-4 = semana específica
+  estado: string
+  creado_por: number
+  fecha_creacion: string
+  servicio: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  requeridos?: RequeridoHorario[]
+  factor?: FactorReduccion | null
+  _count?: { requeridos: number }
+}
+
+export interface RequeridoHorario {
+  id: number
+  programacion_id: number
+  intervalo: string
+  requeridos: number
+  tipo_dia: 'SEMANA' | 'SABADO' | 'DOMINGO'
+}
+
+export interface FactorReduccion {
+  id: number
+  programacion_id: number
+  deslogueo: number
+  ausentismo: number
+  rotacion: number
+}
+
+export interface SimulacionResultado {
+  fecha: string
+  dia_semana: string
+  dia_num: number
+  intervalo: string
+  requeridos: number
+  asignados: number
+  estado: 'UNDER' | 'OK' | 'OVER'
+  agentes: string[]
+}
+
+export interface SimulacionResponse {
+  programacion: ProgramacionMensual
+  resultados: SimulacionResultado[]
+  intervalos: string[]
+  fechas: { fecha: string; dia_num: number; dia_semana: string }[]
+  total_agentes: number
+  agentes_sin_ingreso: number
+}
+
 export interface ExcelPreview {
   token: string
   stats: {

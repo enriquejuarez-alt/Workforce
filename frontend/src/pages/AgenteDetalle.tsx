@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical, BriefcaseMedical, RefreshCw, ScrollText, GraduationCap, DoorOpen, Palmtree } from 'lucide-react'
+import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical, Stethoscope, RefreshCw, ScrollText, GraduationCap, DoorOpen, Palmtree } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { agentesApi } from '../lib/api'
@@ -13,7 +13,7 @@ import type { TimelineEvento } from '../types'
 import type { LucideIcon } from 'lucide-react'
 
 const TIMELINE_CFG: Record<TimelineEvento['tipo'], { label: string; Icon: LucideIcon; iconColor: string; bg: string; badge: string }> = {
-  LICENCIA:        { label: 'Licencia',        Icon: BriefcaseMedical, iconColor: 'text-red-400',     bg: 'bg-red-50',     badge: 'bg-red-100 text-red-600' },
+  LICENCIA:        { label: 'Licencia',        Icon: Stethoscope,      iconColor: 'text-red-400',     bg: 'bg-red-50',     badge: 'bg-red-100 text-red-600' },
   CAMBIO_TEMPORAL: { label: 'Cambio temporal', Icon: RefreshCw,        iconColor: 'text-blue-400',    bg: 'bg-blue-50',    badge: 'bg-blue-100 text-blue-600' },
   CAMBIO_CONTRATO: { label: 'Cambio contrato', Icon: ScrollText,       iconColor: 'text-purple-400',  bg: 'bg-purple-50',  badge: 'bg-purple-100 text-purple-600' },
   CAPACITACION:    { label: 'Capacitación',    Icon: GraduationCap,    iconColor: 'text-emerald-400', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-600' },

@@ -4,6 +4,7 @@ import type {
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
+  ProgramacionMensual, RequeridoHorario, FactorReduccion, SimulacionResponse,
 } from '../types'
 
 // Auth
@@ -184,6 +185,26 @@ export const soporteApi = {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     ),
+}
+
+// Programación
+export const programacionApi = {
+  list: (params?: { servicioId?: number; anio?: number }) =>
+    api.get<ProgramacionMensual[]>('/programacion', { params }),
+  create: (data: { servicio_id: number; mes: number; anio: number; semana?: number }) =>
+    api.post<ProgramacionMensual>('/programacion', data),
+  get: (id: number) =>
+    api.get<ProgramacionMensual>(`/programacion/${id}`),
+  delete: (id: number) =>
+    api.delete(`/programacion/${id}`),
+  upsertRequeridos: (id: number, requeridos: Omit<RequeridoHorario, 'id' | 'programacion_id'>[]) =>
+    api.put(`/programacion/${id}/requeridos`, { requeridos }),
+  upsertFactor: (id: number, factor: Omit<FactorReduccion, 'id' | 'programacion_id'>) =>
+    api.put(`/programacion/${id}/factor`, factor),
+  simular: (id: number) =>
+    api.get<SimulacionResponse>(`/programacion/${id}/simular`),
+  export: (id: number) =>
+    api.get(`/programacion/${id}/export`, { responseType: 'blob' }),
 }
 
 // Vacaciones WF

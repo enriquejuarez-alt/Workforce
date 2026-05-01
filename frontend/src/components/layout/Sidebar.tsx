@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
-  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud,
+  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { to: '/remociones', icon: UserX, label: 'Remociones' },
   { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
+  { to: '/programacion', icon: CalendarClock, label: 'Programación' },
 ]
 
 const ADMIN_ITEMS = [

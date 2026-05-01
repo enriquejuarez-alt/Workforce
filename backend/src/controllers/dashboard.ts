@@ -41,6 +41,8 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       estadoBreakdown,
       agentesConLicencia,
       agentesConLicenciaRecord,
+      porServicio,
+      licenciasHoy,
     ] = await Promise.all([
       prisma.agente.count({ where: agenteWhere }),
       prisma.agente.count({ where: { ...agenteWhere, activo: false } }),
@@ -117,37 +119,33 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
           agente: { licencias: { some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } } } },
         },
       }),
-    ])
-
-    const porServicio = await prisma.servicio.findMany({
-      where: {
-        activo: true,
-        ...(servicioIds ? { id: { in: servicioIds } } : {}),
-      },
-      include: {
-        _count: { select: { agentes: true } },
-      },
-      orderBy: { nombre: 'asc' },
-    })
-
-    const licenciasHoy = await prisma.licencia.findMany({
-      where: {
-        fecha_desde: { lte: now },
-        fecha_hasta: { gte: now },
-        agente: agenteWhere,
-      },
-      include: {
-        agente: {
-          select: {
-            id: true,
-            nombre: true,
-            servicio: { select: { nombre: true, color: true } },
+      prisma.servicio.findMany({
+        where: {
+          activo: true,
+          ...(servicioIds ? { id: { in: servicioIds } } : {}),
+        },
+        include: { _count: { select: { agentes: true } } },
+        orderBy: { nombre: 'asc' },
+      }),
+      prisma.licencia.findMany({
+        where: {
+          fecha_desde: { lte: now },
+          fecha_hasta: { gte: now },
+          agente: agenteWhere,
+        },
+        include: {
+          agente: {
+            select: {
+              id: true,
+              nombre: true,
+              servicio: { select: { nombre: true, color: true } },
+            },
           },
         },
-      },
-      orderBy: { agente: { nombre: 'asc' } },
-      take: 30,
-    })
+        orderBy: { agente: { nombre: 'asc' } },
+        take: 30,
+      }),
+    ])
 
     const countByEstado = (keywords: string[]) =>
       estadoBreakdown

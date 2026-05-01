@@ -122,27 +122,29 @@ export default function Dashboard() {
               <p className="text-sm font-bold text-gray-700">Agentes por servicio</p>
             </div>
             <div className="space-y-2.5">
-              {data?.por_servicio?.map((s) => {
-                const max = Math.max(...(data.por_servicio?.map((x) => x.total_agentes) ?? [1]))
-                const pct = max > 0 ? (s.total_agentes / max) * 100 : 0
-                return (
-                  <div key={s.id}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                        <span className="text-xs font-medium text-gray-700">{s.nombre}</span>
+              {(() => {
+                const max = Math.max(...(data?.por_servicio?.map((x) => x.total_agentes) ?? [0]), 1)
+                return data?.por_servicio?.map((s) => {
+                  const pct = (s.total_agentes / max) * 100
+                  return (
+                    <div key={s.id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                          <span className="text-xs font-medium text-gray-700">{s.nombre}</span>
+                        </div>
+                        <span className="text-xs font-bold text-gray-600">{s.total_agentes}</span>
                       </div>
-                      <span className="text-xs font-bold text-gray-600">{s.total_agentes}</span>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, backgroundColor: s.color }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: s.color }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
               {!data?.por_servicio?.length && (
                 <p className="text-sm text-gray-400">Sin datos de servicios</p>
               )}

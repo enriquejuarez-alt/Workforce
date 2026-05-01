@@ -40,6 +40,21 @@ function startOfToday(): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
+async function buildCalendarioAgenteWhere(req: AuthRequest, servicioIdParam: number | null): Promise<any> {
+  const adminUser = req.user?.rol === 'ADMINISTRADOR'
+  if (!adminUser) {
+    const permisos = await prisma.usuarioServicioPermiso.findMany({
+      where: { usuario_id: req.user!.userId, puede_ver: true },
+      select: { servicio_id: true },
+    })
+    const allowedIds = permisos.map((p) => p.servicio_id)
+    return servicioIdParam
+      ? { servicio_id: allowedIds.includes(servicioIdParam) ? servicioIdParam : -1 }
+      : { servicio_id: { in: allowedIds } }
+  }
+  return servicioIdParam ? { servicio_id: servicioIdParam } : {}
+}
+
 export async function syncAgenteActivo(agenteId: number) {
   const hoy = startOfToday()
   const vigente = await prisma.licencia.findFirst({
@@ -59,21 +74,7 @@ export const getCalendarioLicencias = async (req: AuthRequest, res: Response) =>
 
     const inicioMes = new Date(Date.UTC(anio, mes - 1, 1))
     const finMes = new Date(Date.UTC(anio, mes, 0, 23, 59, 59))
-
-    const adminUser = req.user?.rol === 'ADMINISTRADOR'
-    let agenteWhere: any = {}
-    if (!adminUser) {
-      const permisos = await prisma.usuarioServicioPermiso.findMany({
-        where: { usuario_id: req.user!.userId, puede_ver: true },
-        select: { servicio_id: true },
-      })
-      const allowedIds = permisos.map((p) => p.servicio_id)
-      agenteWhere = servicioIdParam
-        ? { servicio_id: allowedIds.includes(servicioIdParam) ? servicioIdParam : -1 }
-        : { servicio_id: { in: allowedIds } }
-    } else if (servicioIdParam) {
-      agenteWhere = { servicio_id: servicioIdParam }
-    }
+    const agenteWhere = await buildCalendarioAgenteWhere(req, servicioIdParam)
 
     const include = {
       agente: { select: { id: true, nombre: true, servicio: { select: { id: true, nombre: true } } } },
@@ -395,21 +396,7 @@ export const exportCalendarioLicencias = async (req: AuthRequest, res: Response)
 
     const inicioMes = new Date(Date.UTC(anio, mes - 1, 1))
     const finMes = new Date(Date.UTC(anio, mes, 0, 23, 59, 59))
-
-    const adminUser = req.user?.rol === 'ADMINISTRADOR'
-    let agenteWhere: any = {}
-    if (!adminUser) {
-      const permisos = await prisma.usuarioServicioPermiso.findMany({
-        where: { usuario_id: req.user!.userId, puede_ver: true },
-        select: { servicio_id: true },
-      })
-      const allowedIds = permisos.map((p) => p.servicio_id)
-      agenteWhere = servicioIdParam
-        ? { servicio_id: allowedIds.includes(servicioIdParam) ? servicioIdParam : -1 }
-        : { servicio_id: { in: allowedIds } }
-    } else if (servicioIdParam) {
-      agenteWhere = { servicio_id: servicioIdParam }
-    }
+    const agenteWhere = await buildCalendarioAgenteWhere(req, servicioIdParam)
 
     const include = {
       agente: { select: { id: true, nombre: true, servicio: { select: { id: true, nombre: true } } } },

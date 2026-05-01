@@ -1,22 +1,24 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical } from 'lucide-react'
+import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical, BriefcaseMedical, RefreshCw, ScrollText, GraduationCap, DoorOpen, Palmtree } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { agentesApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
-import { EstadoAgenteBadge, LicenciaBadge, CambioTemporalBadge, NominaEstadoBadge } from '../components/ui/Badge'
+import { EstadoAgenteBadge, LicenciaBadge, NominaEstadoBadge } from '../components/ui/Badge'
 import { MESES } from '../types'
 import type { TimelineEvento } from '../types'
 
-const TIMELINE_CFG: Record<TimelineEvento['tipo'], { label: string; icon: string; bg: string; badge: string }> = {
-  LICENCIA:        { label: 'Licencia',        icon: '🏥', bg: 'bg-red-50',     badge: 'bg-red-100 text-red-600' },
-  CAMBIO_TEMPORAL: { label: 'Cambio temporal', icon: '↔️', bg: 'bg-blue-50',    badge: 'bg-blue-100 text-blue-600' },
-  CAMBIO_CONTRATO: { label: 'Cambio contrato', icon: '📋', bg: 'bg-purple-50',  badge: 'bg-purple-100 text-purple-600' },
-  CAPACITACION:    { label: 'Capacitación',    icon: '🎓', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-600' },
-  REMOCION:        { label: 'Remoción',        icon: '🚪', bg: 'bg-orange-50',  badge: 'bg-orange-100 text-orange-600' },
-  VACACION:        { label: 'Vacaciones',      icon: '🌴', bg: 'bg-sky-50',     badge: 'bg-sky-100 text-sky-600' },
+import type { LucideIcon } from 'lucide-react'
+
+const TIMELINE_CFG: Record<TimelineEvento['tipo'], { label: string; Icon: LucideIcon; iconColor: string; bg: string; badge: string }> = {
+  LICENCIA:        { label: 'Licencia',        Icon: BriefcaseMedical, iconColor: 'text-red-400',     bg: 'bg-red-50',     badge: 'bg-red-100 text-red-600' },
+  CAMBIO_TEMPORAL: { label: 'Cambio temporal', Icon: RefreshCw,        iconColor: 'text-blue-400',    bg: 'bg-blue-50',    badge: 'bg-blue-100 text-blue-600' },
+  CAMBIO_CONTRATO: { label: 'Cambio contrato', Icon: ScrollText,       iconColor: 'text-purple-400',  bg: 'bg-purple-50',  badge: 'bg-purple-100 text-purple-600' },
+  CAPACITACION:    { label: 'Capacitación',    Icon: GraduationCap,    iconColor: 'text-emerald-400', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-600' },
+  REMOCION:        { label: 'Remoción',        Icon: DoorOpen,         iconColor: 'text-orange-400',  bg: 'bg-orange-50',  badge: 'bg-orange-100 text-orange-600' },
+  VACACION:        { label: 'Vacaciones',      Icon: Palmtree,         iconColor: 'text-sky-400',     bg: 'bg-sky-50',     badge: 'bg-sky-100 text-sky-600' },
 }
 
 export default function AgenteDetalle() {
@@ -201,9 +203,8 @@ export default function AgenteDetalle() {
                   const cfg = TIMELINE_CFG[ev.tipo]
                   return (
                     <div key={i} className="flex gap-4 group">
-                      {/* Icon */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 z-10 text-sm border-2 border-white ${cfg.bg}`}>
-                        {cfg.icon}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 z-10 border-2 border-white ${cfg.bg}`}>
+                        <cfg.Icon size={15} className={cfg.iconColor} />
                       </div>
                       {/* Content */}
                       <div className="flex-1 min-w-0 pb-4">

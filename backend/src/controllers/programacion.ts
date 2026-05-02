@@ -359,105 +359,151 @@ function prepareAgentInfos(
 
 // ─── Excel parser for requeridos.xlsx ─────────────────────────────────────────
 
+function excelSerialToDateStr(serial: number): string {
+  const d = XLSX.SSF.parse_date_code(serial)
+  return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
+}
+
 function parseRequeridosExcel(
   filePath: string
 ): { fecha: string; intervalo: string; requeridos: number; es_feriado: boolean }[] {
-  const wb = XLSX.readFile(filePath)
-  const ws = wb.Sheets[wb.SheetNames[0]]
-  const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1 })
-  const results: { fecha: string; intervalo: string; requeridos: number; es_feriado: boolean }[] = []
+  const wb = XLSX.readFile(filePath, { cellDates: false })
 
-  if (raw.length < 2) return results
+  // Accumulator: sum requeridos across sheets for same (fecha, intervalo)
+  const acc = new Map<string, { requeridos: number; es_feriado: boolean }>()
+  const addRow = (fecha: string, intervalo: string, requeridos: number, es_feriado: boolean) => {
+    const key = `${fecha}|${intervalo}`
+    const existing = acc.get(key)
+    if (existing) existing.requeridos += requeridos
+    else acc.set(key, { requeridos, es_feriado })
+  }
 
-  // Detect format: pivot (date cols) vs simple (Fecha | Intervalo | Requeridos)
-  const firstHeader = String(raw[0]?.[0] ?? '').trim().toLowerCase()
-  const isSimple = ['fecha', 'date', 'día', 'dia'].some(k => firstHeader.includes(k))
+  for (const sheetName of wb.SheetNames) {
+    if (sheetName.toLowerCase() === 'resumen') continue
 
-  if (isSimple) {
-    // Simple: rows are (fecha, intervalo, requeridos)
-    for (let r = 1; r < raw.length; r++) {
-      const row = raw[r]
-      if (!row || !row[0]) continue
-      const fechaVal = row[0]
-      let fechaStr = ''
-      if (typeof fechaVal === 'number') {
-        const d = XLSX.SSF.parse_date_code(fechaVal)
-        fechaStr = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
-      } else {
-        fechaStr = String(fechaVal).trim().replace(/\//g, '-')
+    const ws = wb.Sheets[sheetName]
+    const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: null })
+    if (raw.length < 2) continue
+
+    const r0 = raw[0] as any[]  // Row 0
+    const r1 = raw[1] as any[]  // Row 1
+
+    // Detect CP Soporte / Workforce pivot format:
+    //   Row 0: ["Dia →", "feriado", "sábado", "lunes", ...]
+    //   Row 1: ["Fecha →", 46143, 46144, ...]  (Excel date serials)
+    const isWorkforce =
+      String(r0?.[0] ?? '').toLowerCase().includes('dia') &&
+      String(r1?.[0] ?? '').toLowerCase().includes('fecha') &&
+      typeof r1?.[1] === 'number'
+
+    if (isWorkforce) {
+      // Build column map: col index → { fecha, es_feriado }
+      const dateCols: { idx: number; fecha: string; es_feriado: boolean }[] = []
+      for (let c = 1; c < r1.length; c++) {
+        const serial = r1[c]
+        if (typeof serial !== 'number') continue
+        const fecha = excelSerialToDateStr(serial)
+        const dayName = String(r0[c] ?? '').toLowerCase().trim()
+        dateCols.push({ idx: c, fecha, es_feriado: dayName.includes('feriado') })
       }
-      const intvVal = row[1]
-      let intvStr = ''
-      if (typeof intvVal === 'number') {
-        const totalMin = Math.round(intvVal * 24 * 60)
-        intvStr = minutesToHHMM(totalMin)
+
+      // Data rows start at index 3 (row 2 = sub-headers like "Franja ↓", "Hs Req")
+      for (let r = 3; r < raw.length; r++) {
+        const row = raw[r] as any[]
+        if (!row) continue
+        const firstCell = row[0]
+        if (firstCell === null || firstCell === undefined) continue
+        // Stop at "Total diario" summary row
+        if (typeof firstCell === 'string' && firstCell.toLowerCase().includes('total')) break
+
+        // Time interval: stored as Excel time fraction (0 = 00:00, 0.020833 = 00:30, ...)
+        let intvStr = ''
+        if (typeof firstCell === 'number') {
+          intvStr = minutesToHHMM(Math.round(firstCell * 24 * 60))
+        } else {
+          const m = String(firstCell).match(/\b(\d{1,2}):(\d{2})\b/)
+          if (m) intvStr = `${String(parseInt(m[1])).padStart(2, '0')}:${m[2]}`
+        }
+        if (!intvStr) continue
+
+        for (const col of dateCols) {
+          const val = row[col.idx]
+          const req = typeof val === 'number' ? Math.round(val) : parseInt(String(val ?? 0)) || 0
+          if (req > 0) addRow(col.fecha, intvStr, req, col.es_feriado)
+        }
+      }
+      continue
+    }
+
+    // Fallback: simple format (col0=fecha, col1=intervalo, col2=requeridos)
+    const firstHeader = String(r0?.[0] ?? '').trim().toLowerCase()
+    if (['fecha', 'date', 'día', 'dia'].some(k => firstHeader.startsWith(k))) {
+      for (let r = 1; r < raw.length; r++) {
+        const row = raw[r] as any[]
+        if (!row || row[0] === null || row[0] === undefined) continue
+        let fechaStr = ''
+        if (typeof row[0] === 'number') fechaStr = excelSerialToDateStr(row[0])
+        else fechaStr = String(row[0]).trim().replace(/\//g, '-')
+
+        let intvStr = ''
+        if (typeof row[1] === 'number') intvStr = minutesToHHMM(Math.round(row[1] * 24 * 60))
+        else {
+          const m = String(row[1] ?? '').match(/\b(\d{1,2}):(\d{2})\b/)
+          if (m) intvStr = `${String(parseInt(m[1])).padStart(2, '0')}:${m[2]}`
+        }
+        const req = typeof row[2] === 'number' ? Math.round(row[2]) : parseInt(String(row[2] ?? 0)) || 0
+        if (fechaStr && intvStr && req > 0) addRow(fechaStr, intvStr, req, false)
+      }
+      continue
+    }
+
+    // Fallback: generic pivot (row 0 has date serials or date strings as headers)
+    const dateCols: { idx: number; fecha: string; es_feriado: boolean }[] = []
+    for (let c = 1; c < (r0?.length ?? 0); c++) {
+      const hVal = r0[c]
+      if (!hVal) continue
+      let fechaStr = ''
+      let es_feriado = false
+      if (typeof hVal === 'number') {
+        fechaStr = excelSerialToDateStr(hVal)
       } else {
+        const s = String(hVal).trim()
+        if (s.toLowerCase().includes('feriado')) es_feriado = true
+        const m = s.match(/(\d{4}[-/]\d{1,2}[-/]\d{1,2})|(\d{1,2}[-/]\d{1,2}[-/]\d{4})/)
+        if (m) fechaStr = m[0].replace(/\//g, '-')
+      }
+      if (fechaStr) dateCols.push({ idx: c, fecha: fechaStr, es_feriado })
+    }
+    const dataStart = (raw as any[][]).findIndex((row, i) => {
+      if (i === 0) return false
+      const cell = row?.[0]
+      if (cell === null || cell === undefined) return false
+      return typeof cell === 'number' || String(cell).match(/\b\d{1,2}:\d{2}\b/) !== null
+    })
+    for (let r = Math.max(1, dataStart); r < raw.length; r++) {
+      const row = raw[r] as any[]
+      if (!row) continue
+      const intvVal = row[0]
+      if (intvVal === null || intvVal === undefined) continue
+      let intvStr = ''
+      if (typeof intvVal === 'number') intvStr = minutesToHHMM(Math.round(intvVal * 24 * 60))
+      else {
         const m = String(intvVal).match(/\b(\d{1,2}):(\d{2})\b/)
         if (m) intvStr = `${String(parseInt(m[1])).padStart(2, '0')}:${m[2]}`
       }
-      const req = parseInt(row[2]) || 0
-      if (fechaStr && intvStr && req > 0) {
-        results.push({ fecha: fechaStr, intervalo: intvStr, requeridos: req, es_feriado: false })
+      if (!intvStr) continue
+      for (const col of dateCols) {
+        const val = row[col.idx]
+        const req = typeof val === 'number' ? Math.round(val) : parseInt(String(val ?? 0)) || 0
+        if (req > 0) addRow(col.fecha, intvStr, req, col.es_feriado)
       }
     }
-    return results
   }
 
-  // Pivot format: rows = intervals, cols = dates
-  // Find date headers (skip first column which is interval label)
-  const headerRow = raw[0]
-  const dateCols: { idx: number; fecha: string; es_feriado: boolean }[] = []
-
-  for (let c = 1; c < headerRow.length; c++) {
-    const hVal = headerRow[c]
-    if (!hVal) continue
-    let fechaStr = ''
-    let es_feriado = false
-
-    if (typeof hVal === 'number') {
-      const d = XLSX.SSF.parse_date_code(hVal)
-      fechaStr = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
-    } else {
-      const s = String(hVal).trim()
-      if (s.toLowerCase().includes('feriado')) es_feriado = true
-      const m = s.match(/(\d{4}[-/]\d{1,2}[-/]\d{1,2})|(\d{1,2}[-/]\d{1,2}[-/]\d{4})/)
-      if (m) fechaStr = m[0].replace(/\//g, '-')
-    }
-    if (fechaStr) dateCols.push({ idx: c, fecha: fechaStr, es_feriado })
-  }
-
-  // Find start data row (skip rows 0 and 2 as in Python app, or skip any non-time row)
-  const dataStartRow = raw.findIndex((row, i) => {
-    if (i === 0) return false
-    const cell = row?.[0]
-    if (!cell) return false
-    return String(cell).match(/\b\d{1,2}:\d{2}\b/) !== null
+  return [...acc.entries()].map(([key, val]) => {
+    const sep = key.indexOf('|')
+    return { fecha: key.substring(0, sep), intervalo: key.substring(sep + 1), ...val }
   })
-  if (dataStartRow < 0) return results
-
-  for (let r = dataStartRow; r < raw.length; r++) {
-    const row = raw[r]
-    if (!row?.[0]) continue
-    const intvVal = row[0]
-    let intvStr = ''
-    if (typeof intvVal === 'number') {
-      intvStr = minutesToHHMM(Math.round(intvVal * 24 * 60))
-    } else {
-      const m = String(intvVal).match(/\b(\d{1,2}):(\d{2})\b/)
-      if (m) intvStr = `${String(parseInt(m[1])).padStart(2, '0')}:${m[2]}`
-    }
-    if (!intvStr) continue
-
-    for (const col of dateCols) {
-      const val = row[col.idx]
-      const req = typeof val === 'number' ? Math.round(val) : parseInt(String(val)) || 0
-      if (req > 0) {
-        results.push({ fecha: col.fecha, intervalo: intvStr, requeridos: req, es_feriado: col.es_feriado })
-      }
-    }
-  }
-
-  return results
 }
 
 // ─── Controllers ──────────────────────────────────────────────────────────────

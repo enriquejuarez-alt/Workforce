@@ -304,8 +304,8 @@ export default function ProgramacionDetalle() {
   return (
     <div className="flex flex-col h-full">
       <Header
-        title={prog.servicio.nombre}
-        subtitle={periodoLabel}
+        title="Programación"
+        subtitle={`${prog.servicio.nombre} · ${periodoLabel}`}
         actions={
           <div className="flex items-center gap-2">
             {sim && (
@@ -336,8 +336,8 @@ export default function ProgramacionDetalle() {
             { key: 'config', label: 'Configuración' },
             { key: 'nomina', label: 'Nómina', badge: sim?.stats.nomina_under },
             { key: 'simulacion', label: 'Simulación', badge: sim?.stats.sim_under },
-            { key: 'movimientos', label: `Movimientos${sim ? ` (${sim.movimientos.length})` : ''}` },
-            { key: 'feriados', label: `Cupos Feriado${sim ? ` (${sim.cupos_feriado.length})` : ''}` },
+            { key: 'movimientos', label: 'Movimientos', badge: sim?.movimientos.length },
+            { key: 'feriados', label: 'Cupos Feriado', badge: sim?.cupos_feriado.length },
           ] as { key: typeof tab; label: string; badge?: number }[]).map(t => (
             <button
               key={t.key}
@@ -361,7 +361,7 @@ export default function ProgramacionDetalle() {
             <div className="lg:col-span-2 card p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-sm font-bold text-gray-800">Requeridos por franja horaria</p>
+                  <p className="text-sm font-semibold text-gray-800">Requeridos por franja horaria</p>
                   <p className="text-xs text-gray-400 mt-0.5">Cantidad de agentes necesarios por hora</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -437,7 +437,7 @@ export default function ProgramacionDetalle() {
             <div className="space-y-4">
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm font-bold text-gray-800">Factor de reducción</p>
+                  <p className="text-sm font-semibold text-gray-800">Factor de reducción</p>
                   <button
                     className="btn-primary text-xs py-1.5 px-3"
                     onClick={() => saveFactorMut.mutate()}
@@ -468,7 +468,7 @@ export default function ProgramacionDetalle() {
               </div>
 
               <div className="card p-4 bg-blue-50 border-blue-100">
-                <p className="text-xs font-semibold text-blue-800 mb-2">Algoritmo</p>
+                <p className="text-sm font-semibold text-blue-800 mb-2">Algoritmo</p>
                 <ul className="text-xs text-blue-700 space-y-1">
                   <li>• Días libres: rotación por contrato (24/30/35/36 hs)</li>
                   <li>• Cobertura neta = presentes × (1 - reductor)</li>
@@ -480,7 +480,7 @@ export default function ProgramacionDetalle() {
 
               {sim && (
                 <div className="card p-4">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Agentes del servicio</p>
+                  <p className="text-sm font-semibold text-gray-800 mb-2">Agentes del servicio</p>
                   <p className="text-2xl font-bold text-gray-900">{sim.total_agentes}</p>
                   {sim.agentes_sin_ingreso > 0 && (
                     <p className="text-xs text-orange-500 mt-1 flex items-center gap-1">
@@ -573,7 +573,7 @@ export default function ProgramacionDetalle() {
 
                   {/* Coverage curve */}
                   <div className="card p-4">
-                    <p className="text-xs font-semibold text-gray-700 mb-2">Curva de cobertura (promedio por franja)</p>
+                    <p className="text-sm font-semibold text-gray-800 mb-2">Curva de cobertura</p>
                     <div className="flex gap-4 text-xs mb-2">
                       <span className="flex items-center gap-1"><span className="w-8 border-t-2 border-dashed border-red-400 inline-block" /> Requeridos</span>
                       <span className="flex items-center gap-1"><span className="w-8 border-t-2 border-green-500 inline-block" /> Asignados</span>
@@ -584,7 +584,7 @@ export default function ProgramacionDetalle() {
                   {/* Grid */}
                   <div className="card overflow-hidden">
                     <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-                      <p className="text-xs font-semibold text-gray-700">Grilla de cobertura</p>
+                      <p className="text-sm font-semibold text-gray-800">Grilla de cobertura</p>
                       <p className="text-xs text-gray-400">{sim.fechas.length} días · {sim.intervalos.length} franjas</p>
                     </div>
                     <CoverageGrid sim={currentSim} intervalos={sim.intervalos} fechas={sim.fechas} />
@@ -592,7 +592,7 @@ export default function ProgramacionDetalle() {
 
                   {/* Interval summary */}
                   <div className="card p-5">
-                    <p className="text-sm font-bold text-gray-800 mb-3">Resumen por franja horaria</p>
+                    <p className="text-sm font-semibold text-gray-800 mb-3">Resumen por franja horaria</p>
                     <div className="overflow-x-auto">
                       <IntervalSummary sim={currentSim} intervalos={sim.intervalos} />
                     </div>
@@ -704,7 +704,7 @@ export default function ProgramacionDetalle() {
               </>
             )}
             <div className="card p-4">
-              <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
                 <CalendarDays size={13} /> Horarios considerados para feriados
               </p>
               <div className="flex flex-wrap gap-2">

@@ -2,12 +2,23 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save, Play, Download, Upload, AlertTriangle, Users, CheckCircle,
-  XCircle, ArrowRight, Sun, CalendarDays, ChevronRight } from 'lucide-react'
+  XCircle, ArrowRight, Sun, CalendarDays, ChevronRight, RefreshCw, Clock } from 'lucide-react'
 import { programacionApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
 import { MESES } from '../types'
 import type { SimulacionResponse, SimulacionResultado } from '../types'
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function timeAgo(date: Date): string {
+  const min = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (min < 1) return 'hace un momento'
+  if (min < 60) return `hace ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `hace ${h}h`
+  return `hace ${Math.floor(h / 24)}d`
+}
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -212,7 +223,11 @@ export default function ProgramacionDetalle() {
   const [reqs, setReqs] = useState<Record<string, number>>({})
   const [factor, setFactor] = useState({ deslogueo: 0, ausentismo: 0, rotacion: 0 })
   const [sim, setSim] = useState<SimulacionResponse | null>(null)
+  const [simTimestamp, setSimTimestamp] = useState<Date | null>(null)
   const [uploadMsg, setUploadMsg] = useState('')
+
+  const CACHE_KEY = `prog_sim_${progId}`
+  const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 h
 
   const { data: prog, isLoading } = useQuery({
     queryKey: ['programacion', progId],
@@ -225,14 +240,33 @@ export default function ProgramacionDetalle() {
     // Convert per-date reqs back to tipo_dia template (use first date of each type as representative)
     const map: Record<string, number> = {}
     for (const r of prog.requeridos ?? []) {
-      const d = new Date(r.fecha)
       const dow = new Date(r.fecha + 'T12:00:00').getDay()
       const tipoDia: TipoDia = dow === 0 ? 'DOMINGO' : dow === 6 ? 'SABADO' : 'SEMANA'
       const key = `${tipoDia}:${r.intervalo}`
-      if (!map[key]) map[key] = r.requeridos  // first occurrence wins
+      if (!map[key]) map[key] = r.requeridos
     }
     setReqs(map)
   }, [prog])
+
+  // Load cached simulation on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY)
+      if (!raw) return
+      const { data, timestamp } = JSON.parse(raw) as { data: SimulacionResponse; timestamp: string }
+      const age = Date.now() - new Date(timestamp).getTime()
+      if (age < CACHE_TTL) {
+        setSim(data)
+        setSimTimestamp(new Date(timestamp))
+        setTab('nomina')
+      } else {
+        localStorage.removeItem(CACHE_KEY)
+      }
+    } catch {
+      localStorage.removeItem(CACHE_KEY)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [CACHE_KEY])
 
   const saveReqsMut = useMutation({
     mutationFn: () => {
@@ -259,6 +293,10 @@ export default function ProgramacionDetalle() {
     onSuccess: (res) => {
       setUploadMsg(`Archivo cargado: ${res.data.total} requeridos importados`)
       qc.invalidateQueries({ queryKey: ['programacion', progId] })
+      // Invalidate cached sim since requirements changed
+      localStorage.removeItem(CACHE_KEY)
+      setSim(null)
+      setSimTimestamp(null)
     },
   })
 
@@ -270,8 +308,15 @@ export default function ProgramacionDetalle() {
   const simMut = useMutation({
     mutationFn: () => programacionApi.simular(progId).then(r => r.data),
     onSuccess: (data) => {
+      const now = new Date()
       setSim(data)
+      setSimTimestamp(now)
       setTab('nomina')
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: now.toISOString() }))
+      } catch {
+        // localStorage lleno, continúa sin caché
+      }
     },
   })
 
@@ -353,6 +398,22 @@ export default function ProgramacionDetalle() {
             </button>
           ))}
         </div>
+
+        {/* Sim timestamp indicator */}
+        {simTimestamp && (
+          <div className="flex items-center gap-2 mb-4 text-xs text-gray-400">
+            <Clock size={11} />
+            <span>Última simulación: <span className="font-medium text-gray-500">{timeAgo(simTimestamp)}</span></span>
+            <button
+              className="flex items-center gap-1 text-konecta hover:text-konecta/80 font-medium transition-colors ml-1"
+              onClick={() => simMut.mutate()}
+              disabled={simMut.isPending}
+            >
+              <RefreshCw size={10} className={simMut.isPending ? 'animate-spin' : ''} />
+              Re-simular
+            </button>
+          </div>
+        )}
 
         {/* ── CONFIG TAB ── */}
         {tab === 'config' && (

@@ -209,6 +209,8 @@ export const programacionApi = {
     api.get<SimulacionResponse>(`/programacion/${id}/simular`),
   export: (id: number) =>
     api.get(`/programacion/${id}/export`, { responseType: 'blob' }),
+  exportFrancos: (id: number) =>
+    api.get(`/programacion/${id}/francos`, { responseType: 'blob' }),
 }
 
 // Vacaciones WF

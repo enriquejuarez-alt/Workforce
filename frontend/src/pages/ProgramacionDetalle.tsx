@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save, Play, Download, Upload, AlertTriangle, Users, CheckCircle,
-  XCircle, ArrowRight, Sun, CalendarDays, ChevronRight, RefreshCw, Clock } from 'lucide-react'
+  XCircle, ArrowRight, Sun, CalendarDays, ChevronRight, RefreshCw, Clock, CalendarOff } from 'lucide-react'
 import { programacionApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
@@ -320,16 +320,26 @@ export default function ProgramacionDetalle() {
     },
   })
 
+  function downloadBlob(data: BlobPart, filename: string) {
+    const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function handleExport() {
-    programacionApi.export(progId).then(res => {
-      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `programacion_${prog?.servicio.nombre}_${prog?.mes}_${prog?.anio}.xlsx`
-      a.click()
-      URL.revokeObjectURL(url)
-    })
+    programacionApi.export(progId).then(res =>
+      downloadBlob(res.data, `programacion_${prog?.servicio.nombre}_${prog?.mes}_${prog?.anio}.xlsx`)
+    )
+  }
+
+  function handleExportFrancos() {
+    programacionApi.exportFrancos(progId).then(res =>
+      downloadBlob(res.data, `francos_${prog?.servicio.nombre}_${prog?.mes}_${prog?.anio}.xlsx`)
+    )
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -353,9 +363,12 @@ export default function ProgramacionDetalle() {
         subtitle={`${prog.servicio.nombre} · ${periodoLabel}`}
         actions={
           <div className="flex items-center gap-2">
+            <button className="btn-secondary" onClick={handleExportFrancos}>
+              <CalendarOff size={14} /> Francos
+            </button>
             {sim && (
               <button className="btn-secondary" onClick={handleExport}>
-                <Download size={14} /> Exportar (4 hojas)
+                <Download size={14} /> Exportar simulación
               </button>
             )}
             <button

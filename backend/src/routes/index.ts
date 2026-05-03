@@ -20,7 +20,7 @@ import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
-import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion } from '../controllers/programacion'
+import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos } from '../controllers/programacion'
 
 const router = Router()
 
@@ -112,6 +112,7 @@ router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
 router.post('/soporte/reporte', authenticate, uploadImagen.single('captura'), enviarReporte)
 
 router.get('/programacion/:id/export', authenticate, exportProgramacion)
+router.get('/programacion/:id/francos', authenticate, exportFrancos)
 router.get('/programacion/:id/simular', authenticate, simularProgramacion)
 router.post('/programacion/:id/upload-requeridos', authenticate, uploadExcel.single('file'), uploadRequeridos)
 router.get('/programacion/:id', authenticate, getProgramacion)

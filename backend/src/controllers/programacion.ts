@@ -802,3 +802,90 @@ export const exportProgramacion = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ error: 'Error al exportar programación' })
   }
 }
+
+export const exportFrancos = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const prog = await prisma.programacionMensual.findUnique({
+      where: { id },
+      include: { servicio: { select: { id: true, nombre: true } } },
+    })
+    if (!prog) return res.status(404).json({ error: 'Programación no encontrada' })
+
+    const rawAgents = await prisma.agente.findMany({
+      where: { servicio_id: prog.servicio_id, activo: true },
+      select: { id: true, nombre: true, segmento: true, horarios: true, contrato: true },
+    })
+
+    const agentInfos = prepareAgentInfos(rawAgents)
+    const dates = getDatesForPeriod(prog.mes, prog.anio, prog.semana)
+
+    // ── Hoja 1: Pivot agentes × fechas ────────────────────────────────────────
+    const dateHeaders = dates.map(d => {
+      const day = String(d.getDate()).padStart(2, '0')
+      const mon = String(d.getMonth() + 1).padStart(2, '0')
+      return `${day}/${mon} ${DIAS_SHORT[d.getDay()]}`
+    })
+
+    const pivotHeader = ['Nombre', 'Contrato', 'Segmento', 'Ingreso', 'Días de Franco', ...dateHeaders]
+
+    const pivotRows = agentInfos.map(a => {
+      const rawContrato = rawAgents.find(r => r.id === a.id)?.contrato ?? '—'
+      const contratoLabel = a.contratoNorm === 'UNKNOWN' ? rawContrato : a.contratoNorm
+      const francoNames = a.offDows.map(d => DIAS_ES[d]).join(', ')
+      const ingresoStr = a.ingresoMin !== null ? minutesToHHMM(a.ingresoMin) : '—'
+      const dateCells = dates.map(d => (a.offDows.includes(d.getDay()) ? 'F' : ''))
+      return [a.nombre, contratoLabel, a.segmento ?? '—', ingresoStr, francoNames, ...dateCells]
+    })
+
+    // Summary row: count francos per day
+    const summaryRow = [
+      'Total francos', '', '', '', '',
+      ...dates.map(d => agentInfos.filter(a => a.offDows.includes(d.getDay())).length),
+    ]
+
+    const ws1 = XLSX.utils.aoa_to_sheet([pivotHeader, ...pivotRows, summaryRow])
+    ws1['!cols'] = [
+      { wch: 32 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 22 },
+      ...dates.map(() => ({ wch: 7 })),
+    ]
+
+    // ── Hoja 2: Detalle por fecha ──────────────────────────────────────────────
+    const detailRows: (string | number)[][] = [
+      ['Fecha', 'Día', 'Agentes de Franco', 'Agentes Presentes', '% Franco'],
+    ]
+    for (const d of dates) {
+      const dow = d.getDay()
+      const franco = agentInfos.filter(a => a.offDows.includes(dow))
+      const presentes = agentInfos.length - franco.length
+      const pct = agentInfos.length > 0 ? ((franco.length / agentInfos.length) * 100).toFixed(1) + '%' : '0%'
+      const day = String(d.getDate()).padStart(2, '0')
+      const mon = String(d.getMonth() + 1).padStart(2, '0')
+      detailRows.push([
+        `${day}/${mon}/${d.getFullYear()}`,
+        DIAS_ES[dow],
+        franco.map(a => a.nombre).join(', '),
+        presentes,
+        pct,
+      ])
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(detailRows)
+    ws2['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 80 }, { wch: 18 }, { wch: 10 }]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws1, 'Francos_Agentes')
+    XLSX.utils.book_append_sheet(wb, ws2, 'Francos_Por_Fecha')
+
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
+    const mes = String(prog.mes).padStart(2, '0')
+    const semStr = prog.semana > 0 ? `_sem${prog.semana}` : ''
+    const filename = `francos_${prog.servicio.nombre}_${mes}_${prog.anio}${semStr}.xlsx`
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return res.send(buf)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al exportar francos' })
+  }
+}

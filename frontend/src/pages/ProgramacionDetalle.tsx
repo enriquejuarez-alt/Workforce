@@ -237,7 +237,7 @@ export default function ProgramacionDetalle() {
   // Nóminas del mismo servicio para el selector
   const { data: nominasDisponibles = [] } = useQuery({
     queryKey: ['nominas', prog?.servicio_id],
-    queryFn: () => nominasApi.list({ servicioId: prog!.servicio_id }).then(r => r.data),
+    queryFn: () => nominasApi.list({ servicio_id: prog!.servicio_id }).then(r => r.data),
     enabled: !!prog?.servicio_id,
   })
 

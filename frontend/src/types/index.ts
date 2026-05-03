@@ -370,10 +370,12 @@ export interface ProgramacionMensual {
   mes: number
   anio: number
   semana: number  // 0 = mes completo, 1-4 = semana específica
+  nomina_id: number | null
   estado: string
   creado_por: number
   fecha_creacion: string
   servicio: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  nomina?: Pick<NominaMensual, 'id' | 'mes' | 'anio' | 'estado' | 'total_agentes'> | null
   requeridos?: RequeridoHorario[]
   factor?: FactorReduccion | null
   _count?: { requeridos: number }

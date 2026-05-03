@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save, Play, Download, Upload, AlertTriangle, Users, CheckCircle,
   XCircle, ArrowRight, Sun, CalendarDays, ChevronRight, RefreshCw, Clock, CalendarOff } from 'lucide-react'
-import { programacionApi } from '../lib/api'
+import { programacionApi, nominasApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
 import { MESES } from '../types'
@@ -234,6 +234,13 @@ export default function ProgramacionDetalle() {
     queryFn: () => programacionApi.get(progId).then(r => r.data),
   })
 
+  // Nóminas del mismo servicio para el selector
+  const { data: nominasDisponibles = [] } = useQuery({
+    queryKey: ['nominas', prog?.servicio_id],
+    queryFn: () => nominasApi.list({ servicioId: prog!.servicio_id }).then(r => r.data),
+    enabled: !!prog?.servicio_id,
+  })
+
   useEffect(() => {
     if (!prog) return
     if (prog.factor) setFactor({ deslogueo: prog.factor.deslogueo, ausentismo: prog.factor.ausentismo, rotacion: prog.factor.rotacion })
@@ -303,6 +310,17 @@ export default function ProgramacionDetalle() {
   const saveFactorMut = useMutation({
     mutationFn: () => programacionApi.upsertFactor(progId, factor),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['programacion', progId] }),
+  })
+
+  const setNominaMut = useMutation({
+    mutationFn: (nominaId: number | null) => programacionApi.setNomina(progId, nominaId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['programacion', progId] })
+      // Invalidar caché de sim porque cambió la fuente de agentes
+      localStorage.removeItem(CACHE_KEY)
+      setSim(null)
+      setSimTimestamp(null)
+    },
   })
 
   const simMut = useMutation({
@@ -509,6 +527,46 @@ export default function ProgramacionDetalle() {
 
             {/* Factor + info */}
             <div className="space-y-4">
+              {/* Nómina base selector */}
+              <div className="card p-5">
+                <p className="text-sm font-semibold text-gray-800 mb-1">Nómina base</p>
+                <p className="text-xs text-gray-400 mb-3">
+                  Agentes que se usan para simular. Sin selección usa todos los agentes activos del servicio.
+                </p>
+                <select
+                  className="input-base w-full mb-3"
+                  value={prog.nomina_id ?? ''}
+                  onChange={e => {
+                    const val = e.target.value ? parseInt(e.target.value) : null
+                    setNominaMut.mutate(val)
+                  }}
+                  disabled={setNominaMut.isPending}
+                >
+                  <option value="">Agentes activos del servicio</option>
+                  {nominasDisponibles.map(n => (
+                    <option key={n.id} value={n.id}>
+                      {MESES[n.mes - 1]} {n.anio} · {n.total_agentes} agentes ({n.estado})
+                    </option>
+                  ))}
+                </select>
+                {prog.nomina && (
+                  <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
+                    <CheckCircle size={11} />
+                    <span>
+                      Usando nómina de <strong>{MESES[prog.nomina.mes - 1]} {prog.nomina.anio}</strong> — {prog.nomina.total_agentes} agentes
+                    </span>
+                  </div>
+                )}
+                {!prog.nomina && (
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                    <Users size={11} /> Usando agentes activos del servicio
+                  </p>
+                )}
+                {setNominaMut.isError && (
+                  <p className="text-xs text-red-600 mt-2">Error al guardar</p>
+                )}
+              </div>
+
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm font-semibold text-gray-800">Factor de reducción</p>

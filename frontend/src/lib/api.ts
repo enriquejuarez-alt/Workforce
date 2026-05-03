@@ -205,6 +205,8 @@ export const programacionApi = {
     }),
   upsertFactor: (id: number, factor: Omit<FactorReduccion, 'id' | 'programacion_id'>) =>
     api.put(`/programacion/${id}/factor`, factor),
+  setNomina: (id: number, nomina_id: number | null) =>
+    api.patch<ProgramacionMensual>(`/programacion/${id}/nomina`, { nomina_id }),
   simular: (id: number) =>
     api.get<SimulacionResponse>(`/programacion/${id}/simular`),
   export: (id: number) =>

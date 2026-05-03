@@ -151,10 +151,11 @@ model NominaMensual {
   fecha_creacion      DateTime     @default(now())
   fecha_actualizacion DateTime     @updatedAt
 
-  servicio      Servicio              @relation(fields: [servicio_id], references: [id])
-  snapshots     AgenteNominaMensual[]
-  importaciones ImportacionNomina[]
-  auditorias    Auditoria[]
+  servicio       Servicio              @relation(fields: [servicio_id], references: [id])
+  snapshots      AgenteNominaMensual[]
+  importaciones  ImportacionNomina[]
+  auditorias     Auditoria[]
+  programaciones ProgramacionMensual[]
 
   @@unique([servicio_id, mes, anio])
   @@map("nominas_mensuales")
@@ -435,12 +436,14 @@ model ProgramacionMensual {
   mes                 Int
   anio                Int
   semana              Int      @default(0)  // 0 = mes completo, 1-4 = semana específica
+  nomina_id           Int?     // nómina base para la simulación
   estado              String   @default("BORRADOR")
   creado_por          Int
   fecha_creacion      DateTime @default(now())
   fecha_actualizacion DateTime @updatedAt
 
   servicio   Servicio          @relation(fields: [servicio_id], references: [id])
+  nomina     NominaMensual?    @relation(fields: [nomina_id], references: [id])
   creador    Usuario           @relation(fields: [creado_por], references: [id])
   requeridos RequeridoHorario[]
   factor     FactorReduccion?

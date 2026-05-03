@@ -334,6 +334,30 @@ function buildReqsMap(
   return map
 }
 
+// ─── Agent source: nómina snapshot or active agents ───────────────────────────
+
+async function getAgentsForProg(
+  prog: { servicio_id: number; nomina_id: number | null }
+): Promise<{ id: number; nombre: string; segmento: string | null; horarios: string | null; contrato: string | null }[]> {
+  if (prog.nomina_id) {
+    const snapshots = await prisma.agenteNominaMensual.findMany({
+      where: { nomina_mensual_id: prog.nomina_id, presente_en_nomina: true },
+      select: { agente_id: true, nombre: true, segmento: true, horarios: true, contrato: true },
+    })
+    return snapshots.map(s => ({
+      id: s.agente_id,
+      nombre: s.nombre,
+      segmento: s.segmento,
+      horarios: s.horarios,
+      contrato: s.contrato,
+    }))
+  }
+  return prisma.agente.findMany({
+    where: { servicio_id: prog.servicio_id, activo: true },
+    select: { id: true, nombre: true, segmento: true, horarios: true, contrato: true },
+  })
+}
+
 // ─── Prepare agent infos ──────────────────────────────────────────────────────
 
 function prepareAgentInfos(
@@ -529,6 +553,7 @@ export const listProgramaciones = async (req: AuthRequest, res: Response) => {
       where,
       include: {
         servicio: { select: { id: true, nombre: true, color: true } },
+        nomina: { select: { id: true, mes: true, anio: true, estado: true, total_agentes: true } },
         factor: true,
         _count: { select: { requeridos: true } },
       },
@@ -569,6 +594,7 @@ export const getProgramacion = async (req: AuthRequest, res: Response) => {
       where: { id },
       include: {
         servicio: { select: { id: true, nombre: true, color: true } },
+        nomina: { select: { id: true, mes: true, anio: true, estado: true, total_agentes: true } },
         requeridos: { orderBy: [{ fecha: 'asc' }, { intervalo: 'asc' }] },
         factor: true,
       },
@@ -623,6 +649,28 @@ export const upsertRequeridos = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: 'Error al guardar requeridos' })
+  }
+}
+
+// Set nómina base for simulation
+export const setNomina = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const { nomina_id } = req.body as { nomina_id: number | null }
+    const prog = await prisma.programacionMensual.update({
+      where: { id },
+      data: { nomina_id: nomina_id ?? null },
+      include: {
+        servicio: { select: { id: true, nombre: true, color: true } },
+        nomina: { select: { id: true, mes: true, anio: true, estado: true, total_agentes: true } },
+        factor: true,
+        _count: { select: { requeridos: true } },
+      },
+    })
+    return res.json(prog)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al actualizar nómina base' })
   }
 }
 
@@ -684,10 +732,7 @@ export const simularProgramacion = async (req: AuthRequest, res: Response) => {
     if (!prog) return res.status(404).json({ error: 'Programación no encontrada' })
     if (!prog.requeridos.length) return res.status(400).json({ error: 'Configure los requeridos antes de simular' })
 
-    const rawAgents = await prisma.agente.findMany({
-      where: { servicio_id: prog.servicio_id, activo: true },
-      select: { id: true, nombre: true, segmento: true, horarios: true, contrato: true },
-    })
+    const rawAgents = await getAgentsForProg(prog)
 
     const agentInfos = prepareAgentInfos(rawAgents)
     const dates = getDatesForPeriod(prog.mes, prog.anio, prog.semana)
@@ -744,10 +789,7 @@ export const exportProgramacion = async (req: AuthRequest, res: Response) => {
     })
     if (!prog) return res.status(404).json({ error: 'Programación no encontrada' })
 
-    const rawAgents = await prisma.agente.findMany({
-      where: { servicio_id: prog.servicio_id, activo: true },
-      select: { id: true, nombre: true, segmento: true, horarios: true, contrato: true },
-    })
+    const rawAgents = await getAgentsForProg(prog)
 
     const agentInfos = prepareAgentInfos(rawAgents)
     const dates = getDatesForPeriod(prog.mes, prog.anio, prog.semana)
@@ -812,10 +854,7 @@ export const exportFrancos = async (req: AuthRequest, res: Response) => {
     })
     if (!prog) return res.status(404).json({ error: 'Programación no encontrada' })
 
-    const rawAgents = await prisma.agente.findMany({
-      where: { servicio_id: prog.servicio_id, activo: true },
-      select: { id: true, nombre: true, segmento: true, horarios: true, contrato: true },
-    })
+    const rawAgents = await getAgentsForProg(prog)
 
     const agentInfos = prepareAgentInfos(rawAgents)
     const dates = getDatesForPeriod(prog.mes, prog.anio, prog.semana)

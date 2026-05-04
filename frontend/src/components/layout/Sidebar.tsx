@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
-  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud,
+  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -21,6 +21,10 @@ const NAV_ITEMS = [
   { to: '/remociones', icon: UserX, label: 'Remociones' },
   { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
+]
+
+const PROGRAMACION_ITEMS = [
+  { to: '/programacion', icon: CalendarClock, label: 'Programación' },
 ]
 
 const ADMIN_ITEMS = [
@@ -152,6 +156,26 @@ export default function Sidebar() {
               </NavLink>
             )
           })}
+        </div>
+
+        {/* Programación section */}
+        <div className="mt-4">
+          <SectionLabel>Programación</SectionLabel>
+          {PROGRAMACION_ITEMS.map(({ to, icon: Icon, label }) => (
+            <NavLink key={to} to={to} className={({ isActive }) => navClass(isActive)}>
+              {({ isActive }) => (
+                <>
+                  <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
+                    <Icon size={15} />
+                  </span>
+                  <span className="flex-1 truncate">{label}</span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
         </div>
       </nav>
 

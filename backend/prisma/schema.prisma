@@ -41,6 +41,7 @@ model Usuario {
   cambios_contrato_creados     CambioContrato[]
   capacitaciones_creadas       Capacitacion[]
   vacacion_importaciones       VacacionImportacion[]
+  programaciones_creadas       ProgramacionMensual[]
 
   @@map("usuarios")
 }
@@ -65,6 +66,7 @@ model Servicio {
   remociones              Remocion[]
   cambios_contrato        CambioContrato[]
   capacitaciones          Capacitacion[]
+  programaciones          ProgramacionMensual[]
 
   @@map("servicios")
 }
@@ -150,10 +152,11 @@ model NominaMensual {
   fecha_creacion      DateTime     @default(now())
   fecha_actualizacion DateTime     @updatedAt
 
-  servicio      Servicio              @relation(fields: [servicio_id], references: [id])
-  snapshots     AgenteNominaMensual[]
-  importaciones ImportacionNomina[]
-  auditorias    Auditoria[]
+  servicio       Servicio              @relation(fields: [servicio_id], references: [id])
+  snapshots      AgenteNominaMensual[]
+  importaciones  ImportacionNomina[]
+  auditorias     Auditoria[]
+  programaciones ProgramacionMensual[]
 
   @@unique([servicio_id, mes, anio])
   @@map("nominas_mensuales")
@@ -426,6 +429,54 @@ model Vacacion {
   @@index([agente_dni])
   @@index([importacion_id])
   @@map("vacaciones")
+}
+
+model ProgramacionMensual {
+  id                  Int      @id @default(autoincrement())
+  servicio_id         Int
+  mes                 Int
+  anio                Int
+  semana              Int      @default(0)  // 0 = mes completo, 1-4 = semana específica
+  nomina_id           Int?     // nómina base para la simulación
+  estado              String   @default("BORRADOR")
+  creado_por          Int
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  servicio   Servicio          @relation(fields: [servicio_id], references: [id])
+  nomina     NominaMensual?    @relation(fields: [nomina_id], references: [id])
+  creador    Usuario           @relation(fields: [creado_por], references: [id])
+  requeridos RequeridoHorario[]
+  factor     FactorReduccion?
+
+  @@unique([servicio_id, mes, anio, semana])
+  @@map("programaciones_mensuales")
+}
+
+model RequeridoHorario {
+  id              Int      @id @default(autoincrement())
+  programacion_id Int
+  fecha           DateTime @db.Date
+  intervalo       String   // "08:00"
+  requeridos      Int
+  es_feriado      Boolean  @default(false)
+
+  programacion ProgramacionMensual @relation(fields: [programacion_id], references: [id], onDelete: Cascade)
+
+  @@unique([programacion_id, fecha, intervalo])
+  @@map("requeridos_horario")
+}
+
+model FactorReduccion {
+  id              Int   @id @default(autoincrement())
+  programacion_id Int   @unique
+  deslogueo       Float @default(0)
+  ausentismo      Float @default(0)
+  rotacion        Float @default(0)
+
+  programacion ProgramacionMensual @relation(fields: [programacion_id], references: [id], onDelete: Cascade)
+
+  @@map("factores_reduccion")
 }
 
 model Auditoria {

@@ -41,6 +41,8 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       estadoBreakdown,
       agentesConLicencia,
       agentesConLicenciaRecord,
+      porServicio,
+      licenciasHoy,
     ] = await Promise.all([
       prisma.agente.count({ where: agenteWhere }),
       prisma.agente.count({ where: { ...agenteWhere, activo: false } }),
@@ -117,18 +119,33 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
           agente: { licencias: { some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } } } },
         },
       }),
+      prisma.servicio.findMany({
+        where: {
+          activo: true,
+          ...(servicioIds ? { id: { in: servicioIds } } : {}),
+        },
+        include: { _count: { select: { agentes: true } } },
+        orderBy: { nombre: 'asc' },
+      }),
+      prisma.licencia.findMany({
+        where: {
+          fecha_desde: { lte: now },
+          fecha_hasta: { gte: now },
+          agente: agenteWhere,
+        },
+        include: {
+          agente: {
+            select: {
+              id: true,
+              nombre: true,
+              servicio: { select: { nombre: true, color: true } },
+            },
+          },
+        },
+        orderBy: { agente: { nombre: 'asc' } },
+        take: 30,
+      }),
     ])
-
-    const porServicio = await prisma.servicio.findMany({
-      where: {
-        activo: true,
-        ...(servicioIds ? { id: { in: servicioIds } } : {}),
-      },
-      include: {
-        _count: { select: { agentes: true } },
-      },
-      orderBy: { nombre: 'asc' },
-    })
 
     const countByEstado = (keywords: string[]) =>
       estadoBreakdown
@@ -175,6 +192,14 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         nombre: s.nombre,
         color: s.color,
         total_agentes: s._count.agentes,
+      })),
+      licencias_hoy: licenciasHoy.map((l) => ({
+        agente_id: l.agente.id,
+        agente_nombre: l.agente.nombre,
+        servicio_nombre: l.agente.servicio?.nombre ?? null,
+        servicio_color: l.agente.servicio?.color ?? null,
+        fecha_hasta: l.fecha_hasta.toISOString().substring(0, 10),
+        motivo: l.motivo,
       })),
     })
   } catch (err) {

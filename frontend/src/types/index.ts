@@ -353,6 +353,101 @@ export interface DashboardData {
   usuarios_activos: number | null
   ultima_carga: ImportacionNomina | null
   por_servicio: Array<{ id: number; nombre: string; color: string; total_agentes: number }>
+  licencias_hoy: Array<{
+    agente_id: number
+    agente_nombre: string
+    servicio_nombre: string | null
+    servicio_color: string | null
+    fecha_hasta: string
+    motivo: string | null
+  }>
+}
+
+export interface TimelineEvento {
+  tipo: 'LICENCIA' | 'CAMBIO_TEMPORAL' | 'CAMBIO_CONTRATO' | 'CAPACITACION' | 'REMOCION' | 'VACACION'
+  fecha_inicio: string
+  fecha_fin: string | null
+  descripcion: string
+  detalle: string | null
+}
+
+export interface ProgramacionMensual {
+  id: number
+  servicio_id: number
+  mes: number
+  anio: number
+  semana: number  // 0 = mes completo, 1-4 = semana específica
+  nomina_id: number | null
+  estado: string
+  creado_por: number
+  fecha_creacion: string
+  servicio: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  nomina?: Pick<NominaMensual, 'id' | 'mes' | 'anio' | 'estado' | 'total_agentes'> | null
+  requeridos?: RequeridoHorario[]
+  factor?: FactorReduccion | null
+  _count?: { requeridos: number }
+}
+
+export interface RequeridoHorario {
+  id: number
+  programacion_id: number
+  fecha: string
+  intervalo: string
+  requeridos: number
+  es_feriado: boolean
+}
+
+export interface FactorReduccion {
+  id: number
+  programacion_id: number
+  deslogueo: number
+  ausentismo: number
+  rotacion: number
+}
+
+export interface SimulacionResultado {
+  fecha: string
+  dia_semana: string
+  dia_num: number
+  intervalo: string
+  requeridos: number
+  asignados: number
+  estado: 'UNDER' | 'OK' | 'OVER'
+  agentes: string[]
+}
+
+export interface MovimientoSugerido {
+  nombre: string
+  de: string
+  hacia: string
+  agente_id: number
+}
+
+export interface CupoFeriado {
+  intervalo: string
+  isla: string
+  asignados: number
+  cupo: number
+}
+
+export interface SimulacionResponse {
+  programacion: ProgramacionMensual
+  nomina: SimulacionResultado[]
+  simulacion: SimulacionResultado[]
+  movimientos: MovimientoSugerido[]
+  cupos_feriado: CupoFeriado[]
+  intervalos: string[]
+  fechas: { fecha: string; dia_num: number; dia_semana: string }[]
+  total_agentes: number
+  agentes_sin_ingreso: number
+  stats: {
+    nomina_under: number
+    nomina_ok: number
+    nomina_over: number
+    sim_under: number
+    sim_ok: number
+    sim_over: number
+  }
 }
 
 export interface ExcelPreview {

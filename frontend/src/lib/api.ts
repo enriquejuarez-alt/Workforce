@@ -3,7 +3,8 @@ import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
-  Vacacion, VacacionImportacion, CalendarioEvento,
+  Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
+  ProgramacionMensual, FactorReduccion, SimulacionResponse,
 } from '../types'
 
 // Auth
@@ -45,6 +46,7 @@ export const agentesApi = {
   create: (data: Partial<Agente>) => api.post<Agente>('/agentes', data),
   update: (id: number, data: Partial<Agente>) => api.put<Agente>(`/agentes/${id}`, data),
   toggle: (id: number) => api.patch<{ activo: boolean }>(`/agentes/${id}/estado`),
+  timeline: (id: number) => api.get<TimelineEvento[]>(`/agentes/${id}/timeline`),
 }
 
 // Nóminas
@@ -78,8 +80,10 @@ export const excelApi = {
 
 // Licencias
 export const licenciasApi = {
-  calendario: (mes: number, anio: number) =>
-    api.get<CalendarioEvento[]>('/licencias/calendario', { params: { mes, anio } }),
+  calendario: (mes: number, anio: number, servicioId?: number | null) =>
+    api.get<CalendarioEvento[]>('/licencias/calendario', { params: { mes, anio, ...(servicioId ? { servicio_id: servicioId } : {}) } }),
+  exportCalendario: (mes: number, anio: number, servicioId?: number | null) =>
+    api.get('/licencias/calendario/export', { params: { mes, anio, ...(servicioId ? { servicio_id: servicioId } : {}) }, responseType: 'blob' }),
   list: (params?: Record<string, any>) => api.get<Licencia[]>('/licencias', { params }),
   create: (data: Partial<Licencia>) => api.post<Licencia>('/licencias', data),
   update: (id: number, data: Partial<Licencia>) => api.put<Licencia>(`/licencias/${id}`, data),
@@ -181,6 +185,34 @@ export const soporteApi = {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     ),
+}
+
+// Programación
+export const programacionApi = {
+  list: (params?: { servicioId?: number; anio?: number }) =>
+    api.get<ProgramacionMensual[]>('/programacion', { params }),
+  create: (data: { servicio_id: number; mes: number; anio: number; semana?: number }) =>
+    api.post<ProgramacionMensual>('/programacion', data),
+  get: (id: number) =>
+    api.get<ProgramacionMensual>(`/programacion/${id}`),
+  delete: (id: number) =>
+    api.delete(`/programacion/${id}`),
+  upsertRequeridos: (id: number, values: { tipo_dia: 'SEMANA' | 'SABADO' | 'DOMINGO'; intervalo: string; requeridos: number }[]) =>
+    api.put(`/programacion/${id}/requeridos`, { values }),
+  uploadRequeridos: (id: number, formData: FormData) =>
+    api.post<{ ok: boolean; total: number }>(`/programacion/${id}/upload-requeridos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  upsertFactor: (id: number, factor: Omit<FactorReduccion, 'id' | 'programacion_id'>) =>
+    api.put(`/programacion/${id}/factor`, factor),
+  setNomina: (id: number, nomina_id: number | null) =>
+    api.patch<ProgramacionMensual>(`/programacion/${id}/nomina`, { nomina_id }),
+  simular: (id: number) =>
+    api.get<SimulacionResponse>(`/programacion/${id}/simular`),
+  export: (id: number) =>
+    api.get(`/programacion/${id}/export`, { responseType: 'blob' }),
+  exportFrancos: (id: number) =>
+    api.get(`/programacion/${id}/francos`, { responseType: 'blob' }),
 }
 
 // Vacaciones WF

@@ -7,9 +7,9 @@ import {
   format, addMonths, subMonths,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, CalendarDays, ExternalLink, X } from 'lucide-react'
-import { licenciasApi } from '../lib/api'
-import type { CalendarioEvento } from '../types'
+import { ChevronLeft, ChevronRight, CalendarDays, ExternalLink, X, Download, Filter } from 'lucide-react'
+import { licenciasApi, serviciosApi } from '../lib/api'
+import type { CalendarioEvento, Servicio } from '../types'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
 
@@ -26,14 +26,22 @@ export default function Calendario() {
   const navigate = useNavigate()
   const [base, setBase] = useState(() => new Date())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const [servicioId, setServicioId] = useState<number | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const mes = base.getMonth() + 1
   const anio = base.getFullYear()
   const isCurrentMonth = isSameMonth(base, new Date())
 
+  const { data: servicios = [] } = useQuery<Servicio[]>({
+    queryKey: ['servicios'],
+    queryFn: () => serviciosApi.list().then((r) => r.data),
+    staleTime: 300_000,
+  })
+
   const { data: eventos = [], isLoading } = useQuery<CalendarioEvento[]>({
-    queryKey: ['calendario', mes, anio],
-    queryFn: () => licenciasApi.calendario(mes, anio).then((r) => r.data),
+    queryKey: ['calendario', mes, anio, servicioId],
+    queryFn: () => licenciasApi.calendario(mes, anio, servicioId).then((r) => r.data),
     staleTime: 60_000,
   })
 
@@ -79,6 +87,22 @@ export default function Calendario() {
     setBase(d)
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await licenciasApi.exportCalendario(mes, anio, servicioId)
+      const url = URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+      a.href = url
+      a.download = `Licencias_${MESES_ES[mes - 1]}_${anio}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const selVenc = selectedEvents.filter((e) => e.tipo === 'VENCIMIENTO')
   const selInic = selectedEvents.filter((e) => e.tipo === 'INICIO')
 
@@ -87,6 +111,34 @@ export default function Calendario() {
       <Header
         title="Calendario de Licencias"
         subtitle={`${vencimientosTotal} vencimiento${vencimientosTotal !== 1 ? 's' : ''} · ${iniciosTotal} inicio${iniciosTotal !== 1 ? 's' : ''} este mes`}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Service filter */}
+            <div className="relative flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 shadow-sm">
+              <Filter size={12} className="text-gray-400 shrink-0" />
+              <select
+                value={servicioId ?? ''}
+                onChange={(e) => { setServicioId(e.target.value ? parseInt(e.target.value) : null); setSelectedDay(null) }}
+                className="text-xs font-medium text-gray-700 bg-transparent outline-none cursor-pointer pr-1"
+              >
+                <option value="">Todos los servicios</option>
+                {servicios.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Export button */}
+            <button
+              onClick={handleExport}
+              disabled={exporting || eventos.length === 0}
+              className="btn-secondary flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <Download size={13} />
+              {exporting ? 'Exportando...' : 'Exportar'}
+            </button>
+          </div>
+        }
       />
 
       <div className="flex-1 overflow-hidden flex gap-5 p-6">
@@ -170,7 +222,6 @@ export default function Calendario() {
                             : 'hover:bg-gray-50',
                       ].join(' ')}
                     >
-                      {/* Day number */}
                       <span className={[
                         'w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold mb-1 shrink-0 transition-colors',
                         today
@@ -184,7 +235,6 @@ export default function Calendario() {
                         {format(day, 'd')}
                       </span>
 
-                      {/* Event bars */}
                       {hasEvents && (
                         <div className="flex flex-col gap-0.5 w-full min-w-0">
                           {dayEvents.slice(0, BARS_MAX).map((e, i) => (
@@ -240,10 +290,7 @@ export default function Calendario() {
         <div className="w-72 shrink-0 flex flex-col gap-3">
 
           {selectedDay ? (
-            /* Day detail card */
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 flex flex-col overflow-hidden">
-
-              {/* Colored header */}
               <div className={[
                 'px-5 py-4 shrink-0',
                 selectedEvents.length === 0
@@ -330,7 +377,6 @@ export default function Calendario() {
 
           ) : (
             <>
-              {/* Stat cards */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
                   <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide mb-1">Vencimientos</p>
@@ -342,7 +388,6 @@ export default function Calendario() {
                 </div>
               </div>
 
-              {/* Unified timeline */}
               {timeline.length > 0 ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-5 py-3 border-b border-gray-100">

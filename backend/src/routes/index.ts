@@ -5,10 +5,10 @@ import { uploadExcel, uploadImagen } from '../middleware/upload'
 import { login, getMe, logout } from '../controllers/auth'
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission } from '../controllers/users'
 import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
-import { listAgents, getAgent, createAgent, updateAgent, toggleAgent } from '../controllers/agents'
+import { listAgents, getAgent, createAgent, updateAgent, toggleAgent, getAgenteTimeline } from '../controllers/agents'
 import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
-import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias, getCalendarioLicencias } from '../controllers/licencias'
+import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias, getCalendarioLicencias, exportCalendarioLicencias } from '../controllers/licencias'
 import { listCambios, createCambio, updateCambio, deleteCambio } from '../controllers/cambios'
 import { getDashboard } from '../controllers/dashboard'
 import { listAuditoria } from '../controllers/auditoria'
@@ -21,6 +21,7 @@ import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVa
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
+import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, setNomina } from '../controllers/programacion'
 
 const router = Router()
 
@@ -49,6 +50,7 @@ router.post('/agentes', authenticate, createAgent)
 router.get('/agentes/:id', authenticate, getAgent)
 router.put('/agentes/:id', authenticate, updateAgent)
 router.patch('/agentes/:id/estado', authenticate, toggleAgent)
+router.get('/agentes/:id/timeline', authenticate, getAgenteTimeline)
 
 router.get('/nominas/comparar', authenticate, compareNominas)
 router.get('/nominas', authenticate, listNominas)
@@ -64,6 +66,7 @@ router.post('/excel/validar', authenticate, uploadExcel.single('file'), validate
 router.post('/excel/confirmar', authenticate, confirmExcel)
 router.get('/importaciones', authenticate, listImportaciones)
 
+router.get('/licencias/calendario/export', authenticate, exportCalendarioLicencias)
 router.get('/licencias/calendario', authenticate, getCalendarioLicencias)
 router.get('/licencias', authenticate, listLicencias)
 router.post('/licencias', authenticate, createLicencia)
@@ -108,6 +111,18 @@ router.put('/remociones/:id', authenticate, updateRemocion)
 router.delete('/remociones/:id', authenticate, requireAdmin, deleteRemocion)
 
 router.post('/soporte/reporte', authenticate, uploadImagen.single('captura'), enviarReporte)
+
+router.get('/programacion/:id/export', authenticate, exportProgramacion)
+router.get('/programacion/:id/francos', authenticate, exportFrancos)
+router.patch('/programacion/:id/nomina', authenticate, setNomina)
+router.get('/programacion/:id/simular', authenticate, simularProgramacion)
+router.post('/programacion/:id/upload-requeridos', authenticate, uploadExcel.single('file'), uploadRequeridos)
+router.get('/programacion/:id', authenticate, getProgramacion)
+router.delete('/programacion/:id', authenticate, requireAdmin, deleteProgramacion)
+router.put('/programacion/:id/requeridos', authenticate, upsertRequeridos)
+router.put('/programacion/:id/factor', authenticate, upsertFactor)
+router.get('/programacion', authenticate, listProgramaciones)
+router.post('/programacion', authenticate, createProgramacion)
 
 router.post('/vacaciones/import', authenticate, requireAdmin, uploadExcel.single('file'), importVacaciones)
 router.get('/vacaciones', authenticate, listVacaciones)

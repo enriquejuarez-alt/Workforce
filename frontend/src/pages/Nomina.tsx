@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useReactTable, getCoreRowModel, getFilteredRowModel,
   getSortedRowModel, getPaginationRowModel, flexRender,
-  type ColumnDef, type SortingState,
+  type ColumnDef, type SortingState, type RowSelectionState,
 } from '@tanstack/react-table'
 import {
   Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft,
@@ -46,9 +46,18 @@ export default function Nomina() {
   const qc = useQueryClient()
   const { isAdmin, canEdit, canExport, canRegisterLicencia, canRegisterCambio } = usePermissions()
 
-  const [selectedServicioId, setSelectedServicioId] = useState<number | ''>('')
-  const [selectedMes, setSelectedMes] = useState(currentMonth)
-  const [selectedAnio, setSelectedAnio] = useState(currentYear)
+  // URL-persisted filters
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedServicioId: number | '' = (() => { const s = searchParams.get('svc'); return s ? parseInt(s) : '' })()
+  const selectedMes = Number(searchParams.get('mes')) || currentMonth
+  const selectedAnio = Number(searchParams.get('anio')) || currentYear
+
+  const setSelectedServicioId = (id: number | '') =>
+    setSearchParams((p) => { const n = new URLSearchParams(p); id ? n.set('svc', String(id)) : n.delete('svc'); return n }, { replace: true })
+  const setSelectedMes = (mes: number) =>
+    setSearchParams((p) => { const n = new URLSearchParams(p); n.set('mes', String(mes)); return n }, { replace: true })
+  const setSelectedAnio = (anio: number) =>
+    setSearchParams((p) => { const n = new URLSearchParams(p); n.set('anio', String(anio)); return n }, { replace: true })
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [sorting, setSorting] = useState<SortingState>([])
@@ -58,6 +67,8 @@ export default function Nomina() {
   const [showDeleteNomina, setShowDeleteNomina] = useState(false)
   const [pendingDeleteAgente, setPendingDeleteAgente] = useState<{ id: number; nombre: string } | null>(null)
   const [showReplicar, setShowReplicar] = useState(false)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [showBulkDelete, setShowBulkDelete] = useState(false)
 
   const { data: servicios = [] } = useQuery({
     queryKey: ['servicios'],
@@ -145,7 +156,62 @@ export default function Nomina() {
     }
   }
 
+  const handleBulkExport = useCallback(() => {
+    const selectedIds = new Set(Object.keys(rowSelection))
+    const selected = agentes.filter((a) => selectedIds.has(String(a.id)))
+    const headers = ['Nombre', 'DNI', 'Usuario', 'Superior', 'Segmento', 'Estado', 'Contrato', 'Modalidad', 'Sitio']
+    const rows = selected.map((a) =>
+      [a.nombre, a.dni, a.usuario, a.superior, a.segmento, a.estado, a.contrato, a.modalidad, a.sitio]
+        .map((v) => `"${(v ?? '').toString().replace(/"/g, '""')}"`)
+        .join(','),
+    )
+    const csv = '﻿' + [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `agentes_${selected.length}_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`${selected.length} agentes exportados`)
+  }, [rowSelection, agentes])
+
+  const handleBulkDeleteConfirm = useCallback(async () => {
+    const ids = Object.keys(rowSelection).map(Number)
+    try {
+      await Promise.all(ids.map((id) => nominasApi.deleteAgente(id)))
+      toast.success(`${ids.length} agentes eliminados`)
+      setRowSelection({})
+      qc.invalidateQueries({ queryKey: ['nomina-agentes'] })
+    } catch {
+      toast.error('Error al eliminar algunos agentes')
+    }
+    setShowBulkDelete(false)
+  }, [rowSelection, qc])
+
   const columns = useMemo<ColumnDef<AgenteNominaMensual>[]>(() => [
+    {
+      id: 'select',
+      enableSorting: false,
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          className="w-3.5 h-3.5 rounded cursor-pointer accent-konecta"
+          checked={table.getIsAllPageRowsSelected()}
+          ref={(el) => { if (el) el.indeterminate = table.getIsSomePageRowsSelected() }}
+          onChange={table.getToggleAllPageRowsSelectedHandler()}
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          className="w-3.5 h-3.5 rounded cursor-pointer accent-konecta"
+          checked={row.getIsSelected()}
+          onChange={row.getToggleSelectedHandler()}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
+    },
     {
       header: 'Agente',
       accessorFn: (r) => r.nombre,
@@ -241,8 +307,11 @@ export default function Nomina() {
   const table = useReactTable({
     data: agentes,
     columns,
-    state: { sorting },
+    state: { sorting, rowSelection },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => String(row.id),
+    enableRowSelection: true,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -618,6 +687,52 @@ export default function Nomina() {
           />
         )
       })()}
+
+      <ConfirmDialog
+        isOpen={showBulkDelete}
+        onClose={() => setShowBulkDelete(false)}
+        onConfirm={handleBulkDeleteConfirm}
+        title="Eliminar agentes seleccionados"
+        message={`¿Eliminar ${Object.keys(rowSelection).length} agentes de esta nómina? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar todos"
+        variant="danger"
+      />
+
+      {/* Bulk action bar */}
+      {Object.keys(rowSelection).length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 pointer-events-auto">
+            <span className="text-sm font-semibold tabular-nums">
+              {Object.keys(rowSelection).length} seleccionado{Object.keys(rowSelection).length !== 1 ? 's' : ''}
+            </span>
+            <span className="w-px h-4 bg-white/20" />
+            <button
+              onClick={handleBulkExport}
+              className="flex items-center gap-1.5 text-sm hover:text-blue-300 transition-colors"
+            >
+              <Download size={14} /> Exportar CSV
+            </button>
+            {isAdmin && (
+              <>
+                <span className="w-px h-4 bg-white/20" />
+                <button
+                  onClick={() => setShowBulkDelete(true)}
+                  className="flex items-center gap-1.5 text-sm hover:text-red-300 transition-colors"
+                >
+                  <Trash2 size={14} /> Eliminar
+                </button>
+              </>
+            )}
+            <span className="w-px h-4 bg-white/20" />
+            <button
+              onClick={() => setRowSelection({})}
+              className="text-white/50 hover:text-white transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

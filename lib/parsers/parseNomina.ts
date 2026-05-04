@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { Agente } from "../domain/types";
-import { resolverServicioPorSegmento } from "../domain/mapeo";
+import { resolverServicioPorSegmentoRuntime } from "../config/servicesRuntime";
 import { extraerHorasContrato, normalizarNombreColumna } from "../utils/excel";
 import type { MappingOverride } from "../domain/types";
 import { normalizar } from "../domain/mapeo";
@@ -14,7 +14,7 @@ export interface ParseNominaResult {
 }
 
 // Punto 2: Parsea "09:00-15:00", "9 a 15", "09:00 / 15:00" → { entry, exit }
-function parsearHorario(raw: string): { entry: string | null; exit: string | null } {
+export function parsearHorario(raw: string): { entry: string | null; exit: string | null } {
   if (!raw) return { entry: null, exit: null };
   const s = raw.toString().trim();
 
@@ -133,7 +133,7 @@ export function parseNomina(
 
     // Resolver servicio: primero override manual, luego auto-mapeo
     let servicioKey: string | null = overrideMap.get(normalizar(segmentoRaw)) ?? null;
-    if (!servicioKey) servicioKey = resolverServicioPorSegmento(segmentoRaw);
+    if (!servicioKey) servicioKey = resolverServicioPorSegmentoRuntime(segmentoRaw);
     if (!servicioKey) {
       sinMapeo++;
       segmentosExcluidos.add(segmentoRaw);

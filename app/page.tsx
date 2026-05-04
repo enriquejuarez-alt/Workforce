@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, ChevronDown, AlertTriangle, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronDown, AlertTriangle, Loader2, CheckCircle2, X } from "lucide-react";
 import { DropZone } from "@/components/upload/DropZone";
 import { FilePreview } from "@/components/upload/FilePreview";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const MESES = [
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+];
+
 const fade = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
@@ -46,7 +51,6 @@ export default function UploadPage() {
     setArchivoReductores,
     setArchivoNomina,
     setHojaNomina,
-    todosSubidos,
   } = useUploads();
 
   const {
@@ -61,9 +65,13 @@ export default function UploadPage() {
     setProcesando,
     setErrores,
     setAgentesExcluidos,
+    clearAgentesDesdeApi,
     errores,
     agentesExcluidos,
     segmentosNoReconocidos,
+    agentesDesdeApi,
+    mesDesdeApi,
+    anioDesdeApi,
   } = useResultados();
 
   const [loadingCP, setLoadingCP] = useState(false);
@@ -131,18 +139,20 @@ export default function UploadPage() {
           return;
         }
         setArchivoNomina(file, hojas);
+        clearAgentesDesdeApi();
       } catch (e) {
         setErrNom(`Error al leer el archivo: ${e}`);
       } finally {
         setLoadingNom(false);
       }
     },
-    [setArchivoNomina]
+    [setArchivoNomina, clearAgentesDesdeApi]
   );
 
   const handleProcesar = useCallback(async () => {
-    if (!archivoCP || !archivoReductores || !archivoNomina || !hojaNomina)
-      return;
+    const nominaDesdeApi = !!agentesDesdeApi;
+    const nominaDesdeArchivo = !!(archivoNomina && hojaNomina);
+    if (!archivoCP || !archivoReductores || (!nominaDesdeApi && !nominaDesdeArchivo)) return;
 
     setProcesandoLocal(true);
     setProcesando(true);
@@ -150,22 +160,30 @@ export default function UploadPage() {
     setPasoActual("Leyendo archivos…");
 
     try {
-      const [bufCP, bufRed, bufNom] = await Promise.all([
-        archivoCP.arrayBuffer(),
-        archivoReductores.arrayBuffer(),
-        archivoNomina.arrayBuffer(),
-      ]);
+      const buffers = nominaDesdeApi
+        ? await Promise.all([archivoCP.arrayBuffer(), archivoReductores.arrayBuffer()])
+        : await Promise.all([archivoCP.arrayBuffer(), archivoReductores.arrayBuffer(), archivoNomina!.arrayBuffer()]);
+
+      const [bufCP, bufRed] = buffers;
 
       setPasoActual("Procesando requerido del cliente…");
       const { matrices, diasDelMes, errores: errCP2 } = parseCP(bufCP);
 
       setPasoActual("Procesando reductores y nómina…");
       const { reductores, errores: errRed2 } = parseReductores(bufRed);
-      const { agentes: agentesRaw, errores: errNom2, agentesExcluidos: excl, segmentosNoReconocidos: segs } = parseNomina(
-        bufNom,
-        hojaNomina,
-        mappingOverrides
-      );
+
+      let agentesRaw = agentesDesdeApi ?? [];
+      let excl = 0;
+      let segs: string[] = [];
+      const errNom2: string[] = [];
+
+      if (!nominaDesdeApi) {
+        const result = parseNomina(buffers[2]!, hojaNomina!, mappingOverrides);
+        agentesRaw = result.agentes;
+        excl = result.agentesExcluidos;
+        segs = result.segmentosNoReconocidos;
+        errNom2.push(...result.errores);
+      }
 
       const todosErrores = [...errCP2, ...errRed2, ...errNom2];
       if (todosErrores.length > 0) {
@@ -174,7 +192,6 @@ export default function UploadPage() {
       }
 
       setPasoActual("Calculando cumplimiento…");
-      // Aplicar pases: reasignar segmentoNorm según pases configurados
       const paseMap = new Map(pases.map((p) => [p.dni.trim().toLowerCase(), p.servicioDestino]));
       const agentesConPases = agentesRaw.map((a) => {
         const dest = paseMap.get(a.dni.trim().toLowerCase());
@@ -203,6 +220,7 @@ export default function UploadPage() {
       setPasoActual("");
     }
   }, [
+    agentesDesdeApi,
     archivoCP,
     archivoReductores,
     archivoNomina,
@@ -223,7 +241,8 @@ export default function UploadPage() {
     router,
   ]);
 
-  const listo = todosSubidos() && !procesandoLocal;
+  const nominaLista = !!agentesDesdeApi || !!(archivoNomina && hojaNomina);
+  const listo = !!(archivoCP && archivoReductores && nominaLista) && !procesandoLocal;
 
   return (
     <div className="px-6 py-6 max-w-5xl mx-auto">
@@ -231,7 +250,7 @@ export default function UploadPage() {
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-0.5">Carga de archivos</h2>
           <p className="text-sm text-gray-500">
-            Subí los tres archivos para calcular el cumplimiento del mes. El procesamiento es local, tus datos no salen del navegador.
+            Subí los archivos para calcular el cumplimiento del mes. El procesamiento es local, tus datos no salen del navegador.
           </p>
         </div>
 
@@ -278,53 +297,80 @@ export default function UploadPage() {
               )}
             </div>
 
-            {/* Nómina */}
+            {/* Nómina — puede ser Excel o inyectada desde Nómina */}
             <div className="space-y-2">
-              <DropZone
-                label="Nómina activa"
-                sublabel="Nomina_Soporte.xlsx"
-                step={3}
-                onFile={handleNomina}
-                hasFile={!!archivoNomina}
-                fileName={archivoNomina?.name}
-                error={errNom}
-                loading={loadingNom}
-              />
-              {archivoNomina && (
-                <>
-                  <FilePreview
-                    nombre={archivoNomina.name}
-                    tamanio={archivoNomina.size}
-                    hojas={hojasNomina}
-                  />
-                  {hojasNomina.length > 1 && (
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1">
-                        <ChevronDown className="h-3 w-3" />
-                        Hoja a usar
-                      </label>
-                      <Select
-                        value={hojaNomina ?? ""}
-                        onValueChange={setHojaNomina}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Seleccioná una hoja" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hojasNomina.map((h) => (
-                            <SelectItem key={h} value={h}>
-                              {h}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+              {agentesDesdeApi ? (
+                <div className="rounded-xl border-2 border-green-200 bg-green-50 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-green-800">Nómina cargada desde el sistema</p>
+                        <p className="text-xs text-green-600 mt-0.5">
+                          {agentesDesdeApi.length} agentes
+                          {mesDesdeApi && anioDesdeApi
+                            ? ` · ${MESES[mesDesdeApi - 1]} ${anioDesdeApi}`
+                            : ""}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={clearAgentesDesdeApi}
+                      className="text-green-400 hover:text-green-700 transition-colors shrink-0"
+                      title="Quitar y subir Excel manual"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <DropZone
+                    label="Nómina activa"
+                    sublabel="Nomina_Soporte.xlsx"
+                    step={3}
+                    onFile={handleNomina}
+                    hasFile={!!archivoNomina}
+                    fileName={archivoNomina?.name}
+                    error={errNom}
+                    loading={loadingNom}
+                  />
+                  {archivoNomina && (
+                    <>
+                      <FilePreview
+                        nombre={archivoNomina.name}
+                        tamanio={archivoNomina.size}
+                        hojas={hojasNomina}
+                      />
+                      {hojasNomina.length > 1 && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1">
+                            <ChevronDown className="h-3 w-3" />
+                            Hoja a usar
+                          </label>
+                          <Select
+                            value={hojaNomina ?? ""}
+                            onValueChange={setHojaNomina}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Seleccioná una hoja" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {hojasNomina.map((h) => (
+                                <SelectItem key={h} value={h}>
+                                  {h}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
             </div>
           </div>
-
         </div>
 
         {errores.length > 0 && (

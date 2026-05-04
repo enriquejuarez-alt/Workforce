@@ -28,6 +28,10 @@ interface ResultadosState {
   activeFilters: ActiveFilters;
   mappingOverrides: MappingOverride[];
   pases: Pase[];
+  // Agents loaded directly from Nómina API (bypass Excel upload)
+  agentesDesdeApi: Agente[] | null;
+  mesDesdeApi: number | null;
+  anioDesdeApi: number | null;
 
   setResultado: (r: ResultadoGeneral) => void;
   setMatrices: (m: Map<ServicioKey, MatrizServicio>) => void;
@@ -45,6 +49,8 @@ interface ResultadosState {
   setPases: (p: Pase[]) => void;
   addPase: (p: Pase) => void;
   removePase: (id: string) => void;
+  setAgentesDesdeApi: (agentes: Agente[], mes: number, anio: number) => void;
+  clearAgentesDesdeApi: () => void;
   reset: () => void;
 }
 
@@ -62,6 +68,9 @@ export const useResultados = create<ResultadosState>((set) => ({
   activeFilters: { ...FILTROS_VACIOS },
   mappingOverrides: [],
   pases: [],
+  agentesDesdeApi: null,
+  mesDesdeApi: null,
+  anioDesdeApi: null,
 
   setResultado: (r) => set({ resultado: r }),
   setMatrices: (m) => set({ matrices: m }),
@@ -95,6 +104,10 @@ export const useResultados = create<ResultadosState>((set) => ({
   setPases: (p) => set({ pases: p }),
   addPase: (p) => set((state) => ({ pases: [...state.pases, p] })),
   removePase: (id) => set((state) => ({ pases: state.pases.filter((p) => p.id !== id) })),
+  setAgentesDesdeApi: (agentes, mes, anio) =>
+    set({ agentesDesdeApi: agentes, mesDesdeApi: mes, anioDesdeApi: anio }),
+  clearAgentesDesdeApi: () =>
+    set({ agentesDesdeApi: null, mesDesdeApi: null, anioDesdeApi: null }),
   reset: () =>
     set({
       resultado: null,
@@ -110,5 +123,8 @@ export const useResultados = create<ResultadosState>((set) => ({
       segmentosNoReconocidos: [],
       mappingOverrides: [],
       pases: [],
+      agentesDesdeApi: null,
+      mesDesdeApi: null,
+      anioDesdeApi: null,
     }),
 }));

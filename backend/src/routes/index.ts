@@ -22,6 +22,7 @@ import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
 import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, setNomina } from '../controllers/programacion'
+import { analizarNomina, procesarDistribucion, descargarDistribucion, cruzarNominas } from '../controllers/distribucion'
 
 const router = Router()
 
@@ -133,5 +134,10 @@ router.delete('/vacaciones/importaciones/:id', authenticate, requireAdmin, delet
 router.get('/plani/config', authenticate, getPlaniConfig)
 router.get('/plani/nomina', authenticate, getPlaniNomina)
 router.put('/servicios/:id/plani-config', authenticate, requireAdmin, updatePlaniConfig)
+
+router.post('/distribucion/analizar', authenticate, uploadExcel.single('file'), analizarNomina)
+router.post('/distribucion/procesar', authenticate, procesarDistribucion)
+router.post('/distribucion/descargar', authenticate, descargarDistribucion)
+router.post('/distribucion/cruzar', authenticate, uploadExcel.array('files', 2), cruzarNominas)
 
 export default router

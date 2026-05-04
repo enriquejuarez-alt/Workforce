@@ -4,6 +4,14 @@ echo  Iniciando Nomina Konecta + Planificacion
 echo ============================================
 echo.
 
+echo [0/4] Cerrando instancias anteriores...
+taskkill /FI "WINDOWTITLE eq Backend - Nomina*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Frontend - Nomina*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq Planificacion - Walt*" /F >nul 2>&1
+timeout /t 1 /nobreak >nul
+echo  Limpieza lista.
+echo.
+
 echo [1/4] Verificando base de datos Docker...
 docker start nomina-db >nul 2>&1
 if %errorlevel% neq 0 (

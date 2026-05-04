@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
-  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock,
+  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { authApi } from '../../lib/api'
@@ -25,6 +25,7 @@ const NAV_ITEMS = [
 
 const PROGRAMACION_ITEMS = [
   { to: '/programacion', icon: CalendarClock, label: 'Programación' },
+  { to: '/distribucion', icon: Shuffle, label: 'Distribución' },
 ]
 
 const ADMIN_ITEMS = [

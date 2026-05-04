@@ -82,15 +82,17 @@ export const getPlaniNomina = async (req: AuthRequest, res: Response) => {
     const capas = await prisma.capacitacion.findMany({
       where: {
         agente_id: { in: agenteIds },
-        fecha_desde: { lte: hoy },
-        OR: [{ fecha_hasta: null }, { fecha_hasta: { gte: hoy } }],
+        fecha_inicio: { lte: hoy },
+        fecha_fin: { gte: hoy },
+        dado_de_alta: false,
       },
-      select: { agente_id: true, fecha_desde: true },
+      select: { agente_id: true, fecha_fin: true },
     })
 
     const capaMap = new Map<number, string>()
     for (const c of capas) {
-      const iso = c.fecha_desde.toISOString().slice(0, 10)
+      if (c.agente_id === null) continue
+      const iso = c.fecha_fin.toISOString().slice(0, 10)
       capaMap.set(c.agente_id, iso)
     }
 

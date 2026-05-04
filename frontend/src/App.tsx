@@ -24,6 +24,7 @@ import Soporte from './pages/Soporte'
 import Calendario from './pages/Calendario'
 import Programacion from './pages/Programacion'
 import ProgramacionDetalle from './pages/ProgramacionDetalle'
+import Distribucion from './pages/Distribucion'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="calendario" element={<Calendario />} />
           <Route path="programacion" element={<Programacion />} />
           <Route path="programacion/:id" element={<ProgramacionDetalle />} />
+          <Route path="distribucion" element={<Distribucion />} />
           <Route path="carga" element={<AdminRoute><CargaExcel /></AdminRoute>} />
           <Route path="importaciones" element={<AdminRoute><Importaciones /></AdminRoute>} />
           <Route path="usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />

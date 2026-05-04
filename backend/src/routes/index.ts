@@ -21,7 +21,7 @@ import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVa
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
-import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, setNomina } from '../controllers/programacion'
+import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, previewRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, exportConversor, getCronograma, setNomina } from '../controllers/programacion'
 import { analizarNomina, procesarDistribucion, descargarDistribucion, cruzarNominas } from '../controllers/distribucion'
 
 const router = Router()
@@ -115,8 +115,11 @@ router.post('/soporte/reporte', authenticate, uploadImagen.single('captura'), en
 
 router.get('/programacion/:id/export', authenticate, exportProgramacion)
 router.get('/programacion/:id/francos', authenticate, exportFrancos)
+router.get('/programacion/:id/conversor', authenticate, exportConversor)
+router.get('/programacion/:id/cronograma', authenticate, getCronograma)
 router.patch('/programacion/:id/nomina', authenticate, setNomina)
 router.get('/programacion/:id/simular', authenticate, simularProgramacion)
+router.post('/programacion/:id/preview-requeridos', authenticate, uploadExcel.single('file'), previewRequeridos)
 router.post('/programacion/:id/upload-requeridos', authenticate, uploadExcel.single('file'), uploadRequeridos)
 router.get('/programacion/:id', authenticate, getProgramacion)
 router.delete('/programacion/:id', authenticate, requireAdmin, deleteProgramacion)

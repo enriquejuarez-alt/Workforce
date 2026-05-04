@@ -5,7 +5,8 @@
       "Bash(node -e ' *)",
       "Bash(del \"c:\\\\Users\\\\Dante\\\\Desktop\\\\Nomina\\\\backend\\\\fix-horarios.ts\")",
       "Read(//c/Users/Dante/Desktop/**)",
-      "Bash(grep -v \"//.*observacion\")"
+      "Bash(grep -v \"//.*observacion\")",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

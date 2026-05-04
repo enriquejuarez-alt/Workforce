@@ -199,6 +199,10 @@ export const programacionApi = {
     api.delete(`/programacion/${id}`),
   upsertRequeridos: (id: number, values: { tipo_dia: 'SEMANA' | 'SABADO' | 'DOMINGO'; intervalo: string; requeridos: number }[]) =>
     api.put(`/programacion/${id}/requeridos`, { values }),
+  previewRequeridos: (id: number, formData: FormData) =>
+    api.post<{ sheets: string[] }>(`/programacion/${id}/preview-requeridos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
   uploadRequeridos: (id: number, formData: FormData) =>
     api.post<{ ok: boolean; total: number }>(`/programacion/${id}/upload-requeridos`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -213,6 +217,10 @@ export const programacionApi = {
     api.get(`/programacion/${id}/export`, { responseType: 'blob' }),
   exportFrancos: (id: number) =>
     api.get(`/programacion/${id}/francos`, { responseType: 'blob' }),
+  exportConversor: (id: number) =>
+    api.get(`/programacion/${id}/conversor`, { responseType: 'blob' }),
+  cronograma: (id: number) =>
+    api.get<import('../types').CronogramaResponse>(`/programacion/${id}/cronograma`),
 }
 
 // Vacaciones WF

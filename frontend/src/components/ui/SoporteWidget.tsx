@@ -18,7 +18,7 @@ function nowTime() {
 }
 
 const INITIAL_MESSAGES: Message[] = [
-  { from: 'bot', text: 'Hola, soy tu asistente virtual 👋', time: nowTime() },
+  { from: 'bot', text: 'Hola, soy Walt, tu asistente virtual 👋', time: nowTime() },
   { from: 'bot', text: 'Te ayudo con tu reclamo por error de acceso u otro problema del sistema.', time: nowTime() },
 ]
 
@@ -218,7 +218,7 @@ export default function SoporteWidget() {
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-sm leading-tight">Asistente Virtual</p>
+              <p className="text-white font-bold text-sm leading-tight">Walt</p>
               <p className="text-white/55 text-xs mt-0.5">En línea · Soporte al sistema</p>
             </div>
             <button

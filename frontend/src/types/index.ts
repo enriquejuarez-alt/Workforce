@@ -412,7 +412,7 @@ export interface SimulacionResultado {
   intervalo: string
   requeridos: number
   asignados: number
-  estado: 'UNDER' | 'OK' | 'OVER'
+  estado: 'UNDER' | 'LIMITE' | 'OK' | 'OVER'
   agentes: string[]
 }
 
@@ -440,6 +440,7 @@ export interface SimulacionResponse {
   fechas: { fecha: string; dia_num: number; dia_semana: string }[]
   total_agentes: number
   agentes_sin_ingreso: number
+  presencia_por_fecha: Record<string, { presentes: number; francos: number }>
   stats: {
     nomina_under: number
     nomina_ok: number
@@ -448,6 +449,25 @@ export interface SimulacionResponse {
     sim_ok: number
     sim_over: number
   }
+}
+
+export interface CronogramaAgent {
+  id: number
+  nombre: string
+  contrato: string | null
+  contratoNorm: string
+  segmento: string | null
+  ingreso: string | null
+  hora_break: string | null
+  francos: string[]
+  dias: Record<string, string>
+}
+
+export interface CronogramaResponse {
+  agents: CronogramaAgent[]
+  dates: { fecha: string; dia_num: number; dia_semana: string; dow: number }[]
+  total: number
+  requeridos_pico: Record<string, number>
 }
 
 export interface ExcelPreview {

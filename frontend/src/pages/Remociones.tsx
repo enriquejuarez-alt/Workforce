@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { remocionesApi, serviciosApi, agentesApi, bajasApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { useAuthStore } from '../store/auth'
 import type { Remocion, Agente } from '../types'
 
@@ -76,6 +77,7 @@ export default function Remociones() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState<RemocionForm>(emptyForm())
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; nombre: string } | null>(null)
 
   const [agentQuery, setAgentQuery] = useState('')
   const [agentSelected, setAgentSelected] = useState<Agente | null>(null)
@@ -358,11 +360,7 @@ export default function Remociones() {
                             </button>
                             {isAdmin && (
                               <button
-                                onClick={() => {
-                                  if (confirm(`¿Eliminar la remoción de ${r.nombre}?`)) {
-                                    deleteMutation.mutate(r.id)
-                                  }
-                                }}
+                                onClick={() => setPendingDelete({ id: r.id, nombre: r.nombre })}
                                 className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
                                 title="Eliminar"
                               >
@@ -634,6 +632,17 @@ export default function Remociones() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) deleteMutation.mutate(pendingDelete.id); setPendingDelete(null) }}
+        title="Eliminar remoción"
+        message={`¿Eliminar la remoción de ${pendingDelete?.nombre}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

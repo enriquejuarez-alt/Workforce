@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/auth'
 import { capacitacionesApi, agentesApi, serviciosApi, bajasApi } from '../lib/api'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import type { Capacitacion, Agente } from '../types'
 
 type TipoAgente = 'existente' | 'nuevo'
@@ -63,6 +64,7 @@ export default function Capacitaciones() {
   const [editId, setEditId] = useState<number | null>(null)
   const [tipoAgente, setTipoAgente] = useState<TipoAgente>('existente')
   const [form, setForm] = useState<CapForm>(FORM_EMPTY)
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; nombre: string } | null>(null)
 
   const [agentQuery, setAgentQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
@@ -400,7 +402,7 @@ export default function Capacitaciones() {
                         </button>
                         {isAdmin && (
                           <button
-                            onClick={() => { if (confirm(`¿Eliminar la capacitación de ${c.agente_nombre}?`)) deleteMut.mutate(c.id) }}
+                            onClick={() => setPendingDelete({ id: c.id, nombre: c.agente_nombre })}
                             className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors"
                             title="Eliminar"
                           >
@@ -785,6 +787,17 @@ export default function Capacitaciones() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) deleteMut.mutate(pendingDelete.id); setPendingDelete(null) }}
+        title="Eliminar capacitación"
+        message={`¿Eliminar la capacitación de ${pendingDelete?.nombre}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMut.isPending}
+      />
     </div>
   )
 }

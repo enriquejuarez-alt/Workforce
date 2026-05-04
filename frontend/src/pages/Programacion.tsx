@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import { programacionApi, serviciosApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { MESES } from '../types'
 import type { ProgramacionMensual } from '../types'
 import { useAuthStore } from '../store/auth'
@@ -28,6 +29,7 @@ export default function Programacion() {
   const qc = useQueryClient()
 
   const [showForm, setShowForm] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<ProgramacionMensual | null>(null)
   const [filterServicio, setFilterServicio] = useState('')
   const [filterAnio, setFilterAnio] = useState(now.getFullYear())
   const [form, setForm] = useState({
@@ -71,9 +73,7 @@ export default function Programacion() {
 
   function handleDelete(prog: ProgramacionMensual, e: React.MouseEvent) {
     e.stopPropagation()
-    if (confirm(`¿Eliminar programación de ${prog.servicio.nombre} — ${MESES[prog.mes - 1]} ${prog.anio}?`)) {
-      deleteMut.mutate(prog.id)
-    }
+    setPendingDelete(prog)
   }
 
   const years = [now.getFullYear() + 1, now.getFullYear(), now.getFullYear() - 1]
@@ -247,6 +247,17 @@ export default function Programacion() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) deleteMut.mutate(pendingDelete.id); setPendingDelete(null) }}
+        title="Eliminar programación"
+        message={pendingDelete ? `¿Eliminar programación de ${pendingDelete.servicio.nombre} — ${MESES[pendingDelete.mes - 1]} ${pendingDelete.anio}?` : ''}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMut.isPending}
+      />
     </div>
   )
 }

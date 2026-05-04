@@ -9,7 +9,7 @@ import { dashboardApi } from '../lib/api'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/layout/Header'
 import KpiCard from '../components/ui/KpiCard'
-import { PageLoading } from '../components/ui/LoadingSpinner'
+import { SkeletonDashboard } from '../components/ui/Skeleton'
 import { MESES } from '../types'
 import { useAuthStore } from '../store/auth'
 
@@ -22,7 +22,12 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   })
 
-  if (isLoading) return <PageLoading text="Cargando dashboard..." />
+  if (isLoading) return (
+    <div className="flex flex-col h-full">
+      <Header title="Dashboard" subtitle="Cargando..." />
+      <SkeletonDashboard />
+    </div>
+  )
 
   return (
     <div className="flex flex-col h-full">

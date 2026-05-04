@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { bajasApi, serviciosApi, agentesApi } from '../lib/api'
 import Header from '../components/layout/Header'
 import { PageLoading } from '../components/ui/LoadingSpinner'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { useAuthStore } from '../store/auth'
 import type { HistoricoBaja, Agente } from '../types'
 
@@ -65,6 +66,7 @@ export default function Bajas() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState<BajaForm>(emptyForm())
+  const [pendingDeleteId, setPendingDeleteId] = useState<{ id: number; nombre: string } | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [importServicio, setImportServicio] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -416,9 +418,7 @@ export default function Bajas() {
                             {isAdmin && (
                               <button
                                 onClick={() => {
-                                  if (confirm(`¿Eliminar la baja de ${b.nombre}?`)) {
-                                    deleteMutation.mutate(b.id)
-                                  }
+                                  setPendingDeleteId({ id: b.id, nombre: b.nombre })
                                 }}
                                 className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
                                 title="Eliminar"
@@ -798,6 +798,17 @@ export default function Bajas() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!pendingDeleteId}
+        onClose={() => setPendingDeleteId(null)}
+        onConfirm={() => { if (pendingDeleteId) deleteMutation.mutate(pendingDeleteId.id); setPendingDeleteId(null) }}
+        title="Eliminar baja"
+        message={`¿Eliminar la baja de ${pendingDeleteId?.nombre}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

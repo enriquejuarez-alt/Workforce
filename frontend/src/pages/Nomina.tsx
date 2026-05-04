@@ -56,6 +56,8 @@ export default function Nomina() {
   const [licenciaAgent, setLicenciaAgent] = useState<AgenteNominaMensual | null>(null)
   const [cambioAgent, setCambioAgent] = useState<AgenteNominaMensual | null>(null)
   const [showDeleteNomina, setShowDeleteNomina] = useState(false)
+  const [pendingDeleteAgente, setPendingDeleteAgente] = useState<{ id: number; nombre: string } | null>(null)
+  const [showReplicar, setShowReplicar] = useState(false)
 
   const { data: servicios = [] } = useQuery({
     queryKey: ['servicios'],
@@ -114,10 +116,8 @@ export default function Nomina() {
   })
 
   const handleDeleteAgente = useCallback((snapshotId: number, nombre: string) => {
-    if (confirm(`¿Eliminar a ${nombre} de esta nómina?\n\nEsta acción no se puede deshacer.`)) {
-      deleteMutation.mutate(snapshotId)
-    }
-  }, [deleteMutation.mutate])
+    setPendingDeleteAgente({ id: snapshotId, nombre })
+  }, [])
 
   const deleteNominaMutation = useMutation({
     mutationFn: () => nominasApi.delete(nomina!.id),
@@ -282,9 +282,7 @@ export default function Nomina() {
                 onClick={() => {
                   const nextMes = selectedMes === 12 ? 1 : selectedMes + 1
                   const nextAnio = selectedMes === 12 ? selectedAnio + 1 : selectedAnio
-                  if (confirm(`¿Replicar nómina al mes siguiente? (${MESES[nextMes - 1]} ${nextAnio})\n\nSe copiarán ${nomina.total_agentes} agentes como borrador.`)) {
-                    replicarMutation.mutate()
-                  }
+                  setShowReplicar(true)
                 }}
                 disabled={replicarMutation.isPending}
               >
@@ -589,6 +587,37 @@ export default function Nomina() {
         variant="danger"
         loading={deleteNominaMutation.isPending}
       />
+
+      <ConfirmDialog
+        isOpen={!!pendingDeleteAgente}
+        onClose={() => setPendingDeleteAgente(null)}
+        onConfirm={() => {
+          if (pendingDeleteAgente) deleteMutation.mutate(pendingDeleteAgente.id)
+          setPendingDeleteAgente(null)
+        }}
+        title="Eliminar agente de nómina"
+        message={`¿Eliminar a ${pendingDeleteAgente?.nombre} de esta nómina? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
+
+      {nomina && (() => {
+        const nextMes = selectedMes === 12 ? 1 : selectedMes + 1
+        const nextAnio = selectedMes === 12 ? selectedAnio + 1 : selectedAnio
+        return (
+          <ConfirmDialog
+            isOpen={showReplicar}
+            onClose={() => setShowReplicar(false)}
+            onConfirm={() => { replicarMutation.mutate(); setShowReplicar(false) }}
+            title="Replicar nómina"
+            message={`¿Replicar nómina al mes siguiente? (${MESES[nextMes - 1]} ${nextAnio})\n\nSe copiarán ${nomina.total_agentes} agentes como borrador.`}
+            confirmLabel="Replicar"
+            variant="warning"
+            loading={replicarMutation.isPending}
+          />
+        )
+      })()}
     </div>
   )
 }

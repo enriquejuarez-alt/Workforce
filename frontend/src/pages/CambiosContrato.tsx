@@ -4,6 +4,7 @@ import { Plus, Search, Pencil, Trash2, X, FilePen } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/auth'
 import { cambiosContratoApi, agentesApi, serviciosApi } from '../lib/api'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import type { CambioContrato, Agente } from '../types'
 
 const CONTRATOS = ['30', '35', '36'] as const
@@ -57,6 +58,7 @@ export default function CambiosContrato() {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<CambioContratoForm>(FORM_EMPTY)
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; nombre: string } | null>(null)
 
   const [agentQuery, setAgentQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
@@ -317,10 +319,7 @@ export default function CambiosContrato() {
                         </button>
                         {isAdmin && (
                           <button
-                            onClick={() => {
-                              if (confirm(`¿Eliminar el cambio de contrato de ${c.agente_nombre}?`))
-                                deleteMutation.mutate(c.id)
-                            }}
+                            onClick={() => setPendingDelete({ id: c.id, nombre: c.agente_nombre })}
                             className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors"
                             title="Eliminar"
                           >
@@ -532,6 +531,17 @@ export default function CambiosContrato() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) deleteMutation.mutate(pendingDelete.id); setPendingDelete(null) }}
+        title="Eliminar cambio de contrato"
+        message={`¿Eliminar el cambio de contrato de ${pendingDelete?.nombre}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

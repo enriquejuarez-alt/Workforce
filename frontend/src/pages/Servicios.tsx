@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, Trash2 } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, Trash2, ChevronDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import Header from '../components/layout/Header'
 import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { serviciosApi } from '../lib/api'
+import { serviciosApi, planiApi } from '../lib/api'
+import type { PlaniServicioConfig } from '../lib/api'
 import type { Servicio } from '../types'
 import { PageLoading } from '../components/ui/LoadingSpinner'
 
@@ -127,10 +128,26 @@ function ServicioFormModal({ servicio, onClose, onSaved }: { servicio?: Servicio
     },
   })
   const color = watch('color')
+  const [showPlani, setShowPlani] = useState(false)
+  const [planiKey, setPlaniKey] = useState((servicio as any)?.plani_config?.key ?? '')
+  const [planiHojas, setPlaniHojas] = useState(((servicio as any)?.plani_config?.hojaCP ?? []).join('\n'))
+  const [planiSegmentos, setPlaniSegmentos] = useState(((servicio as any)?.plani_config?.segmentos ?? []).join('\n'))
+  const [planiReductores, setPlaniReductores] = useState(((servicio as any)?.plani_config?.reductores ?? []).join('\n'))
 
   const mutation = useMutation({
-    mutationFn: (data: any) =>
-      servicio ? serviciosApi.update(servicio.id, data) : serviciosApi.create(data),
+    mutationFn: async (data: any) => {
+      const saved = await (servicio ? serviciosApi.update(servicio.id, data) : serviciosApi.create(data))
+      const id = (saved.data as any).id ?? servicio?.id
+      if (id && planiKey.trim()) {
+        const config: PlaniServicioConfig = {
+          key: planiKey.trim(),
+          hojaCP: planiHojas.split('\n').map((s) => s.trim()).filter(Boolean),
+          segmentos: planiSegmentos.split('\n').map((s) => s.trim()).filter(Boolean),
+          reductores: planiReductores.split('\n').map((s) => s.trim()).filter(Boolean),
+        }
+        await planiApi.updateServicioConfig(id, config)
+      }
+    },
     onSuccess: () => { toast.success(servicio ? 'Servicio actualizado' : 'Servicio creado'); onSaved() },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Error'),
   })
@@ -170,6 +187,64 @@ function ServicioFormModal({ servicio, onClose, onSaved }: { servicio?: Servicio
             <input {...register('color')} type="color" className="w-10 h-8 rounded cursor-pointer border border-gray-200" />
             <span className="text-xs text-gray-500 font-mono">{color}</span>
           </div>
+        </div>
+
+        {/* Walt / Plani config */}
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowPlani((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <span>Configuración Walt / Plani</span>
+            <ChevronDown size={14} className={`transition-transform ${showPlani ? 'rotate-180' : ''}`} />
+          </button>
+          {showPlani && (
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Definí cómo este servicio se llama en los archivos Excel de Walt. Dejá en blanco para usar la detección automática.
+              </p>
+              <div>
+                <label className="label-base text-xs">Clave interna (key)</label>
+                <input
+                  className="input-base text-xs"
+                  placeholder="ej: Conectividad"
+                  value={planiKey}
+                  onChange={(e) => setPlaniKey(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label-base text-xs">Hojas CP (una por línea)</label>
+                <textarea
+                  rows={2}
+                  className="input-base text-xs resize-none font-mono"
+                  placeholder={"Sop_Conectividad\nConectividad"}
+                  value={planiHojas}
+                  onChange={(e) => setPlaniHojas(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label-base text-xs">Segmentos de nómina (uno por línea)</label>
+                <textarea
+                  rows={2}
+                  className="input-base text-xs resize-none font-mono"
+                  placeholder={"SOPORTE-CONECTIVIDAD\nSOPORTE CONECTIVIDAD"}
+                  value={planiSegmentos}
+                  onChange={(e) => setPlaniSegmentos(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label-base text-xs">Nombres de reductor (uno por línea)</label>
+                <textarea
+                  rows={2}
+                  className="input-base text-xs resize-none font-mono"
+                  placeholder={"SOPORTE-CONECTIVIDAD\nSOPORTE CONECTIVIDAD"}
+                  value={planiReductores}
+                  onChange={(e) => setPlaniReductores(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

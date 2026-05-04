@@ -20,6 +20,13 @@ export interface Servicio {
   color: string
   activo: boolean
   fecha_creacion: string
+  plani_config?: {
+    key: string
+    label?: string
+    hojaCP: string[]
+    segmentos: string[]
+    reductores: string[]
+  } | null
   _count?: { agentes: number; nominas: number }
 }
 

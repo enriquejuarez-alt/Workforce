@@ -1,15 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { BarChart3, ExternalLink, RefreshCw } from 'lucide-react'
+import { BarChart3, ExternalLink, RefreshCw, Download, ChevronDown } from 'lucide-react'
+import { planiApi } from '../lib/api'
+import toast from 'react-hot-toast'
 
 const PLANI_BASE = 'http://localhost:3000'
 
+const MESES = [
+  { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' },
+  { value: 3, label: 'Marzo' }, { value: 4, label: 'Abril' },
+  { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
+  { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' },
+  { value: 9, label: 'Septiembre' }, { value: 10, label: 'Octubre' },
+  { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' },
+]
+
 const PAGE_MAP: Record<string, string> = {
-  carga:       '/',
-  dashboard:   '/dashboard',
-  analisis:    '/analisis',
-  curvas:      '/curvas',
-  simulador:   '/simulador',
+  carga:     '/',
+  dashboard: '/dashboard',
+  analisis:  '/analisis',
+  curvas:    '/curvas',
+  simulador: '/simulador',
 }
 
 function buildSrc(page: string) {
@@ -20,41 +31,137 @@ export default function Planificacion() {
   const location = useLocation()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [error, setError] = useState(false)
+  const [planiReady, setPlaniReady] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const [showPeriod, setShowPeriod] = useState(false)
+
+  const now = new Date()
+  const [mes, setMes] = useState(now.getMonth() + 1)
+  const [anio, setAnio] = useState(now.getFullYear())
 
   const searchParams = new URLSearchParams(location.search)
   const page = searchParams.get('page') ?? 'carga'
 
-  // Fixed src: only used on mount — never changes reactively.
-  // Changing the src prop causes a full iframe reload which races with
-  // the embedded detection in AppShell. Navigation after mount uses
-  // contentWindow.location.replace (allowed cross-origin).
   const initialSrc = useRef(buildSrc(page))
-
   const prevPage = useRef<string | null>(null)
 
+  // Send service config and listen for PLANI_READY
   useEffect(() => {
-    // First mount: iframe already loaded the right page via initialSrc
-    if (prevPage.current === null) {
-      prevPage.current = page
-      return
+    async function sendInit() {
+      try {
+        const { data } = await planiApi.getConfig()
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'PLANI_INIT', servicios: data.servicios },
+          PLANI_BASE
+        )
+      } catch {
+        // Non-critical: Plali falls back to static config
+      }
     }
+
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== PLANI_BASE) return
+      if (event.data?.type === 'PLANI_READY') {
+        setPlaniReady(true)
+        sendInit()
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
+
+  useEffect(() => {
+    if (prevPage.current === null) { prevPage.current = page; return }
     if (prevPage.current === page) return
     prevPage.current = page
     setError(false)
-
-    // location.replace is allowed for cross-origin iframes (write-only access)
     iframeRef.current?.contentWindow?.location.replace(buildSrc(page))
   }, [page])
+
+  const handleCargarEnWalt = async () => {
+    if (!planiReady) {
+      toast.error('Walt todavía no está listo, esperá un momento')
+      return
+    }
+    setCargando(true)
+    try {
+      const { data } = await planiApi.getNomina(mes, anio)
+      if (data.agentes.length === 0) {
+        toast.error(`No hay nóminas activas para ${MESES.find(m => m.value === mes)?.label} ${anio}`)
+        return
+      }
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'PLANI_NOMINA', agentes: data.agentes, mes: data.mes, anio: data.anio },
+        PLANI_BASE
+      )
+      // Navigate Walt to the upload page so the user sees the loaded state
+      iframeRef.current?.contentWindow?.location.replace(buildSrc('carga'))
+      toast.success(`${data.agentes.length} agentes cargados en Walt`)
+      setShowPeriod(false)
+    } catch {
+      toast.error('Error al cargar la nómina en Walt')
+    } finally {
+      setCargando(false)
+    }
+  }
 
   const currentSrc = buildSrc(page)
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+      {/* Toolbar */}
       <div className="h-11 bg-white border-b border-gray-200 flex items-center justify-between px-5 shrink-0">
         <span className="text-sm font-semibold text-gray-700">
           Walt · <span className="text-gray-400 font-normal capitalize">{page}</span>
         </span>
+
         <div className="flex items-center gap-1">
+          {/* Cargar nómina */}
+          <div className="relative">
+            <button
+              className="btn-ghost py-1 px-2.5 text-xs flex items-center gap-1.5"
+              onClick={() => setShowPeriod((v) => !v)}
+              title="Cargar nómina en Walt"
+            >
+              <Download size={13} />
+              <span className="hidden sm:inline">Cargar en Walt</span>
+              <ChevronDown size={11} />
+            </button>
+
+            {showPeriod && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-64">
+                <p className="text-xs font-semibold text-gray-700 mb-3">Período a cargar</p>
+                <div className="flex gap-2 mb-3">
+                  <select
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                    value={mes}
+                    onChange={(e) => setMes(Number(e.target.value))}
+                  >
+                    {MESES.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    className="w-20 text-xs border border-gray-200 rounded-lg px-2 py-1.5"
+                    value={anio}
+                    min={2020}
+                    max={2099}
+                    onChange={(e) => setAnio(Number(e.target.value))}
+                  />
+                </div>
+                <button
+                  className="btn-primary w-full text-xs py-1.5 flex items-center justify-center gap-1.5"
+                  onClick={handleCargarEnWalt}
+                  disabled={cargando}
+                >
+                  {cargando ? 'Cargando…' : 'Enviar a Walt'}
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             className="btn-ghost py-1 px-2.5 text-xs"
             onClick={() => { setError(false); iframeRef.current?.setAttribute('src', currentSrc) }}
@@ -74,6 +181,7 @@ export default function Planificacion() {
         </div>
       </div>
 
+      {/* iframe */}
       <div className="flex-1 relative bg-[#F8F9FA]">
         {error ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-center p-8">

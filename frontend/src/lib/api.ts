@@ -196,3 +196,45 @@ export const vacacionesApi = {
   delete: (id: number) => api.delete(`/vacaciones/${id}`),
   deleteImportacion: (id: number) => api.delete(`/vacaciones/importaciones/${id}`),
 }
+
+// Plani / Walt integration
+export interface PlaniServicioConfig {
+  key: string
+  label?: string
+  hojaCP: string[]
+  segmentos: string[]
+  reductores: string[]
+}
+
+export interface PlaniServicioRef {
+  id: number
+  nombre: string
+  planiConfig: PlaniServicioConfig | null
+}
+
+export interface PlaniNominaExport {
+  mes: number
+  anio: number
+  agentes: Array<{
+    dni: string
+    usuario: string
+    nombre: string
+    superior: string | null
+    segmento: string | null
+    horarios: string | null
+    estado: string | null
+    contrato: string | null
+    sitio: string | null
+    modalidad: string | null
+    jefe: string | null
+    fechaInicioAtencion: string | null
+  }>
+}
+
+export const planiApi = {
+  getConfig: () => api.get<{ servicios: PlaniServicioRef[] }>('/plani/config'),
+  getNomina: (mes: number, anio: number) =>
+    api.get<PlaniNominaExport>('/plani/nomina', { params: { mes, anio } }),
+  updateServicioConfig: (id: number, config: PlaniServicioConfig) =>
+    api.put<{ ok: boolean }>(`/servicios/${id}/plani-config`, config),
+}

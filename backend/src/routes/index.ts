@@ -20,6 +20,7 @@ import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
+import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
 
 const router = Router()
 
@@ -113,5 +114,9 @@ router.get('/vacaciones', authenticate, listVacaciones)
 router.get('/vacaciones/importaciones', authenticate, requireAdmin, listImportacionesVacaciones)
 router.delete('/vacaciones/:id', authenticate, requireAdmin, deleteVacacion)
 router.delete('/vacaciones/importaciones/:id', authenticate, requireAdmin, deleteImportacionVacaciones)
+
+router.get('/plani/config', authenticate, getPlaniConfig)
+router.get('/plani/nomina', authenticate, getPlaniNomina)
+router.put('/servicios/:id/plani-config', authenticate, requireAdmin, updatePlaniConfig)
 
 export default router

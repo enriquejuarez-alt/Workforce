@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
-  BarChart3, CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
+  CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
@@ -41,7 +41,6 @@ const ADMIN_ITEMS = [
 const WALT_ITEMS = [
   { page: 'carga',       icon: UploadCloud,     label: 'Carga de archivos' },
   { page: 'dashboard',   icon: LayoutDashboard, label: 'Resumen' },
-  { page: 'analisis',    icon: BarChart3,        label: 'Análisis' },
   { page: 'curvas',      icon: TrendingUp,       label: 'Curvas' },
   { page: 'simulador',   icon: Sliders,          label: 'Simulador' },
 ]
@@ -161,7 +160,7 @@ export default function Sidebar() {
 
         {/* Walt section */}
         <div className="mt-2">
-          <SectionLabel collapsed={collapsed}>Walt · Planificación</SectionLabel>
+          <SectionLabel collapsed={collapsed}>Planificación</SectionLabel>
           {WALT_ITEMS.map(({ page, icon: Icon, label }) => {
             const isActive = inWalt && activePage === page
             return (

@@ -8,7 +8,12 @@ echo [0/4] Cerrando instancias anteriores...
 taskkill /FI "WINDOWTITLE eq Backend - Nomina*" /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq Frontend - Nomina*" /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq Planificacion - Walt*" /F >nul 2>&1
-timeout /t 1 /nobreak >nul
+
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000 " ^| findstr "LISTENING"') do taskkill /PID %%a /F >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3001 " ^| findstr "LISTENING"') do taskkill /PID %%a /F >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":5173 " ^| findstr "LISTENING"') do taskkill /PID %%a /F >nul 2>&1
+
+timeout /t 2 /nobreak >nul
 echo  Limpieza lista.
 echo.
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, ExternalLink, RefreshCw, Download, ChevronDown } from 'lucide-react'
 import { planiApi } from '../lib/api'
 import toast from 'react-hot-toast'
@@ -29,6 +29,7 @@ function buildSrc(page: string) {
 
 export default function Planificacion() {
   const location = useLocation()
+  const navigate = useNavigate()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [error, setError] = useState(false)
   const [planiReady, setPlaniReady] = useState(false)
@@ -42,10 +43,10 @@ export default function Planificacion() {
   const searchParams = new URLSearchParams(location.search)
   const page = searchParams.get('page') ?? 'carga'
 
-  const initialSrc = useRef(buildSrc(page))
-  const prevPage = useRef<string | null>(null)
+  // El iframe siempre carga en la base — la navegación interna es via postMessage
+  const initialSrc = useRef(`${PLANI_BASE}/?embedded=1`)
 
-  // Send service config and listen for PLANI_READY
+  // Send service config and listen for PLANI_READY / PLANI_PAGE_CHANGE
   useEffect(() => {
     async function sendInit() {
       try {
@@ -65,19 +66,23 @@ export default function Planificacion() {
         setPlaniReady(true)
         sendInit()
       }
+      if (event.data?.type === 'PLANI_PAGE_CHANGE' && typeof event.data.page === 'string') {
+        navigate(`/planificacion?page=${event.data.page}`)
+      }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [])
 
+  // Navegar dentro del iframe via postMessage — sin recargar
   useEffect(() => {
-    if (prevPage.current === null) { prevPage.current = page; return }
-    if (prevPage.current === page) return
-    prevPage.current = page
-    setError(false)
-    iframeRef.current?.contentWindow?.location.replace(buildSrc(page))
-  }, [page])
+    if (!planiReady) return
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'PLANI_NAVIGATE', path: PAGE_MAP[page] ?? '/' },
+      PLANI_BASE
+    )
+  }, [page, planiReady])
 
   const handleCargarEnWalt = async () => {
     if (!planiReady) {
@@ -95,8 +100,10 @@ export default function Planificacion() {
         { type: 'PLANI_NOMINA', agentes: data.agentes, mes: data.mes, anio: data.anio },
         PLANI_BASE
       )
-      // Navigate Walt to the upload page so the user sees the loaded state
-      iframeRef.current?.contentWindow?.location.replace(buildSrc('carga'))
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'PLANI_NAVIGATE', path: '/' },
+        PLANI_BASE
+      )
       toast.success(`${data.agentes.length} agentes cargados en Walt`)
       setShowPeriod(false)
     } catch {
@@ -164,7 +171,10 @@ export default function Planificacion() {
 
           <button
             className="btn-ghost py-1 px-2.5 text-xs"
-            onClick={() => { setError(false); iframeRef.current?.setAttribute('src', currentSrc) }}
+            onClick={() => {
+              setError(false)
+              iframeRef.current?.contentWindow?.postMessage({ type: 'PLANI_NAVIGATE', path: PAGE_MAP[page] ?? '/' }, PLANI_BASE)
+            }}
             title="Recargar"
           >
             <RefreshCw size={13} />

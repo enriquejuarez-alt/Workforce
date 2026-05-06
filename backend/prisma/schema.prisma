@@ -39,6 +39,7 @@ model Usuario {
   bajas_creadas                HistoricoBaja[]          @relation("BajaCreador")
   remociones_creadas           Remocion[]               @relation("RemocionCreador")
   cambios_contrato_creados     CambioContrato[]
+  cambios_horario_creados      CambioHorario[]
   capacitaciones_creadas       Capacitacion[]
   vacacion_importaciones       VacacionImportacion[]
   programaciones_creadas       ProgramacionMensual[]
@@ -65,6 +66,7 @@ model Servicio {
   bajas                   HistoricoBaja[]
   remociones              Remocion[]
   cambios_contrato        CambioContrato[]
+  cambios_horario         CambioHorario[]
   capacitaciones          Capacitacion[]
   programaciones          ProgramacionMensual[]
 
@@ -125,6 +127,7 @@ model Agente {
   licencias          Licencia[]
   cambios_temporales CambioServicioTemporal[]
   cambios_contrato   CambioContrato[]
+  cambios_horario    CambioHorario[]
   capacitaciones     Capacitacion[]
   snapshots          AgenteNominaMensual[]
   bajas              HistoricoBaja[]
@@ -358,6 +361,32 @@ model CambioContrato {
   @@index([agente_id])
   @@index([servicio_id])
   @@map("cambios_contrato")
+}
+
+model CambioHorario {
+  id                  Int       @id @default(autoincrement())
+  agente_id           Int
+  agente_dni          String
+  agente_nombre       String
+  servicio_id         Int?
+  tipo                String    // 'TEMPORAL' | 'DEFINITIVO'
+  horario_anterior    String?
+  horario_nuevo       String
+  fecha_desde         DateTime  @db.Date
+  fecha_hasta         DateTime? @db.Date
+  motivo              String?
+  observacion         String?
+  creado_por          Int
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+
+  agente   Agente    @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("cambios_horario")
 }
 
 model Capacitacion {

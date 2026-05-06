@@ -15,6 +15,7 @@ import { listAuditoria } from '../controllers/auditoria'
 import { exportNomina } from '../controllers/export'
 import { listBajas, createBaja, updateBaja, deleteBaja, importBajas, getTiposBajas, getOpciones } from '../controllers/bajas'
 import { listCambiosContrato, createCambioContrato, updateCambioContrato, deleteCambioContrato } from '../controllers/cambiosContrato'
+import { listCambiosHorario, createCambioHorario, updateCambioHorario, deleteCambioHorario } from '../controllers/cambiosHorario'
 import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
@@ -99,6 +100,11 @@ router.get('/cambios-contrato', authenticate, listCambiosContrato)
 router.post('/cambios-contrato', authenticate, createCambioContrato)
 router.put('/cambios-contrato/:id', authenticate, updateCambioContrato)
 router.delete('/cambios-contrato/:id', authenticate, requireAdmin, deleteCambioContrato)
+
+router.get('/cambios-horario', authenticate, listCambiosHorario)
+router.post('/cambios-horario', authenticate, createCambioHorario)
+router.put('/cambios-horario/:id', authenticate, updateCambioHorario)
+router.delete('/cambios-horario/:id', authenticate, requireAdmin, deleteCambioHorario)
 
 router.get('/capacitaciones', authenticate, listCapacitaciones)
 router.post('/capacitaciones', authenticate, createCapacitacion)

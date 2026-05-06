@@ -18,9 +18,7 @@ const Permisos = lazy(() => import('./pages/Permisos'))
 const Auditoria = lazy(() => import('./pages/Auditoria'))
 const Comparacion = lazy(() => import('./pages/Comparacion'))
 const Bajas = lazy(() => import('./pages/Bajas'))
-const CambiosContrato = lazy(() => import('./pages/CambiosContrato'))
 const Capacitaciones = lazy(() => import('./pages/Capacitaciones'))
-const Remociones = lazy(() => import('./pages/Remociones'))
 const Vacaciones = lazy(() => import('./pages/Vacaciones'))
 const Planificacion = lazy(() => import('./pages/Planificacion'))
 const Soporte = lazy(() => import('./pages/Soporte'))
@@ -55,9 +53,9 @@ export default function App() {
             <Route path="licencias" element={<Licencias />} />
             <Route path="cambios" element={<CambiosTemporales />} />
             <Route path="bajas" element={<Bajas />} />
-            <Route path="cambios-contrato" element={<CambiosContrato />} />
+            <Route path="cambios-contrato" element={<Navigate to="/cambios" replace />} />
             <Route path="capacitaciones" element={<Capacitaciones />} />
-            <Route path="remociones" element={<Remociones />} />
+            <Route path="remociones" element={<Navigate to="/bajas" replace />} />
             <Route path="vacaciones" element={<Vacaciones />} />
             <Route path="comparacion" element={<Comparacion />} />
             <Route path="planificacion" element={<Planificacion />} />

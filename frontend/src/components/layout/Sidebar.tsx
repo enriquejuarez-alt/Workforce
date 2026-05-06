@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Building2, FileSpreadsheet, Upload,
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
-  LogOut, Activity, History, UserMinus, FilePen, GraduationCap, UserX, Palmtree,
+  LogOut, Activity, History, UserMinus, GraduationCap, Palmtree,
   CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
@@ -16,11 +16,9 @@ const NAV_ITEMS = [
   { to: '/nomina', icon: FileSpreadsheet, label: 'Nómina' },
   { to: '/licencias', icon: ClipboardList, label: 'Licencias' },
   { to: '/calendario', icon: CalendarDays, label: 'Calendario' },
-  { to: '/cambios', icon: ArrowLeftRight, label: 'Cambios Temporales' },
-  { to: '/bajas', icon: UserMinus, label: 'Bajas' },
-  { to: '/cambios-contrato', icon: FilePen, label: 'Cambios de Contrato' },
+  { to: '/cambios', icon: ArrowLeftRight, label: 'Cambios' },
+  { to: '/bajas', icon: UserMinus, label: 'Bajas y Remociones' },
   { to: '/capacitaciones', icon: GraduationCap, label: 'Capacitaciones' },
-  { to: '/remociones', icon: UserX, label: 'Remociones' },
   { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
 ]

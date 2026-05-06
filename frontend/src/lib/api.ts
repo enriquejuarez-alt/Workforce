@@ -2,7 +2,7 @@ import api from './axios'
 import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
-  AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, Capacitacion, Remocion,
+  AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, CambioHorario, Capacitacion, Remocion,
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
   ProgramacionMensual, FactorReduccion, SimulacionResponse,
 } from '../types'
@@ -164,6 +164,14 @@ export const cambiosContratoApi = {
   create: (data: any) => api.post<CambioContrato>('/cambios-contrato', data),
   update: (id: number, data: any) => api.put<CambioContrato>(`/cambios-contrato/${id}`, data),
   delete: (id: number) => api.delete(`/cambios-contrato/${id}`),
+}
+
+// Cambios de horario
+export const cambiosHorarioApi = {
+  list: (params?: Record<string, any>) => api.get<CambioHorario[]>('/cambios-horario', { params }),
+  create: (data: any) => api.post<CambioHorario>('/cambios-horario', data),
+  update: (id: number, data: any) => api.put<CambioHorario>(`/cambios-horario/${id}`, data),
+  delete: (id: number) => api.delete(`/cambios-horario/${id}`),
 }
 
 // Exportar

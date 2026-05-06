@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useResultados } from "@/store/useResultados";
 import { useUploads } from "@/store/useUploads";
@@ -17,9 +16,9 @@ import { calcularResultados } from "@/lib/domain/calculos";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SinDatos } from "@/components/SinDatos";
 
 export default function DashboardPage() {
-  const router = useRouter();
   const {
     resultado,
     agentes,
@@ -30,10 +29,6 @@ export default function DashboardPage() {
     activeFilters,
   } = useResultados();
   const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
-
-  useEffect(() => {
-    if (!resultado) router.replace("/");
-  }, [resultado, router]);
 
   const resultadoMostrado = useMemo(() => {
     if (!resultado || agentes.length === 0) return resultado;
@@ -47,7 +42,7 @@ export default function DashboardPage() {
     }
   }, [resultado, agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, activeFilters]);
 
-  if (!resultado || !resultadoMostrado) return null;
+  if (!resultado || !resultadoMostrado) return <SinDatos />;
 
   const nivel = nivelCumplimiento(resultadoMostrado.cumplimientoTotal);
   const accentMap = {

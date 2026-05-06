@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
@@ -49,9 +50,10 @@ function rawToAgente(raw: RawAgentePlani): Agente {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [embedded, setEmbedded] = useState<boolean | null>(null);
+  const [embedded, setEmbedded] = useState(false);
   const setServiciosNomina = usePlaniConfig((s) => s.setServiciosNomina);
   const setAgentesDesdeApi = useResultados((s) => s.setAgentesDesdeApi);
+  const router = useRouter();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -60,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const fromSession = sessionStorage.getItem("plani_embedded") === "1";
     let fromIframe = false;
     try { fromIframe = window.self !== window.top; } catch { fromIframe = true; }
-    setEmbedded(fromParam || fromSession || fromIframe);
+    if (fromParam || fromSession || fromIframe) setEmbedded(true);
   }, []);
 
   useEffect(() => {
@@ -81,15 +83,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const agentes: Agente[] = (data.agentes as RawAgentePlani[]).map(rawToAgente);
         setAgentesDesdeApi(agentes, data.mes as number, data.anio as number);
       }
+
+      if (data.type === "PLANI_NAVIGATE" && typeof data.path === "string") {
+        router.push(data.path);
+      }
     }
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setServiciosNomina, setAgentesDesdeApi]);
-
-  if (embedded === null) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>;
-  }
+  }, [setServiciosNomina, setAgentesDesdeApi, router]);
 
   if (embedded) {
     return <main className="min-h-screen bg-[#F8F9FA]">{children}</main>;

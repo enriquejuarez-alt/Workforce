@@ -1,24 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { FileBarChart2, TrendingDown } from "lucide-react";
 import { useResultados } from "@/store/useResultados";
 import { ContratosMixChart } from "@/components/charts/ContratosMixChart";
 import { ReduccionRankingChart } from "@/components/charts/ReduccionRankingChart";
+import { SinDatos } from "@/components/SinDatos";
 
 const fade = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.3 } };
 
 export default function AnalisisPage() {
-  const router = useRouter();
   const { resultado, agentes } = useResultados();
 
-  useEffect(() => {
-    if (!resultado) router.replace("/");
-  }, [resultado, router]);
-
-  if (!resultado) return null;
+  if (!resultado) return <SinDatos />;
 
   return (
     <div className="px-6 py-6 max-w-7xl mx-auto">

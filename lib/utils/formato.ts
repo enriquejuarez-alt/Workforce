@@ -15,7 +15,7 @@ export function fmtNumero(valor: number, decimales = 0): string {
 
 export function fmtDelta(delta: number): string {
   const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta.toFixed(1)} HC`;
+  return `${sign}${delta.toFixed(1)} A`;
 }
 
 export const COLOR_NIVEL = {

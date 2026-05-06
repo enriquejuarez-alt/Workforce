@@ -68,9 +68,9 @@ function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
       severidad: "critical",
       servicio: r.servicio,
       mensaje: `Déficit crítico: ${r.cumplimiento.toFixed(1)}% de cumplimiento`,
-      detalle: `Faltan aprox. ${Math.ceil(r.deltaHC103)} HC para alcanzar el 103%.`,
+      detalle: `Faltan aprox. ${Math.ceil(r.deltaHC103)} A para alcanzar el 103%.`,
       metrica: r.deltaHC103,
-      metricaLabel: "HC faltantes",
+      metricaLabel: "Agentes faltantes",
     });
   } else if (r.cumplimiento < 100) {
     alertas.push({
@@ -78,7 +78,7 @@ function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
       severidad: "warning",
       servicio: r.servicio,
       mensaje: `Cumplimiento bajo el 100% (${r.cumplimiento.toFixed(1)}%)`,
-      detalle: `Delta HC @ 103%: ${r.deltaHC103.toFixed(1)}`,
+      detalle: `Delta A @ 103%: ${r.deltaHC103.toFixed(1)}`,
       metrica: r.deltaHC103,
       metricaLabel: "HC faltantes",
     });
@@ -104,9 +104,9 @@ function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
       severidad: "info",
       servicio: r.servicio,
       mensaje: `Sobredotado (${r.cumplimiento.toFixed(1)}%)`,
-      detalle: `Exceso de ${Math.abs(r.deltaHC103).toFixed(1)} HC sobre el objetivo 103%.`,
+      detalle: `Exceso de ${Math.abs(r.deltaHC103).toFixed(1)} A sobre el objetivo 103%.`,
       metrica: Math.abs(r.deltaHC103),
-      metricaLabel: "HC excedentes",
+      metricaLabel: "Agentes excedentes",
     });
   }
 }

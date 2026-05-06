@@ -7,14 +7,12 @@ import {
   LayoutDashboard,
   TrendingUp,
   Sliders,
-  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const NAV_ITEMS = [
   { href: "/", label: "Carga de archivos", icon: UploadCloud },
   { href: "/dashboard", label: "Resumen", icon: LayoutDashboard },
-  { href: "/analisis", label: "Análisis", icon: BarChart3 },
   { href: "/curvas", label: "Curvas", icon: TrendingUp },
   { href: "/simulador", label: "Simulador", icon: Sliders },
 ];

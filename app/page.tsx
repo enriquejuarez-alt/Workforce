@@ -212,6 +212,10 @@ export default function UploadPage() {
       setAgentesExcluidos(excl, segs);
 
       router.push("/dashboard");
+      // Notificar a Walt para que sincronice el nav activo
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: "PLANI_PAGE_CHANGE", page: "dashboard" }, "*");
+      }
     } catch (e) {
       setErrores([`Error inesperado al procesar: ${String(e)}`]);
     } finally {

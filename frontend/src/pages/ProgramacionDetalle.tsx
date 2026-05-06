@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -135,19 +135,27 @@ function CurvaDiariaChart({ sim, fechas, presencia }: {
   fechas: { fecha: string; dia_num: number; dia_semana: string }[]
   presencia: Record<string, { presentes: number; francos: number }>
 }) {
-  const data = useMemo(() => fechas.map(f => {
-    const rows = sim.filter(r => r.fecha === f.fecha)
-    const hasReqs = rows.length > 0
-    return {
-      dia: `${f.dia_semana} ${f.dia_num}`,
-      fecha: f.fecha,
-      under:    hasReqs ? rows.filter(r => r.estado === 'UNDER').length : 0,
-      limite:   hasReqs ? rows.filter(r => r.estado === 'LIMITE').length : 0,
-      ok:       hasReqs ? rows.filter(r => r.estado === 'OK').length : 0,
-      over:     hasReqs ? rows.filter(r => r.estado === 'OVER').length : 0,
-      presentes: !hasReqs ? (presencia[f.fecha]?.presentes ?? 0) : 0,
+  const data = useMemo(() => {
+    const byFecha = new Map<string, SimulacionResultado[]>()
+    for (const r of sim) {
+      const list = byFecha.get(r.fecha)
+      if (list) list.push(r)
+      else byFecha.set(r.fecha, [r])
     }
-  }), [sim, fechas, presencia])
+    return fechas.map(f => {
+      const rows = byFecha.get(f.fecha) ?? []
+      const hasReqs = rows.length > 0
+      return {
+        dia: `${f.dia_semana} ${f.dia_num}`,
+        fecha: f.fecha,
+        under:    hasReqs ? rows.filter(r => r.estado === 'UNDER').length : 0,
+        limite:   hasReqs ? rows.filter(r => r.estado === 'LIMITE').length : 0,
+        ok:       hasReqs ? rows.filter(r => r.estado === 'OK').length : 0,
+        over:     hasReqs ? rows.filter(r => r.estado === 'OVER').length : 0,
+        presentes: !hasReqs ? (presencia[f.fecha]?.presentes ?? 0) : 0,
+      }
+    })
+  }, [sim, fechas, presencia])
 
   return (
     <ResponsiveContainer width="100%" height={130}>
@@ -171,18 +179,20 @@ function CurvaDiariaChart({ sim, fechas, presencia }: {
 
 // ─── Coverage curve ────────────────────────────────────────────────────────────
 
-function CoverageCurve({ sim }: { sim: SimulacionResultado[] }) {
-  const byIntervalo = new Map<string, { asig: number[]; req: number[] }>()
-  for (const r of sim) {
-    if (!byIntervalo.has(r.intervalo)) byIntervalo.set(r.intervalo, { asig: [], req: [] })
-    byIntervalo.get(r.intervalo)!.asig.push(r.asignados)
-    byIntervalo.get(r.intervalo)!.req.push(r.requeridos)
-  }
-  const points = [...byIntervalo.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([intv, d]) => ({
-    intv,
-    asig: d.asig.reduce((s, v) => s + v, 0) / d.asig.length,
-    req: d.req.reduce((s, v) => s + v, 0) / d.req.length,
-  }))
+const CoverageCurve = memo(function CoverageCurve({ sim }: { sim: SimulacionResultado[] }) {
+  const points = useMemo(() => {
+    const byIntervalo = new Map<string, { asig: number[]; req: number[] }>()
+    for (const r of sim) {
+      if (!byIntervalo.has(r.intervalo)) byIntervalo.set(r.intervalo, { asig: [], req: [] })
+      byIntervalo.get(r.intervalo)!.asig.push(r.asignados)
+      byIntervalo.get(r.intervalo)!.req.push(r.requeridos)
+    }
+    return [...byIntervalo.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([intv, d]) => ({
+      intv,
+      asig: d.asig.reduce((s, v) => s + v, 0) / d.asig.length,
+      req: d.req.reduce((s, v) => s + v, 0) / d.req.length,
+    }))
+  }, [sim])
   if (points.length < 2) return null
 
   const W = 600, H = 160, PAD = 40
@@ -206,7 +216,7 @@ function CoverageCurve({ sim }: { sim: SimulacionResultado[] }) {
       ))}
     </svg>
   )
-}
+})
 
 // ─── Coverage grid ─────────────────────────────────────────────────────────────
 
@@ -296,7 +306,29 @@ function CoverageGrid({ sim, intervalos, fechas }: {
 
 // ─── Interval summary ──────────────────────────────────────────────────────────
 
-function IntervalSummary({ sim, intervalos }: { sim: SimulacionResultado[]; intervalos: string[] }) {
+const IntervalSummary = memo(function IntervalSummary({ sim, intervalos }: { sim: SimulacionResultado[]; intervalos: string[] }) {
+  const rows = useMemo(() => {
+    const byIntervalo = new Map<string, SimulacionResultado[]>()
+    for (const r of sim) {
+      const list = byIntervalo.get(r.intervalo)
+      if (list) list.push(r)
+      else byIntervalo.set(r.intervalo, [r])
+    }
+    const avg = (arr: number[]) => arr.length ? (arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1) : '—'
+    return intervalos.map(intv => {
+      const cells = byIntervalo.get(intv) ?? []
+      return {
+        intv,
+        avgAsig: avg(cells.map(c => c.asignados)),
+        avgReq: avg(cells.map(c => c.requeridos)),
+        UNDER: cells.filter(c => c.estado === 'UNDER').length,
+        LIMITE: cells.filter(c => c.estado === 'LIMITE').length,
+        OK: cells.filter(c => c.estado === 'OK').length,
+        OVER: cells.filter(c => c.estado === 'OVER').length,
+      }
+    })
+  }, [sim, intervalos])
+
   return (
     <table className="w-full text-xs">
       <thead>
@@ -311,31 +343,21 @@ function IntervalSummary({ sim, intervalos }: { sim: SimulacionResultado[]; inte
         </tr>
       </thead>
       <tbody>
-        {intervalos.map(intv => {
-          const cells = sim.filter(r => r.intervalo === intv)
-          const avg = (arr: number[]) => arr.length ? (arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(1) : '—'
-          const counts = {
-            UNDER: cells.filter(c => c.estado === 'UNDER').length,
-            LIMITE: cells.filter(c => c.estado === 'LIMITE').length,
-            OK: cells.filter(c => c.estado === 'OK').length,
-            OVER: cells.filter(c => c.estado === 'OVER').length,
-          }
-          return (
-            <tr key={intv} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-              <td className="py-2 pr-4 font-mono font-bold text-gray-800 text-[11px]">{intv}</td>
-              <td className="py-2 text-right text-gray-600 tabular-nums">{avg(cells.map(c => c.asignados))}</td>
-              <td className="py-2 text-right text-gray-600 tabular-nums">{avg(cells.map(c => c.requeridos))}</td>
-              <td className="py-2 text-center">{counts.UNDER > 0 ? <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{counts.UNDER}</span> : <span className="text-gray-200">—</span>}</td>
-              <td className="py-2 text-center">{counts.LIMITE > 0 ? <span className="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{counts.LIMITE}</span> : <span className="text-gray-200">—</span>}</td>
-              <td className="py-2 text-center">{counts.OK > 0 ? <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{counts.OK}</span> : <span className="text-gray-200">—</span>}</td>
-              <td className="py-2 text-center">{counts.OVER > 0 ? <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{counts.OVER}</span> : <span className="text-gray-200">—</span>}</td>
-            </tr>
-          )
-        })}
+        {rows.map(r => (
+          <tr key={r.intv} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+            <td className="py-2 pr-4 font-mono font-bold text-gray-800 text-[11px]">{r.intv}</td>
+            <td className="py-2 text-right text-gray-600 tabular-nums">{r.avgAsig}</td>
+            <td className="py-2 text-right text-gray-600 tabular-nums">{r.avgReq}</td>
+            <td className="py-2 text-center">{r.UNDER > 0 ? <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{r.UNDER}</span> : <span className="text-gray-200">—</span>}</td>
+            <td className="py-2 text-center">{r.LIMITE > 0 ? <span className="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{r.LIMITE}</span> : <span className="text-gray-200">—</span>}</td>
+            <td className="py-2 text-center">{r.OK > 0 ? <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{r.OK}</span> : <span className="text-gray-200">—</span>}</td>
+            <td className="py-2 text-center">{r.OVER > 0 ? <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{r.OVER}</span> : <span className="text-gray-200">—</span>}</td>
+          </tr>
+        ))}
       </tbody>
     </table>
   )
-}
+})
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 

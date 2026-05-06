@@ -8,8 +8,10 @@ import type {
   ResultadoServicio,
   ServicioKey,
 } from "./types";
-import { SERVICIOS_KEYS } from "./types";
-import { resolverServicioPorReductor } from "./mapeo";
+import {
+  getServiciosKeys,
+  resolverServicioPorReductorRuntime,
+} from "../config/servicesRuntime";
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
 
@@ -29,7 +31,7 @@ export function calcularFactorProductivo(
   if (modo === "multiplicativo") {
     return (1 - deslogueo) * (1 - ausentismo) * (1 - rotacion);
   }
-  return 1 - (deslogueo + ausentismo + rotacion);
+  return Math.max(0, 1 - (deslogueo + ausentismo + rotacion));
 }
 
 export function calcularCumplimiento(
@@ -99,7 +101,7 @@ function agruparAgentesPorServicio(
   agentes: Agente[]
 ): Map<ServicioKey, GrupoServicio> {
   const mapa = new Map<ServicioKey, GrupoServicio>();
-  for (const key of SERVICIOS_KEYS) {
+  for (const key of getServiciosKeys()) {
     mapa.set(key, { hcActivos: 0, hcLP: 0, hcCapa: 0, hsBrutas: 0, hsSemanalSuma: 0, hsSemanalConteo: 0 });
   }
 
@@ -133,14 +135,14 @@ export function calcularResultados(
 ): ResultadoGeneral {
   const reductorPorServicio = new Map<ServicioKey, Reductor>();
   for (const r of reductores) {
-    const key = resolverServicioPorReductor(r.servicioNorm);
+    const key = resolverServicioPorReductorRuntime(r.servicioNorm);
     if (key) reductorPorServicio.set(key, r);
   }
 
   const grupos = agruparAgentesPorServicio(agentes);
   const resultados: ResultadoServicio[] = [];
 
-  for (const servicio of SERVICIOS_KEYS) {
+  for (const servicio of getServiciosKeys()) {
     const grupo = grupos.get(servicio) ?? {
       hcActivos: 0,
       hcLP: 0,

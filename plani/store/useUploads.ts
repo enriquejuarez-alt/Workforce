@@ -51,6 +51,8 @@ export const useUploads = create<UploadsState>((set, get) => ({
       archivoNomina: null,
       hojaNomina: null,
       hojasNomina: [],
+      modoReductor: "multiplicativo",
+      topeFacturacion: 103,
     }),
 
   todosSubidos: () => {

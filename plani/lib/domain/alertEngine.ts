@@ -2,18 +2,13 @@ import type {
   Alerta,
   ResultadoGeneral,
   ResultadoServicio,
-  ServicioCoverage,
-  ServicioKey,
 } from "./types";
 
 function nextId() {
   return `alerta-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function generarAlertas(
-  resultado: ResultadoGeneral,
-  coverages: Map<ServicioKey, ServicioCoverage>
-): Alerta[] {
+export function generarAlertas(resultado: ResultadoGeneral): Alerta[] {
   const alertas: Alerta[] = [];
 
   // ── GLOBAL ──────────────────────────────────────────────────────────────────
@@ -50,43 +45,12 @@ export function generarAlertas(
     alertasServicio(r, alertas);
   }
 
-  // ── COVERAGE ─────────────────────────────────────────────────────────────────
-
-  for (const [key, cov] of coverages) {
-    if (cov.franjasCriticas.length > 0) {
-      alertas.push({
-        id: nextId(),
-        severidad: "warning",
-        servicio: key,
-        mensaje: `${cov.franjasCriticas.length} franja${cov.franjasCriticas.length > 1 ? "s" : ""} con déficit persistente`,
-        detalle: `Franjas en déficit ≥50% de los días: ${cov.franjasCriticas.slice(0, 5).join(", ")}${cov.franjasCriticas.length > 5 ? "…" : ""}`,
-        metrica: cov.franjasCriticas.length,
-        metricaLabel: "Franjas críticas",
-      });
-    }
-
-    // Día con peor cobertura
-    const peorDia = [...cov.dias].sort((a, b) => a.totalGap - b.totalGap)[0];
-    if (peorDia && peorDia.totalGap < -10) {
-      alertas.push({
-        id: nextId(),
-        severidad: "info",
-        servicio: key,
-        mensaje: `Día con mayor déficit: ${peorDia.fecha.toLocaleDateString("es-AR", { day: "numeric", weekday: "short" })}`,
-        detalle: `Gap total del día: ${peorDia.totalGap.toFixed(1)} HC`,
-        metrica: peorDia.totalGap,
-        metricaLabel: "HC de gap",
-      });
-    }
-  }
-
   // Ordenar: critical → warning → info
   const orden: Record<string, number> = { critical: 0, warning: 1, info: 2 };
   return alertas.sort((a, b) => orden[a.severidad] - orden[b.severidad]);
 }
 
 function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
-  // Sin agentes pero con requerido → mapeo posiblemente roto
   if (r.hcActivos === 0 && r.hsRequeridas > 0) {
     alertas.push({
       id: nextId(),
@@ -98,16 +62,15 @@ function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
     return;
   }
 
-  // Cumplimiento crítico
   if (r.cumplimiento < 80) {
     alertas.push({
       id: nextId(),
       severidad: "critical",
       servicio: r.servicio,
       mensaje: `Déficit crítico: ${r.cumplimiento.toFixed(1)}% de cumplimiento`,
-      detalle: `Faltan aprox. ${Math.ceil(r.deltaHC103)} HC para alcanzar el 103%.`,
+      detalle: `Faltan aprox. ${Math.ceil(r.deltaHC103)} A para alcanzar el 103%.`,
       metrica: r.deltaHC103,
-      metricaLabel: "HC faltantes",
+      metricaLabel: "Agentes faltantes",
     });
   } else if (r.cumplimiento < 100) {
     alertas.push({
@@ -115,13 +78,12 @@ function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
       severidad: "warning",
       servicio: r.servicio,
       mensaje: `Cumplimiento bajo el 100% (${r.cumplimiento.toFixed(1)}%)`,
-      detalle: `Delta HC @ 103%: ${r.deltaHC103.toFixed(1)}`,
+      detalle: `Delta A @ 103%: ${r.deltaHC103.toFixed(1)}`,
       metrica: r.deltaHC103,
       metricaLabel: "HC faltantes",
     });
   }
 
-  // Reductor alto
   const totalReductor =
     r.reductoRes.deslogueo + r.reductoRes.ausentismo + r.reductoRes.rotacion;
   if (totalReductor > 0.08) {
@@ -136,16 +98,15 @@ function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
     });
   }
 
-  // Sobredotación
   if (r.cumplimiento > 115) {
     alertas.push({
       id: nextId(),
       severidad: "info",
       servicio: r.servicio,
       mensaje: `Sobredotado (${r.cumplimiento.toFixed(1)}%)`,
-      detalle: `Exceso de ${Math.abs(r.deltaHC103).toFixed(1)} HC sobre el objetivo 103%.`,
+      detalle: `Exceso de ${Math.abs(r.deltaHC103).toFixed(1)} A sobre el objetivo 103%.`,
       metrica: Math.abs(r.deltaHC103),
-      metricaLabel: "HC excedentes",
+      metricaLabel: "Agentes excedentes",
     });
   }
 }

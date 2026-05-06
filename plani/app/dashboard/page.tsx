@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useResultados } from "@/store/useResultados";
 import { useUploads } from "@/store/useUploads";
@@ -15,12 +14,11 @@ import { fmtNumero, fmtPct, fmtHoras } from "@/lib/utils/formato";
 import { filtrarAgentes, hayFiltrosActivos } from "@/lib/domain/filterEngine";
 import { calcularResultados } from "@/lib/domain/calculos";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
-import { cn } from "@/lib/utils/cn";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SinDatos } from "@/components/SinDatos";
 
 export default function DashboardPage() {
-  const router = useRouter();
   const {
     resultado,
     agentes,
@@ -30,11 +28,7 @@ export default function DashboardPage() {
     alertas,
     activeFilters,
   } = useResultados();
-  const { modoReductor, setModoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
-
-  useEffect(() => {
-    if (!resultado) router.replace("/");
-  }, [resultado, router]);
+  const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
 
   const resultadoMostrado = useMemo(() => {
     if (!resultado || agentes.length === 0) return resultado;
@@ -48,7 +42,7 @@ export default function DashboardPage() {
     }
   }, [resultado, agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, activeFilters]);
 
-  if (!resultado || !resultadoMostrado) return null;
+  if (!resultado || !resultadoMostrado) return <SinDatos />;
 
   const nivel = nivelCumplimiento(resultadoMostrado.cumplimientoTotal);
   const accentMap = {
@@ -92,29 +86,12 @@ export default function DashboardPage() {
               />
               <span className="text-xs text-gray-500">%</span>
             </div>
-            {/* Modo reductor toggle */}
-            <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1">
-              {(["multiplicativo", "aditivo"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setModoReductor(m)}
-                  className={cn(
-                    "rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors",
-                    modoReductor === m
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
             {/* Export */}
             <Button
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => resultadoMostrado && exportarSimulacion(resultadoMostrado.mes, resultadoMostrado.resultados, resultadoMostrado.resultados)}
+              onClick={() => resultadoMostrado && exportarSimulacion(resultadoMostrado.mes, resultadoMostrado.resultados)}
             >
               <Download className="h-3.5 w-3.5" />
               Exportar

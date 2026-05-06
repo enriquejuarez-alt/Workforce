@@ -1,10 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,37 +11,50 @@ import {
   Legend,
   ReferenceDot,
   ResponsiveContainer,
-  Cell,
+  Brush,
 } from "recharts";
+import { ChevronLeft, ChevronRight, ZoomOut } from "lucide-react";
 import type { MatrizServicio, ResultadoServicio } from "@/lib/domain/types";
+import { cn } from "@/lib/utils/cn";
 
-export type Granularity = "dias" | "semanas" | "mes";
+const DEFAULT_WINDOW = 7;
 
 interface Props {
   matriz: MatrizServicio;
   resultado: ResultadoServicio;
   diasDelMes: number;
-  granularity: Granularity;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const TooltipHs = ({ active, payload, label }: any) => {
+const TooltipDia = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const req  = payload.find((p: any) => p.dataKey === "Requeridas")?.value as number | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const disp = payload.find((p: any) => p.dataKey === "Disponibles")?.value as number | undefined;
+  const diff = req != null && disp != null ? disp - req : null;
   return (
-    <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-xl">
-      <p className="font-semibold text-zinc-300 mb-1">{label}</p>
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold text-gray-700 mb-1.5">Día {label}</p>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }}>
-          {p.name}: {Number(p.value).toFixed(0)} hs
+          {p.name}:{" "}
+          <span className="font-semibold tabular-nums">{Number(p.value).toFixed(1)} hs</span>
         </p>
       ))}
+      {diff != null && (
+        <p className={cn("mt-1.5 font-semibold tabular-nums border-t border-gray-100 pt-1.5",
+          diff >= 0 ? "text-emerald-600" : "text-rose-500"
+        )}>
+          {diff >= 0 ? "+" : ""}{diff.toFixed(1)} hs
+        </p>
+      )}
     </div>
   );
 };
 
-// ── Vista por días ──────────────────────────────────────────────────────────
-function DiaView({ matriz, resultado, diasDelMes }: Omit<Props, "granularity">) {
+export function CurvaTemporalChart({ matriz, resultado, diasDelMes }: Props) {
   const hsPorDia = diasDelMes > 0 ? resultado.hsNetas / diasDelMes : 0;
 
   const data = matriz.dias.map((dia, i) => ({
@@ -52,136 +64,158 @@ function DiaView({ matriz, resultado, diasDelMes }: Omit<Props, "granularity">) 
     feriado: dia.esFeriado,
   }));
 
-  const feriados = data.filter((d) => d.feriado);
+  const maxIdx = data.length - 1;
+  const [start, setStart] = useState(0);
+  const [end, setEnd]     = useState(Math.min(DEFAULT_WINDOW - 1, maxIdx));
+
+  const windowSize = end - start + 1;
+  const canPrev    = start > 0;
+  const canNext    = end < maxIdx;
+  const isFullView = start === 0 && end === maxIdx;
+
+  const movePrev = () => {
+    const newStart = Math.max(0, start - windowSize);
+    setStart(newStart);
+    setEnd(newStart + windowSize - 1);
+  };
+
+  const moveNext = () => {
+    const newEnd = Math.min(maxIdx, end + windowSize);
+    setEnd(newEnd);
+    setStart(newEnd - windowSize + 1);
+  };
+
+  const feriadosVisibles = data
+    .slice(start, end + 1)
+    .filter((d) => d.feriado)
+    .map((d) => d.label);
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id="gReq" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2} />
-            <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="gDisp" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-        <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} interval={Math.floor(data.length / 10)} />
-        <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-        <Tooltip content={<TooltipHs />} />
-        <Legend wrapperStyle={{ fontSize: "12px", color: "#71717a" }} iconType="circle" iconSize={8} />
-        <Area type="monotone" dataKey="Requeridas" stroke="#f43f5e" strokeWidth={2} fill="url(#gReq)" dot={false} />
-        <Area type="monotone" dataKey="Disponibles" stroke="#10b981" strokeWidth={2} fill="url(#gDisp)" dot={false} />
-        {feriados.map((f) => (
-          <ReferenceDot key={f.label} x={f.label} y={f.Requeridas} r={4} fill="#f59e0b" stroke="none" />
-        ))}
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ── Vista por semanas ───────────────────────────────────────────────────────
-function SemanaView({ matriz, resultado, diasDelMes }: Omit<Props, "granularity">) {
-  const hsPorDia = diasDelMes > 0 ? resultado.hsNetas / diasDelMes : 0;
-  const n = matriz.totalDiario.length;
-
-  const semanas: { label: string; Requeridas: number; Disponibles: number; feriados: number }[] = [];
-  let s = 0;
-  while (s * 7 < n) {
-    const start = s * 7;
-    const end   = Math.min(start + 7, n);
-    const reqSemana  = matriz.totalDiario.slice(start, end).reduce((a, v) => a + (v ?? 0), 0);
-    const dispSemana = hsPorDia * (end - start);
-    const feriados   = matriz.dias.slice(start, end).filter((d) => d.esFeriado).length;
-    semanas.push({
-      label: `Sem ${s + 1}\n(días ${start + 1}–${end})`,
-      Requeridas: parseFloat(reqSemana.toFixed(1)),
-      Disponibles: parseFloat(dispSemana.toFixed(1)),
-      feriados,
-    });
-    s++;
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={semanas} barGap={4} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-        <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-        <Tooltip content={<TooltipHs />} />
-        <Legend wrapperStyle={{ fontSize: "12px", color: "#71717a" }} iconType="square" iconSize={8} />
-        <Bar dataKey="Requeridas" fill="#f43f5e" radius={[3, 3, 0, 0]} maxBarSize={48} />
-        <Bar dataKey="Disponibles" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={48} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ── Vista mensual ───────────────────────────────────────────────────────────
-function MesView({ matriz, resultado }: Omit<Props, "granularity" | "diasDelMes">) {
-  const requeridas  = matriz.totalMes;
-  const disponibles = resultado.hsNetas;
-  const cumpl       = requeridas > 0 ? (disponibles / requeridas) * 100 : 0;
-
-  const data = [
-    { label: "Mes completo", Requeridas: parseFloat(requeridas.toFixed(0)), Disponibles: parseFloat(disponibles.toFixed(0)) },
-  ];
-
-  const cumplColor = cumpl >= 103 ? "#10b981" : cumpl >= 90 ? "#f59e0b" : "#f43f5e";
-
-  return (
-    <div className="space-y-6">
-      {/* Gauge simple */}
-      <div className="flex items-center justify-center gap-10 py-4">
-        <div className="text-center">
-          <p className="text-xs text-zinc-500 mb-1">Hs Requeridas</p>
-          <p className="text-3xl font-bold text-zinc-100 tabular-nums">{requeridas.toFixed(0)}</p>
+    <div className="space-y-3">
+      {/* Controles de navegación */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={movePrev}
+            disabled={!canPrev}
+            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Período anterior"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-xs text-gray-500 tabular-nums px-2 min-w-[90px] text-center">
+            Día {start + 1} – {end + 1}
+          </span>
+          <button
+            onClick={moveNext}
+            disabled={!canNext}
+            className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Período siguiente"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <div className="text-center">
-          <p className="text-xs text-zinc-500 mb-1">Cumplimiento</p>
-          <p className="text-4xl font-bold tabular-nums" style={{ color: cumplColor }}>{cumpl.toFixed(1)}%</p>
-        </div>
-        <div className="text-center">
-          <p className="text-xs text-zinc-500 mb-1">Hs Disponibles</p>
-          <p className="text-3xl font-bold text-zinc-100 tabular-nums">{disponibles.toFixed(0)}</p>
-        </div>
+
+        {!isFullView && (
+          <button
+            onClick={() => { setStart(0); setEnd(maxIdx); }}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <ZoomOut className="h-3 w-3" />
+            Ver mes completo
+          </button>
+        )}
       </div>
 
-      {/* Barra comparativa */}
-      <ResponsiveContainer width="100%" height={160}>
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-          <XAxis type="number" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} width={80} />
-          <Tooltip content={<TooltipHs />} />
-          <Legend wrapperStyle={{ fontSize: "12px", color: "#71717a" }} iconType="square" iconSize={8} />
-          <Bar dataKey="Requeridas" fill="#f43f5e" radius={[0, 3, 3, 0]} maxBarSize={28} />
-          <Bar dataKey="Disponibles" radius={[0, 3, 3, 0]} maxBarSize={28}>
-            {data.map((_, i) => (
-              <Cell key={i} fill={cumplColor} />
-            ))}
-          </Bar>
-        </BarChart>
+      {/* Gráfico */}
+      <ResponsiveContainer width="100%" height={320}>
+        <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="gReq" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#f43f5e" stopOpacity={0.15} />
+              <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gDisp" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#10b981" stopOpacity={0.15} />
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: "#9ca3af", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fill: "#9ca3af", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            unit=" hs"
+            width={52}
+          />
+          <Tooltip content={<TooltipDia />} />
+          <Legend
+            wrapperStyle={{ fontSize: "12px", color: "#6b7280" }}
+            iconType="circle"
+            iconSize={8}
+          />
+
+          <Area
+            type="monotone"
+            dataKey="Requeridas"
+            stroke="#f43f5e"
+            strokeWidth={2}
+            fill="url(#gReq)"
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 0 }}
+          />
+          <Area
+            type="monotone"
+            dataKey="Disponibles"
+            stroke="#10b981"
+            strokeWidth={2}
+            fill="url(#gDisp)"
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 0 }}
+          />
+
+          {data.filter((d) => d.feriado).map((f) => (
+            <ReferenceDot
+              key={f.label}
+              x={f.label}
+              y={f.Requeridas}
+              r={5}
+              fill="#f59e0b"
+              stroke="#fff"
+              strokeWidth={1.5}
+            />
+          ))}
+
+          <Brush
+            dataKey="label"
+            startIndex={start}
+            endIndex={end}
+            onChange={(e) => {
+              if (e.startIndex != null) setStart(e.startIndex);
+              if (e.endIndex != null)   setEnd(e.endIndex);
+            }}
+            height={28}
+            stroke="#e5e7eb"
+            fill="#f9fafb"
+            travellerWidth={8}
+            gap={1}
+          />
+        </AreaChart>
       </ResponsiveContainer>
 
-      {/* Diferencia */}
-      <div className="flex justify-center">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-6 py-3 text-center">
-          <p className="text-xs text-zinc-500 mb-0.5">Diferencia mensual</p>
-          <p className="text-xl font-semibold tabular-nums" style={{ color: cumplColor }}>
-            {disponibles - requeridas >= 0 ? "+" : ""}{(disponibles - requeridas).toFixed(0)} hs
-          </p>
-        </div>
-      </div>
+      {feriadosVisibles.length > 0 && (
+        <p className="text-xs text-amber-600 flex items-center gap-1.5">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+          Feriados en vista: días {feriadosVisibles.join(", ")}
+        </p>
+      )}
     </div>
   );
-}
-
-// ── Componente principal ────────────────────────────────────────────────────
-export function CurvaTemporalChart({ matriz, resultado, diasDelMes, granularity }: Props) {
-  if (granularity === "semanas") return <SemanaView matriz={matriz} resultado={resultado} diasDelMes={diasDelMes} />;
-  if (granularity === "mes")     return <MesView    matriz={matriz} resultado={resultado} />;
-  return <DiaView matriz={matriz} resultado={resultado} diasDelMes={diasDelMes} />;
 }

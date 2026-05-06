@@ -1,10 +1,10 @@
 import * as XLSX from "xlsx";
 import type { MatrizServicio, ServicioKey } from "../domain/types";
-import { SERVICIOS_KEYS } from "../domain/types";
 import {
-  resolverHojaCP,
-  getHojasCP,
-} from "../config/services";
+  getServiciosKeys,
+  resolverHojaCPRuntime,
+  getHojasCPRuntime,
+} from "../config/servicesRuntime";
 import {
   esFeriado,
   generarFranjas,
@@ -50,10 +50,10 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
 
   const hojasPresentes = wb.SheetNames as string[];
 
-  for (const servicio of SERVICIOS_KEYS) {
-    const nombreHoja = resolverHojaCP(servicio, hojasPresentes);
+  for (const servicio of getServiciosKeys()) {
+    const nombreHoja = resolverHojaCPRuntime(servicio, hojasPresentes);
     if (!nombreHoja) {
-      const aliases = getHojasCP(servicio);
+      const aliases = getHojasCPRuntime(servicio);
       errores.push(
         `Falta la hoja del servicio '${servicio}' (esperadas: ${aliases.join(", ")})`
       );
@@ -154,9 +154,9 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
 
 export function validarHojasCP(sheetNames: string[]): string[] {
   const errores: string[] = [];
-  for (const servicio of SERVICIOS_KEYS) {
-    if (!resolverHojaCP(servicio, sheetNames)) {
-      const aliases = getHojasCP(servicio);
+  for (const servicio of getServiciosKeys()) {
+    if (!resolverHojaCPRuntime(servicio, sheetNames)) {
+      const aliases = getHojasCPRuntime(servicio);
       errores.push(
         `Falta la hoja del servicio '${servicio}' (esperadas: ${aliases.join(", ")})`
       );

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { RotateCcw, Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
@@ -10,6 +9,7 @@ import { useSimulador } from "@/store/useSimulador";
 import { useUploads } from "@/store/useUploads";
 import { SimuladorTable } from "@/components/tables/SimuladorTable";
 import { Button } from "@/components/ui/button";
+import { SinDatos } from "@/components/SinDatos";
 import {
   calcularFactorProductivo,
   calcularCumplimiento,
@@ -20,14 +20,9 @@ import type { ResultadoServicio, ServicioKey } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
 
 export default function SimuladorPage() {
-  const router = useRouter();
   const { resultado, diasDelMes } = useResultados();
   const { ajustes, modificaciones, resetAjustes } = useSimulador();
   const { modoReductor } = useUploads();
-
-  useEffect(() => {
-    if (!resultado) router.replace("/");
-  }, [resultado, router]);
 
   const resultadosSimulados: ResultadoServicio[] = useMemo(() => {
     if (!resultado) return [];
@@ -121,7 +116,7 @@ export default function SimuladorPage() {
     exportarSimulacion(resultado.mes, resultado.resultados, resultadosSimulados);
   };
 
-  if (!resultado) return null;
+  if (!resultado) return <SinDatos />;
 
   const totalPersonasBase = resultado.resultados.reduce((a, r) => a + r.hcActivos, 0);
   const totalPersonasSim  = resultadosSimulados.reduce((a, r) => a + r.hcActivos, 0);

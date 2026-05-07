@@ -6,7 +6,7 @@ import { AuthRequest } from '../middleware/auth'
 
 export const listNominas = async (req: AuthRequest, res: Response) => {
   try {
-    const { servicio_id, mes, anio, estado } = req.query
+    const { servicio_id, mes, anio, estado, tipo } = req.query
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
 
     let where: any = {}
@@ -14,6 +14,7 @@ export const listNominas = async (req: AuthRequest, res: Response) => {
     if (mes) where.mes = parseInt(mes as string)
     if (anio) where.anio = parseInt(anio as string)
     if (estado) where.estado = estado
+    if (tipo) where.tipo = tipo
 
     if (!adminUser) {
       const permisos = await prisma.usuarioServicioPermiso.findMany({
@@ -201,13 +202,14 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     })
 
     const agenteIds = snapshots.map((a) => a.agente_id)
+    const dnisEnNomina = snapshots.map((a) => a.dni).filter(Boolean)
 
-    // Usar el período de la nómina para cruzar licencias y cambios,
-    // no la fecha de hoy — así las licencias históricas también aparecen
+    // Usar el período de la nómina para cruzar licencias, cambios y vacaciones,
+    // no la fecha de hoy — así los registros históricos también aparecen
     const inicioPeriodo = new Date(Date.UTC(nomina.anio, nomina.mes - 1, 1))
     const finPeriodo = new Date(Date.UTC(nomina.anio, nomina.mes, 0, 23, 59, 59))
 
-    const [licenciasEnPeriodo, cambiosEnPeriodo] = await Promise.all([
+    const [licenciasEnPeriodo, cambiosEnPeriodo, vacacionesEnPeriodo] = await Promise.all([
       prisma.licencia.findMany({
         where: {
           agente_id: { in: agenteIds },
@@ -225,6 +227,14 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
         },
         include: { servicio_temporal: { select: { id: true, nombre: true } } },
       }),
+      prisma.vacacion.findMany({
+        where: {
+          agente_dni: { in: dnisEnNomina },
+          fecha_desde: { lte: finPeriodo },
+          fecha_hasta: { gte: inicioPeriodo },
+        },
+        select: { agente_dni: true, id: true, fecha_desde: true, fecha_hasta: true },
+      }),
     ])
 
     const licenciaMap = new Map<number, (typeof licenciasEnPeriodo)[0]>()
@@ -235,16 +245,25 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
     for (const c of cambiosEnPeriodo) {
       if (!cambioMap.has(c.agente_id)) cambioMap.set(c.agente_id, c)
     }
+    const vacacionMap = new Map<string, (typeof vacacionesEnPeriodo)[0]>()
+    for (const v of vacacionesEnPeriodo) {
+      if (!vacacionMap.has(v.agente_dni)) vacacionMap.set(v.agente_dni, v)
+    }
 
     let result: any[] = snapshots.map((a) => {
       const licencia = licenciaMap.get(a.agente_id)
       const cambio = cambioMap.get(a.agente_id)
+      const vacacion = vacacionMap.get(a.dni)
+      const estadoCalculado = nomina.tipo === 'MEUCCI'
+        ? (licencia ? 'LICENCIA' : 'ACTIVO')
+        : (licencia || a.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : a.estado)
       return {
         ...a,
-        estado: licencia || a.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : a.estado,
+        estado: estadoCalculado,
         agente: {
           licencias: licencia ? [licencia] : [],
           cambios_temporales: cambio ? [cambio] : [],
+          vacaciones: vacacion ? [vacacion] : [],
         },
       }
     })
@@ -389,7 +408,7 @@ export const replicarNomina = async (req: AuthRequest, res: Response) => {
     const nextAnio = nomina.mes === 12 ? nomina.anio + 1 : nomina.anio
 
     const exists = await prisma.nominaMensual.findFirst({
-      where: { servicio_id: nomina.servicio_id, mes: nextMes, anio: nextAnio },
+      where: { servicio_id: nomina.servicio_id, mes: nextMes, anio: nextAnio, tipo: nomina.tipo },
     })
     if (exists) {
       return res.status(409).json({
@@ -402,6 +421,7 @@ export const replicarNomina = async (req: AuthRequest, res: Response) => {
         servicio_id: nomina.servicio_id,
         mes: nextMes,
         anio: nextAnio,
+        tipo: nomina.tipo,
         estado: 'BORRADOR',
         cargado_por: req.user!.userId,
         fecha_carga: new Date(),
@@ -539,7 +559,7 @@ export const deleteAgentNomina = async (req: AuthRequest, res: Response) => {
 
 export const compareNominas = async (req: AuthRequest, res: Response) => {
   try {
-    const { servicioId, mes1, anio1, mes2, anio2 } = req.query
+    const { servicioId, mes1, anio1, mes2, anio2, tipo1, tipo2 } = req.query
 
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
     if (!adminUser) {
@@ -555,6 +575,7 @@ export const compareNominas = async (req: AuthRequest, res: Response) => {
           servicio_id: parseInt(servicioId as string),
           mes: parseInt(mes1 as string),
           anio: parseInt(anio1 as string),
+          ...(tipo1 ? { tipo: tipo1 as string } : {}),
         },
       }),
       prisma.nominaMensual.findFirst({
@@ -562,6 +583,7 @@ export const compareNominas = async (req: AuthRequest, res: Response) => {
           servicio_id: parseInt(servicioId as string),
           mes: parseInt(mes2 as string),
           anio: parseInt(anio2 as string),
+          ...(tipo2 ? { tipo: tipo2 as string } : {}),
         },
       }),
     ])
@@ -571,20 +593,62 @@ export const compareNominas = async (req: AuthRequest, res: Response) => {
     }
 
     const [snapshots1, snapshots2] = await Promise.all([
-      prisma.agenteNominaMensual.findMany({ where: { nomina_mensual_id: nomina1.id } }),
-      prisma.agenteNominaMensual.findMany({ where: { nomina_mensual_id: nomina2.id } }),
+      prisma.agenteNominaMensual.findMany({ where: { nomina_mensual_id: nomina1.id, presente_en_nomina: true } }),
+      prisma.agenteNominaMensual.findMany({ where: { nomina_mensual_id: nomina2.id, presente_en_nomina: true } }),
     ])
 
-    const map1 = new Map(snapshots1.map((s) => [s.agente_id, s]))
-    const map2 = new Map(snapshots2.map((s) => [s.agente_id, s]))
+    // Fetch licencias activas en el período de cada nómina para calcular estados reales
+    const fin1 = new Date(Date.UTC(nomina1.anio, nomina1.mes, 0, 23, 59, 59))
+    const ini1 = new Date(Date.UTC(nomina1.anio, nomina1.mes - 1, 1))
+    const fin2 = new Date(Date.UTC(nomina2.anio, nomina2.mes, 0, 23, 59, 59))
+    const ini2 = new Date(Date.UTC(nomina2.anio, nomina2.mes - 1, 1))
 
-    const agentesNuevos = snapshots2.filter((s) => !map1.has(s.agente_id))
-    const agentesNoPresentes = snapshots1.filter((s) => !map2.has(s.agente_id))
+    const ids1 = snapshots1.map((s) => s.agente_id)
+    const ids2 = snapshots2.map((s) => s.agente_id)
+
+    const [licencias1, licencias2] = await Promise.all([
+      prisma.licencia.findMany({
+        where: { agente_id: { in: ids1 }, fecha_desde: { lte: fin1 }, fecha_hasta: { gte: ini1 } },
+        select: { agente_id: true },
+      }),
+      prisma.licencia.findMany({
+        where: { agente_id: { in: ids2 }, fecha_desde: { lte: fin2 }, fecha_hasta: { gte: ini2 } },
+        select: { agente_id: true },
+      }),
+    ])
+
+    const licSet1 = new Set(licencias1.map((l) => l.agente_id))
+    const licSet2 = new Set(licencias2.map((l) => l.agente_id))
+
+    const calcEstado = (snap: any, tipo: string, licSet: Set<number>) => {
+      if (tipo === 'MEUCCI') return licSet.has(snap.agente_id) ? 'LICENCIA' : 'ACTIVO'
+      return licSet.has(snap.agente_id) || snap.estado?.toUpperCase() === 'LP' ? 'LICENCIA' : 'ACTIVO'
+    }
+
+    const activos1 = snapshots1.filter((s) => calcEstado(s, nomina1.tipo, licSet1) === 'ACTIVO').length
+    const licencia1 = snapshots1.filter((s) => calcEstado(s, nomina1.tipo, licSet1) === 'LICENCIA').length
+    const activos2 = snapshots2.filter((s) => calcEstado(s, nomina2.tipo, licSet2) === 'ACTIVO').length
+    const licencia2 = snapshots2.filter((s) => calcEstado(s, nomina2.tipo, licSet2) === 'LICENCIA').length
+
+    // Cruzar por DNI (identificador real de la persona) — evita duplicados por agente_id distinto
+    const normDni = (d: string | null) => (d ?? '').replace(/\D/g, '').trim()
+    const map1 = new Map(snapshots1.map((s) => [normDni(s.dni), s]))
+    const map2 = new Map(snapshots2.map((s) => [normDni(s.dni), s]))
+
+    // Nombres que aparecen como superior/jefe en cualquiera de las dos nóminas → son líderes, no agentes nuevos
+    const superioresNomina1 = new Set(snapshots1.flatMap((s) => [s.superior, s.jefe].filter(Boolean).map((v) => v!.trim().toUpperCase())))
+    const superioresNomina2 = new Set(snapshots2.flatMap((s) => [s.superior, s.jefe].filter(Boolean).map((v) => v!.trim().toUpperCase())))
+    const todosSuperiores = new Set([...superioresNomina1, ...superioresNomina2])
+
+    const esLider = (nombre: string) => todosSuperiores.has(nombre.trim().toUpperCase())
+
+    const agentesNuevos = snapshots2.filter((s) => !map1.has(normDni(s.dni)) && !esLider(s.nombre))
+    const agentesNoPresentes = snapshots1.filter((s) => !map2.has(normDni(s.dni)) && !esLider(s.nombre))
     const cambios: any[] = []
 
     const fields = ['estado', 'servicio_id', 'superior', 'horarios', 'contrato', 'modalidad']
-    for (const [agenteId, s2] of map2) {
-      const s1 = map1.get(agenteId)
+    for (const [dni, s2] of map2) {
+      const s1 = map1.get(dni)
       if (!s1) continue
       const diffs: any = {}
       for (const f of fields) {
@@ -593,13 +657,19 @@ export const compareNominas = async (req: AuthRequest, res: Response) => {
         }
       }
       if (Object.keys(diffs).length > 0) {
-        cambios.push({ agente_id: agenteId, nombre: s2.nombre, cambios: diffs })
+        cambios.push({ agente_id: s2.agente_id, nombre: s2.nombre, cambios: diffs })
       }
     }
 
     return res.json({
-      nomina1: { mes: nomina1.mes, anio: nomina1.anio, total: snapshots1.length },
-      nomina2: { mes: nomina2.mes, anio: nomina2.anio, total: snapshots2.length },
+      nomina1: {
+        mes: nomina1.mes, anio: nomina1.anio, tipo: nomina1.tipo,
+        total: snapshots1.length, activos: activos1, licencia: licencia1,
+      },
+      nomina2: {
+        mes: nomina2.mes, anio: nomina2.anio, tipo: nomina2.tipo,
+        total: snapshots2.length, activos: activos2, licencia: licencia2,
+      },
       agentes_nuevos: agentesNuevos.map((a) => ({ id: a.agente_id, nombre: a.nombre })),
       agentes_no_presentes: agentesNoPresentes.map((a) => ({ id: a.agente_id, nombre: a.nombre })),
       cambios,

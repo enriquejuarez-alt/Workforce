@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { to: '/calendario', icon: CalendarDays, label: 'Calendario' },
   { to: '/cambios', icon: ArrowLeftRight, label: 'Cambios' },
   { to: '/bajas', icon: UserMinus, label: 'Bajas y Remociones' },
-  { to: '/capacitaciones', icon: GraduationCap, label: 'Capacitaciones' },
+  { to: '/capacitaciones', icon: GraduationCap, label: 'Formador' },
   { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
 ]

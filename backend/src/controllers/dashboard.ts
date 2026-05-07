@@ -8,6 +8,11 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
     const now = new Date()
     const currentMes = now.getMonth() + 1
     const currentAnio = now.getFullYear()
+    const inicioPeriodo = new Date(currentAnio, currentMes - 1, 1)
+    const finPeriodo = new Date(currentAnio, currentMes, 0, 23, 59, 59)
+    const prismaAny = prisma as any
+
+    const servicioIdParam = req.query.servicio_id ? parseInt(req.query.servicio_id as string) : null
 
     let servicioIds: number[] | null = null
 
@@ -19,11 +24,20 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       servicioIds = permisos.map((p) => p.servicio_id)
     }
 
+    // Si se selecciona un servicio específico, filtrar por él (respetando permisos)
+    if (servicioIdParam) {
+      if (!adminUser && servicioIds && !servicioIds.includes(servicioIdParam)) {
+        return res.status(403).json({ error: 'Sin permiso para este servicio' })
+      }
+      servicioIds = [servicioIdParam]
+    }
+
     const agenteWhere = servicioIds ? { servicio_id: { in: servicioIds } } : {}
 
     const nominaWhere = {
       mes: currentMes,
       anio: currentAnio,
+      tipo: 'OPERACION',
       ...(servicioIds ? { servicio_id: { in: servicioIds } } : {}),
     }
 
@@ -38,11 +52,11 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       nominasCerradas,
       totalUsuarios,
       ultimaCarga,
-      estadoBreakdown,
+      totalEnNomina,
       agentesConLicencia,
-      agentesConLicenciaRecord,
       porServicio,
       licenciasHoy,
+      vacacionesMes,
     ] = await Promise.all([
       prisma.agente.count({ where: agenteWhere }),
       prisma.agente.count({ where: { ...agenteWhere, activo: false } }),
@@ -70,6 +84,7 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       prisma.nominaMensual.count({
         where: {
           estado: 'ACTIVA',
+          tipo: 'OPERACION',
           mes: currentMes,
           anio: currentAnio,
           ...(servicioIds ? { servicio_id: { in: servicioIds } } : {}),
@@ -78,6 +93,7 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       prisma.nominaMensual.count({
         where: {
           estado: 'CERRADA',
+          tipo: 'OPERACION',
           ...(servicioIds ? { servicio_id: { in: servicioIds } } : {}),
         },
       }),
@@ -92,26 +108,11 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
           usuario: { select: { nombre: true } },
         },
       }),
-      prisma.agenteNominaMensual.groupBy({
-        by: ['estado'],
-        where: {
-          nomina_mensual: nominaWhere,
-          presente_en_nomina: true,
-        },
-        _count: { estado: true },
-      }),
-      // Total en licencia: LP del Excel O tiene registro Licencia activo hoy
+      // Total agentes presentes en nómina OPERACION del mes
       prisma.agenteNominaMensual.count({
-        where: {
-          nomina_mensual: nominaWhere,
-          presente_en_nomina: true,
-          OR: [
-            { estado: { equals: 'LP', mode: 'insensitive' } },
-            { agente: { licencias: { some: { fecha_desde: { lte: now }, fecha_hasta: { gte: now } } } } },
-          ],
-        },
+        where: { nomina_mensual: nominaWhere, presente_en_nomina: true },
       }),
-      // Solo registros Licencia (para ajustar el contador ACTIVO del breakdown)
+      // Agentes con licencia activa hoy (usamos tabla licencias, no el campo estado del snapshot)
       prisma.agenteNominaMensual.count({
         where: {
           nomina_mensual: nominaWhere,
@@ -145,40 +146,34 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         orderBy: { agente: { nombre: 'asc' } },
         take: 30,
       }),
+      prismaAny.vacacion.findMany({
+        where: {
+          fecha_desde: { lte: finPeriodo },
+          fecha_hasta: { gte: inicioPeriodo },
+          ...(servicioIds ? { agente: { servicio_id: { in: servicioIds } } } : {}),
+        },
+        include: {
+          agente: {
+            select: {
+              id: true,
+              nombre: true,
+              servicio: { select: { nombre: true, color: true } },
+            },
+          },
+        },
+        orderBy: { fecha_desde: 'asc' },
+        take: 50,
+      }),
     ])
 
-    const countByEstado = (keywords: string[]) =>
-      estadoBreakdown
-        .filter((e) => e.estado && keywords.some((k) => e.estado!.toLowerCase().includes(k)))
-        .reduce((sum, e) => sum + e._count.estado, 0)
-
-    const agentesActivosRaw = countByEstado(['activo', 'activa'])
-    // agentesConLicenciaRecord solo resta de ACTIVO (LP ya está excluido del grupo activo)
-    const agentesActivos = Math.max(0, agentesActivosRaw - agentesConLicenciaRecord)
-
-    // Ajustar breakdown: quitar grupo LP, restar Licencia-record del ACTIVO, agregar LICENCIA unificado
-    const breakdownAjustado = estadoBreakdown
-      .filter((e) => e.estado?.toLowerCase().trim() !== 'lp')
-      .map((e) => {
-        const cantidad = e._count.estado
-        const esActivo = e.estado && ['activo', 'activa'].some((k) => e.estado!.toLowerCase().includes(k))
-        return {
-          estado: e.estado,
-          cantidad: esActivo ? Math.max(0, cantidad - agentesConLicenciaRecord) : cantidad,
-        }
-      })
-      .filter((e) => e.cantidad > 0)
-
-    if (agentesConLicencia > 0) {
-      breakdownAjustado.push({ estado: 'LICENCIA', cantidad: agentesConLicencia })
-    }
+    const agentesActivos = Math.max(0, totalEnNomina - agentesConLicencia)
 
     return res.json({
-      total_agentes: totalAgentes,
+      total_agentes: totalEnNomina,
       agentes_activos: agentesActivos,
       agentes_lp: agentesConLicencia,
       agentes_inactivos: agentesInactivos,
-      estado_breakdown: breakdownAjustado,
+      estado_breakdown: [],
       licencias_vigentes: licenciasVigentes,
       licencias_programadas: licenciasProgramadas,
       cambios_activos: cambiosActivos,
@@ -200,6 +195,15 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         servicio_color: l.agente.servicio?.color ?? null,
         fecha_hasta: l.fecha_hasta.toISOString().substring(0, 10),
         motivo: l.motivo,
+      })),
+      vacaciones_mes: (vacacionesMes as any[]).map((v) => ({
+        agente_id: v.agente?.id ?? null,
+        agente_nombre: v.agente?.nombre ?? v.agente_nombre,
+        agente_dni: v.agente_dni,
+        servicio_nombre: v.agente?.servicio?.nombre ?? null,
+        servicio_color: v.agente?.servicio?.color ?? null,
+        fecha_desde: v.fecha_desde.toISOString().substring(0, 10),
+        fecha_hasta: v.fecha_hasta.toISOString().substring(0, 10),
       })),
     })
   } catch (err) {

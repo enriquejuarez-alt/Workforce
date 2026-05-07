@@ -74,6 +74,7 @@ export interface Agente {
   fecha_actualizacion: string
   licencias?: Licencia[]
   cambios_temporales?: CambioServicioTemporal[]
+  vacaciones?: Pick<Vacacion, 'id' | 'fecha_desde' | 'fecha_hasta'>[]
   snapshots?: AgenteNominaMensual[]
 }
 
@@ -83,6 +84,7 @@ export interface NominaMensual {
   servicio?: Servicio
   mes: number
   anio: number
+  tipo: string
   estado: EstadoNomina
   archivo_nombre: string | null
   cargado_por: number | null
@@ -235,6 +237,7 @@ export interface Capacitacion {
   modalidad: string | null
   jefe: string | null
   observacion: string | null
+  tipo_formacion: 'OJT' | 'TRAINING' | null
   fecha_inicio: string
   fecha_fin: string
   dado_de_alta: boolean
@@ -380,6 +383,15 @@ export interface DashboardData {
     servicio_color: string | null
     fecha_hasta: string
     motivo: string | null
+  }>
+  vacaciones_mes: Array<{
+    agente_id: number | null
+    agente_nombre: string
+    agente_dni: string
+    servicio_nombre: string | null
+    servicio_color: string | null
+    fecha_desde: string
+    fecha_hasta: string
   }>
 }
 

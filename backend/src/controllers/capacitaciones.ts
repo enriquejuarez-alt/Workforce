@@ -12,12 +12,15 @@ function calcularEstado(fechaInicio: Date, fechaFin: Date): string {
 
 export const listCapacitaciones = async (req: AuthRequest, res: Response) => {
   try {
-    const { servicio_id, segmento, estado_cap } = req.query
+    const { servicio_id, segmento, estado_cap, tipo_formacion } = req.query
     const now = new Date()
     const where: any = {}
     if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
     if (segmento) {
       where.segmento = segmento === 'SIN_DEFINIR' ? null : { equals: segmento as string, mode: 'insensitive' }
+    }
+    if (tipo_formacion) {
+      where.tipo_formacion = { equals: (tipo_formacion as string).toUpperCase(), mode: 'insensitive' }
     }
 
     if (estado_cap) {
@@ -59,7 +62,7 @@ export const createCapacitacion = async (req: AuthRequest, res: Response) => {
     const {
       agente_id, agente_dni, agente_nombre, usuario_sistema, superior,
       servicio_id, servicio_nombre, segmento, horarios, estado, contrato,
-      sitio, modalidad, jefe, observacion, fecha_inicio, fecha_fin,
+      sitio, modalidad, jefe, observacion, tipo_formacion, fecha_inicio, fecha_fin,
     } = req.body
 
     if (!agente_nombre || !fecha_inicio || !fecha_fin) {
@@ -87,6 +90,7 @@ export const createCapacitacion = async (req: AuthRequest, res: Response) => {
         modalidad: modalidad || null,
         jefe: jefe || null,
         observacion: observacion || null,
+        tipo_formacion: tipo_formacion || null,
         fecha_inicio: new Date(fecha_inicio),
         fecha_fin: new Date(fecha_fin),
         creado_por: req.user!.userId,
@@ -125,7 +129,7 @@ export const updateCapacitacion = async (req: AuthRequest, res: Response) => {
 
     const fields = [
       'agente_nombre', 'usuario_sistema', 'superior', 'servicio_nombre',
-      'horarios', 'estado', 'contrato', 'sitio', 'modalidad', 'jefe', 'observacion',
+      'horarios', 'estado', 'contrato', 'sitio', 'modalidad', 'jefe', 'observacion', 'tipo_formacion',
     ]
     const data: any = {}
     for (const f of fields) {

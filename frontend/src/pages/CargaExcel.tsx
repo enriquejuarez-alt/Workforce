@@ -18,6 +18,9 @@ export default function CargaExcel() {
   const [servicioId, setServicioId] = useState(searchParams.get('servicio_id') || '')
   const [mes, setMes] = useState(parseInt(searchParams.get('mes') || String(currentMonth)))
   const [anio, setAnio] = useState(parseInt(searchParams.get('anio') || String(currentYear)))
+  const [formato, setFormato] = useState<'operacion' | 'meucci'>(
+    searchParams.get('formato') === 'meucci' ? 'meucci' : 'operacion'
+  )
   const [preview, setPreview] = useState<ExcelPreview | null>(null)
   const [step, setStep] = useState<'upload' | 'preview' | 'success'>('upload')
   const [result, setResult] = useState<any>(null)
@@ -34,6 +37,7 @@ export default function CargaExcel() {
       fd.append('servicio_id', servicioId)
       fd.append('mes', String(mes))
       fd.append('anio', String(anio))
+      fd.append('formato', formato)
       return excelApi.validar(fd).then((r) => r.data)
     },
     onSuccess: (data) => {
@@ -127,20 +131,75 @@ export default function CargaExcel() {
                 </div>
               </div>
 
+              {/* Tipo de nómina */}
+              <div className="card p-6">
+                <h3 className="text-sm font-bold text-gray-800 mb-4">2. Tipo de nómina</h3>
+                <div className="flex gap-3">
+                  {([
+                    { id: 'operacion', label: 'Nómina de Operación', desc: 'Formato estándar con columnas DNI, USUARIO, NOMBRE…' },
+                    { id: 'meucci', label: 'Nómina Meucci', desc: 'Formato Meucci con Apellido, Nombre, Dni, Lider, Cuenta…' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setFormato(opt.id)}
+                      className={`flex-1 text-left p-4 rounded-xl border-2 transition-all ${
+                        formato === opt.id
+                          ? 'border-konecta bg-konecta/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className={`text-sm font-semibold ${formato === opt.id ? 'text-konecta' : 'text-gray-700'}`}>
+                        {opt.label}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* File upload */}
               <div className="card p-6">
-                <h3 className="text-sm font-bold text-gray-800 mb-4">2. Subir archivo Excel</h3>
+                <h3 className="text-sm font-bold text-gray-800 mb-4">3. Subir archivo Excel</h3>
                 <Dropzone file={file} onFile={setFile} onClear={() => setFile(null)} />
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">Columnas requeridas en el Excel:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['DNI', 'USUARIO', 'NOMBRE', 'SUPERIOR', 'SEGMENTO', 'HORARIOS', 'ESTADO', 'CONTRATO', 'SITIO', 'MODALIDAD', 'JEFE'].map((c) => (
-                      <span key={c} className={`px-2 py-0.5 rounded text-xs font-mono ${['DNI', 'USUARIO', 'NOMBRE'].includes(c) ? 'bg-konecta text-white' : 'bg-gray-200 text-gray-600'}`}>
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">En azul: columnas obligatorias</p>
+                  {formato === 'operacion' ? (
+                    <>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Columnas requeridas en el Excel:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['DNI', 'USUARIO', 'NOMBRE', 'SUPERIOR', 'SEGMENTO', 'HORARIOS', 'ESTADO', 'CONTRATO', 'SITIO', 'MODALIDAD', 'JEFE'].map((c) => (
+                          <span key={c} className={`px-2 py-0.5 rounded text-xs font-mono ${['DNI', 'USUARIO', 'NOMBRE'].includes(c) ? 'bg-konecta text-white' : 'bg-gray-200 text-gray-600'}`}>
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">En azul: columnas obligatorias</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">Columnas que se leen del archivo Meucci:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { col: 'Apellido', dest: 'nombre', req: true },
+                          { col: 'Nombre', dest: 'nombre', req: true },
+                          { col: 'Dni', dest: 'dni', req: true },
+                          { col: 'Cuil', dest: 'dni (alt)', req: false },
+                          { col: 'Usuario Windows', dest: 'usuario', req: false },
+                          { col: 'Lider', dest: 'superior', req: false },
+                          { col: 'Subarea', dest: 'segmento', req: false },
+                          { col: 'Clasificacion', dest: 'estado', req: false },
+                          { col: 'Hs Semanales', dest: 'contrato', req: false },
+                          { col: 'Site', dest: 'sitio', req: false },
+                          { col: 'Jefe', dest: 'jefe', req: false },
+                        ].map(({ col, dest, req }) => (
+                          <span key={col} className={`px-2 py-0.5 rounded text-xs font-mono ${req ? 'bg-konecta text-white' : 'bg-gray-200 text-gray-600'}`} title={`→ ${dest}`}>
+                            {col}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">En azul: obligatorias. Pasá el mouse para ver a qué campo del sistema se mapea cada columna.</p>
+                    </>
+                  )}
                 </div>
               </div>
 

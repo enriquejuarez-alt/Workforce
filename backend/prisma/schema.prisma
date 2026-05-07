@@ -142,6 +142,7 @@ model NominaMensual {
   servicio_id         Int
   mes                 Int
   anio                Int
+  tipo                String       @default("OPERACION")
   estado              EstadoNomina @default(BORRADOR)
   archivo_nombre      String?
   cargado_por         Int?
@@ -161,7 +162,7 @@ model NominaMensual {
   auditorias     Auditoria[]
   programaciones ProgramacionMensual[]
 
-  @@unique([servicio_id, mes, anio])
+  @@unique([servicio_id, mes, anio, tipo])
   @@map("nominas_mensuales")
 }
 
@@ -406,6 +407,7 @@ model Capacitacion {
   modalidad           String?
   jefe                String?
   observacion         String?
+  tipo_formacion      String?
   fecha_inicio        DateTime @db.Date
   fecha_fin           DateTime @db.Date
   dado_de_alta        Boolean  @default(false)

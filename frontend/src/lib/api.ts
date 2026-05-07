@@ -58,7 +58,7 @@ export const nominasApi = {
     api.get<AgenteNominaMensual[]>(`/nominas/${nominaId}/agentes`, { params }),
   editAgente: (snapshotId: number, data: Partial<AgenteNominaMensual>) =>
     api.patch<AgenteNominaMensual>(`/nominas/agentes/${snapshotId}`, data),
-  comparar: (params: { servicioId: number; mes1: number; anio1: number; mes2: number; anio2: number }) =>
+  comparar: (params: { servicioId: number; mes1: number; anio1: number; mes2: number; anio2: number; tipo1?: string; tipo2?: string }) =>
     api.get('/nominas/comparar', { params }),
   replicar: (id: number) =>
     api.post<{ message: string; nomina: NominaMensual }>(`/nominas/${id}/replicar`),
@@ -110,7 +110,7 @@ export const cambiosApi = {
 
 // Dashboard
 export const dashboardApi = {
-  get: () => api.get<DashboardData>('/dashboard'),
+  get: (params?: { servicio_id?: number }) => api.get<DashboardData>('/dashboard', { params }),
 }
 
 // Auditoría

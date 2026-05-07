@@ -77,7 +77,7 @@ export const getCalendarioLicencias = async (req: AuthRequest, res: Response) =>
     const agenteWhere = await buildCalendarioAgenteWhere(req, servicioIdParam)
 
     const include = {
-      agente: { select: { id: true, nombre: true, servicio: { select: { id: true, nombre: true } } } },
+      agente: { select: { id: true, nombre: true, segmento: true, servicio: { select: { id: true, nombre: true } } } },
     }
 
     const [vencimientos, inicios] = await Promise.all([
@@ -100,6 +100,7 @@ export const getCalendarioLicencias = async (req: AuthRequest, res: Response) =>
         tipo: 'VENCIMIENTO',
         agente_id: l.agente.id,
         agente_nombre: l.agente.nombre,
+        segmento: l.agente.segmento ?? null,
         servicio_nombre: l.agente.servicio?.nombre ?? null,
         servicio_id: l.agente.servicio?.id ?? null,
         motivo: l.motivo,
@@ -111,6 +112,7 @@ export const getCalendarioLicencias = async (req: AuthRequest, res: Response) =>
         tipo: 'INICIO',
         agente_id: l.agente.id,
         agente_nombre: l.agente.nombre,
+        segmento: l.agente.segmento ?? null,
         servicio_nombre: l.agente.servicio?.nombre ?? null,
         servicio_id: l.agente.servicio?.id ?? null,
         motivo: l.motivo,
@@ -259,6 +261,7 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
       dni: string
       nombre: string
       motivo: string
+      segmento: string
       ranges: Array<{ desde: Date; hasta: Date }>
     }>()
 
@@ -278,13 +281,14 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
       totalDias++
       const key = `${dni}__${motivo}`
       if (!byKey.has(key)) {
-        byKey.set(key, { dni, nombre: String(row[3] || '').trim(), motivo, ranges: [] })
+        const segmento = String(row[14] || '').trim()
+        byKey.set(key, { dni, nombre: String(row[3] || '').trim(), motivo, segmento, ranges: [] })
       }
       byKey.get(key)!.ranges.push({ desde, hasta })
     }
 
     // Mapa normalizado de todos los agentes para el cruce
-    const todosAgentes = await prisma.agente.findMany({ select: { id: true, dni: true } })
+    const todosAgentes = await prisma.agente.findMany({ select: { id: true, dni: true, segmento: true } })
     const agenteByDni = new Map(todosAgentes.map((a) => [normalizeDni(a.dni), a]))
 
     const importacion = await prisma.licenciaImportacion.create({
@@ -309,6 +313,10 @@ export const importLicenciasWF = async (req: AuthRequest, res: Response) => {
 
       if (agente) {
         await prisma.licencia.deleteMany({ where: { agente_id: agente.id, importacion_id: { not: null } } })
+        // Sincronizar segmento del agente si viene del archivo WF y está vacío
+        if (info.segmento && !agente.segmento) {
+          await prisma.agente.update({ where: { id: agente.id }, data: { segmento: info.segmento } })
+        }
       }
 
       for (const { desde, hasta } of merged) {
@@ -399,7 +407,7 @@ export const exportCalendarioLicencias = async (req: AuthRequest, res: Response)
     const agenteWhere = await buildCalendarioAgenteWhere(req, servicioIdParam)
 
     const include = {
-      agente: { select: { id: true, nombre: true, servicio: { select: { id: true, nombre: true } } } },
+      agente: { select: { id: true, nombre: true, segmento: true, servicio: { select: { id: true, nombre: true } } } },
     }
 
     const [vencimientos, inicios] = await Promise.all([
@@ -422,6 +430,7 @@ export const exportCalendarioLicencias = async (req: AuthRequest, res: Response)
         Tipo: 'VENCIMIENTO',
         Agente: l.agente.nombre,
         Servicio: l.agente.servicio?.nombre ?? '',
+        'Micro-Servicio': l.agente.segmento ?? '',
         Motivo: l.motivo ?? '',
       })
     }
@@ -431,6 +440,7 @@ export const exportCalendarioLicencias = async (req: AuthRequest, res: Response)
         Tipo: 'INICIO',
         Agente: l.agente.nombre,
         Servicio: l.agente.servicio?.nombre ?? '',
+        'Micro-Servicio': l.agente.segmento ?? '',
         Motivo: l.motivo ?? '',
       })
     }

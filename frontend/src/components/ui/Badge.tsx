@@ -75,6 +75,15 @@ export function CambioTemporalBadge({ servicio }: { servicio?: string | null }) 
   return <Badge variant="info" dot>{servicio ? `Cambio → ${servicio}` : 'Cambio temporal'}</Badge>
 }
 
+export function VacacionBadge({ tipo }: { tipo: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA' }) {
+  const map = {
+    VIGENTE: { label: 'Vacaciones', variant: 'purple' as const },
+    PROGRAMADA: { label: 'Vacaciones progr.', variant: 'info' as const },
+    FINALIZADA: { label: 'Vacaciones fin.', variant: 'gray' as const },
+  }
+  return <Badge variant={map[tipo].variant} dot>{map[tipo].label}</Badge>
+}
+
 export function ServicioBadge({ nombre, color }: { nombre: string; color: string }) {
   return (
     <span

@@ -11,6 +11,88 @@ const REQUIRED_COLUMNS = ['DNI', 'USUARIO', 'NOMBRE']
 const ALLOWED_COLUMNS = ['DNI', 'USUARIO', 'NOMBRE', 'SUPERIOR', 'SEGMENTO', 'HORARIOS',
   'ESTADO', 'CONTRATO', 'SITIO', 'MODALIDAD', 'JEFE']
 
+// Meucci column → system field mapping
+// Cuenta = servicio (ya está seleccionado, se ignora)
+// Apellido + Nombre → nombre
+// Dni → dni  (float from xlrd, round to int)
+// Cuil → dni fallback (strip first 2 digits and last 1 digit)
+// Usuario Windows → usuario
+// Lider → superior
+// Subarea → segmento
+// Clasificacion → estado
+// Hs Semanales → contrato  ("30:00" → "30")
+// Site → sitio
+// Jefe → jefe
+function parseMeucciRows(data: Record<string, any>[]): { normalizedRows: any[]; errors: any[] } {
+  const normalizedRows: any[] = []
+  const errors: any[] = []
+
+  const getCol = (row: Record<string, any>, name: string): string => {
+    const key = Object.keys(row).find((k) => k.toLowerCase().trim() === name.toLowerCase().trim())
+    const val = key ? row[key] : ''
+    if (val === null || val === undefined) return ''
+    return String(val).trim()
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i]
+
+    // Solo procesar filas con Tipo cargo = REPRESENTANTE
+    const tipoCargo = getCol(row, 'Tipo cargo').toUpperCase().trim()
+    if (tipoCargo && tipoCargo !== 'REPRESENTANTE') continue
+
+    // DNI: direct column first (comes as float like 31846049.0)
+    let dni = ''
+    const dniRaw = getCol(row, 'Dni')
+    if (dniRaw) {
+      const n = parseFloat(dniRaw)
+      dni = isNaN(n) ? dniRaw : String(Math.round(n))
+    }
+    // Fallback: extract from CUIL (format: XX-XXXXXXXX-X → strip 2 leading + 1 trailing digit)
+    if (!dni) {
+      const cuil = getCol(row, 'Cuil').replace(/\D/g, '')
+      if (cuil.length >= 10) dni = cuil.slice(2, -1)
+    }
+
+    const apellido = getCol(row, 'Apellido')
+    const nombrePila = getCol(row, 'Nombre')
+    const nombre = [apellido, nombrePila].filter(Boolean).join(' ')
+
+    let usuario = getCol(row, 'Usuario Windows')
+    if (!usuario) usuario = dni // fallback: use DNI as system user
+
+    const superior = getCol(row, 'Lider')
+    const segmento = getCol(row, 'Subarea')
+    const sitio = getCol(row, 'Site')
+    const jefe = getCol(row, 'Jefe')
+
+    // Hs Semanales: "30:00" → "30"
+    let contrato = ''
+    const hs = getCol(row, 'Hs Semanales')
+    if (hs) {
+      const m = hs.match(/^(\d+)/)
+      if (m) contrato = m[1]
+    }
+
+    const normalized = {
+      dni, usuario, nombre,
+      superior, segmento, horarios: '', estado: 'ACTIVO', contrato, sitio, modalidad: '', jefe,
+    }
+
+    const rowErrors: string[] = []
+    if (!normalized.dni) rowErrors.push('DNI requerido (columna Dni o Cuil)')
+    if (!normalized.nombre) rowErrors.push('Nombre requerido (columnas Apellido + Nombre)')
+
+    if (rowErrors.length > 0) {
+      errors.push({ fila: i + 2, datos: normalized, errores: rowErrors })
+    } else {
+      normalizedRows.push(normalized)
+    }
+  }
+
+  return { normalizedRows, errors }
+}
+
 function normalizeCell(col: string, rawValue: any): string {
   if (rawValue === null || rawValue === undefined) return ''
   // Excel stores time-formatted cells as a fraction of 24h (e.g. 8:00 → 0.3333)
@@ -27,6 +109,7 @@ interface PreviewStore {
   servicio_id: number
   mes: number
   anio: number
+  formato: string
   rows: any[]
   errors: any[]
   stats: any
@@ -40,7 +123,7 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se proporcionó archivo' })
 
-    const { servicio_id, mes, anio } = req.body
+    const { servicio_id, mes, anio, formato } = req.body
     if (!servicio_id || !mes || !anio) {
       fs.unlinkSync(req.file.path)
       return res.status(400).json({ error: 'servicio_id, mes y anio son requeridos' })
@@ -65,36 +148,47 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'El archivo está vacío' })
     }
 
-    const headers = Object.keys(data[0]).map((h) => h.toUpperCase().trim())
-    const missingColumns = REQUIRED_COLUMNS.filter((col) => !headers.includes(col))
-    if (missingColumns.length > 0) {
-      fs.unlinkSync(req.file.path)
-      return res.status(400).json({
-        error: `Faltan columnas obligatorias: ${missingColumns.join(', ')}`,
-      })
-    }
+    let normalizedRows: any[]
+    let errors: any[]
 
-    const normalizedRows: any[] = []
-    const errors: any[] = []
-
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i]
-      const normalized: any = {}
-
-      for (const col of ALLOWED_COLUMNS) {
-        const key = Object.keys(row).find((k) => k.toUpperCase().trim() === col)
-        normalized[col.toLowerCase()] = key ? normalizeCell(col, row[key]) : ''
+    if (formato === 'meucci') {
+      // Meucci format: different column names, parse accordingly
+      const parsed = parseMeucciRows(data)
+      normalizedRows = parsed.normalizedRows
+      errors = parsed.errors
+    } else {
+      // Standard format: requires DNI, USUARIO, NOMBRE columns (uppercase)
+      const headers = Object.keys(data[0]).map((h) => h.toUpperCase().trim())
+      const missingColumns = REQUIRED_COLUMNS.filter((col) => !headers.includes(col))
+      if (missingColumns.length > 0) {
+        fs.unlinkSync(req.file.path)
+        return res.status(400).json({
+          error: `Faltan columnas obligatorias: ${missingColumns.join(', ')}`,
+        })
       }
 
-      const rowErrors: string[] = []
-      if (!normalized.dni) rowErrors.push('DNI requerido')
-      if (!normalized.usuario) rowErrors.push('USUARIO requerido')
-      if (!normalized.nombre) rowErrors.push('NOMBRE requerido')
+      normalizedRows = []
+      errors = []
 
-      if (rowErrors.length > 0) {
-        errors.push({ fila: i + 2, datos: normalized, errores: rowErrors })
-      } else {
-        normalizedRows.push(normalized)
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i]
+        const normalized: any = {}
+
+        for (const col of ALLOWED_COLUMNS) {
+          const key = Object.keys(row).find((k) => k.toUpperCase().trim() === col)
+          normalized[col.toLowerCase()] = key ? normalizeCell(col, row[key]) : ''
+        }
+
+        const rowErrors: string[] = []
+        if (!normalized.dni) rowErrors.push('DNI requerido')
+        if (!normalized.usuario) rowErrors.push('USUARIO requerido')
+        if (!normalized.nombre) rowErrors.push('NOMBRE requerido')
+
+        if (rowErrors.length > 0) {
+          errors.push({ fila: i + 2, datos: normalized, errores: rowErrors })
+        } else {
+          normalizedRows.push(normalized)
+        }
       }
     }
 
@@ -124,8 +218,9 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
     })
 
     // No presentes = solo los que ya estaban en esta nómina y no aparecen en el archivo nuevo
+    const tipo = formato === 'meucci' ? 'MEUCCI' : 'OPERACION'
     const nominaExistente = await prisma.nominaMensual.findFirst({
-      where: { servicio_id: parseInt(servicio_id), mes: parseInt(mes), anio: parseInt(anio) },
+      where: { servicio_id: parseInt(servicio_id), mes: parseInt(mes), anio: parseInt(anio), tipo },
     })
     const noPresentes = nominaExistente
       ? await prisma.agenteNominaMensual.findMany({
@@ -139,6 +234,7 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
       servicio_id: parseInt(servicio_id),
       mes: parseInt(mes),
       anio: parseInt(anio),
+      formato: formato || 'operacion',
       rows: processedRows,
       errors,
       stats: { total: data.length, nuevos, actualizados, errores: errors.length, no_presentes: noPresentes.length },
@@ -175,7 +271,8 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
     const preview = pendingPreviews.get(token)
     if (!preview) return res.status(404).json({ error: 'Preview expirado o no encontrado' })
 
-    const { servicio_id, mes, anio, rows, stats, fileName } = preview
+    const { servicio_id, mes, anio, formato: previewFormato, rows, stats, fileName } = preview
+    const tipo = previewFormato === 'meucci' ? 'MEUCCI' : 'OPERACION'
     pendingPreviews.delete(token)
     if (fs.existsSync(preview.filePath)) fs.unlinkSync(preview.filePath)
 
@@ -183,12 +280,12 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
     if (!servicio) return res.status(404).json({ error: 'Servicio no encontrado' })
 
     let nomina = await prisma.nominaMensual.findFirst({
-      where: { servicio_id, mes, anio },
+      where: { servicio_id, mes, anio, tipo },
     })
     if (!nomina) {
       nomina = await prisma.nominaMensual.create({
         data: {
-          servicio_id, mes, anio, estado: 'ACTIVA',
+          servicio_id, mes, anio, tipo, estado: 'ACTIVA',
           archivo_nombre: fileName,
           cargado_por: req.user!.userId,
           fecha_carga: new Date(),

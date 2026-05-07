@@ -1,11 +1,12 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Users, UserCheck, UserX, FileSpreadsheet, Upload,
-  ArrowLeftRight, AlertCircle, Clock, CheckCircle, Building2, CalendarDays,
+  ArrowLeftRight, Clock, CheckCircle, Building2, CalendarDays, Palmtree,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { dashboardApi } from '../lib/api'
+import { dashboardApi, serviciosApi } from '../lib/api'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/layout/Header'
 import KpiCard from '../components/ui/KpiCard'
@@ -16,9 +17,16 @@ import { useAuthStore } from '../store/auth'
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
+  const [selectedServicioId, setSelectedServicioId] = useState<number | ''>('')
+
+  const { data: servicios = [] } = useQuery({
+    queryKey: ['servicios'],
+    queryFn: () => serviciosApi.list().then((r) => r.data),
+  })
+
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => dashboardApi.get().then((r) => r.data),
+    queryKey: ['dashboard', selectedServicioId],
+    queryFn: () => dashboardApi.get(selectedServicioId ? { servicio_id: selectedServicioId } : undefined).then((r) => r.data),
     refetchInterval: 60_000,
   })
 
@@ -37,10 +45,40 @@ export default function Dashboard() {
       />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Selector de servicio */}
+        <div className="flex items-center gap-3">
+          <Building2 size={16} className="text-gray-400 shrink-0" />
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedServicioId('')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedServicioId === '' ? 'bg-konecta text-white border-konecta' : 'bg-white text-gray-600 border-gray-200 hover:border-konecta hover:text-konecta'}`}
+            >
+              Todos
+            </button>
+            {(servicios as any[]).filter((s) => s.activo).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedServicioId(s.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedServicioId === s.id ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-800'}`}
+                style={selectedServicioId === s.id ? { backgroundColor: s.color, borderColor: s.color } : {}}
+              >
+                {s.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* KPIs principales */}
         <div>
-          <p className="section-title mb-3">Resumen de agentes — mes corriente</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <p className="section-title mb-3">
+            Resumen de agentes — mes corriente
+            {selectedServicioId !== '' && (
+              <span className="ml-2 text-xs font-normal text-gray-400">
+                · {(servicios as any[]).find((s) => s.id === selectedServicioId)?.nombre}
+              </span>
+            )}
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard title="Total en nómina" value={data?.total_agentes ?? 0} icon={Users} color="blue" />
             <KpiCard title="Activos" value={data?.agentes_activos ?? 0} icon={UserCheck} color="green"
               subtitle="Estado ACTIVO en nómina" />
@@ -48,8 +86,6 @@ export default function Dashboard() {
               subtitle="Con licencia vigente hoy" />
             <KpiCard title="Dados de baja" value={data?.agentes_inactivos ?? 0} icon={UserX} color="red"
               subtitle="Desactivados del sistema" />
-            <KpiCard title="No presentes" value={data?.agentes_no_presentes ?? 0} icon={AlertCircle} color="gray"
-              subtitle="Última carga" />
           </div>
         </div>
 
@@ -76,6 +112,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard title="Licencias vigentes" value={data?.licencias_vigentes ?? 0} icon={Clock} color="yellow" />
             <KpiCard title="Licencias programadas" value={data?.licencias_programadas ?? 0} icon={Clock} color="blue" />
+            <KpiCard title="Vacaciones en el mes" value={data?.vacaciones_mes?.length ?? 0} icon={Palmtree} color="purple"
+              subtitle="Mes corriente" />
             <KpiCard title="Cambios temporales" value={data?.cambios_activos ?? 0} icon={ArrowLeftRight} color="blue" />
             <KpiCard title="Nóminas activas" value={data?.nominas_activas ?? 0} icon={CheckCircle} color="green"
               subtitle="Mes corriente" />
@@ -156,6 +194,51 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Vacaciones del mes */}
+        {(data?.vacaciones_mes?.length ?? 0) > 0 && (
+          <div>
+            <p className="section-title mb-3">De vacaciones este mes</p>
+            <div className="card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Palmtree size={16} className="text-purple-500" />
+                <p className="text-sm font-bold text-gray-700">Agentes con vacaciones en el mes corriente</p>
+                <span className="ml-auto text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                  {data!.vacaciones_mes.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {data!.vacaciones_mes.map((v, i) => (
+                  <button
+                    key={v.agente_id ?? `${v.agente_dni}-${i}`}
+                    onClick={() => v.agente_id ? navigate(`/nomina/agente/${v.agente_id}`) : undefined}
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors text-left group border border-gray-100 ${v.agente_id ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-bold"
+                      style={{ backgroundColor: v.servicio_color || '#8b5cf6' }}
+                    >
+                      {v.agente_nombre.trim().split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate group-hover:text-konecta transition-colors">
+                        {v.agente_nombre}
+                      </p>
+                      <p className="text-[10px] text-gray-400 truncate">
+                        {v.servicio_nombre ?? v.agente_dni ?? '—'}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] text-purple-500 font-semibold">
+                        {format(new Date(v.fecha_desde + 'T12:00:00'), 'dd/MM')} → {format(new Date(v.fecha_hasta + 'T12:00:00'), 'dd/MM')}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {user?.rol === 'ADMINISTRADOR' && data?.usuarios_activos !== null && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useReactTable, getCoreRowModel, getFilteredRowModel,
@@ -17,7 +17,7 @@ import { nominasApi, serviciosApi, exportApi } from '../lib/api'
 import type { AgenteNominaMensual, NominaMensual, Servicio } from '../types'
 import { MESES, ESTADO_NOMINA_LABELS } from '../types'
 import Header from '../components/layout/Header'
-import { NominaEstadoBadge, EstadoAgenteBadge, LicenciaBadge, CambioTemporalBadge } from '../components/ui/Badge'
+import { NominaEstadoBadge, EstadoAgenteBadge, LicenciaBadge, CambioTemporalBadge, VacacionBadge } from '../components/ui/Badge'
 import { PageLoading } from '../components/ui/LoadingSpinner'
 import EditAgentModal from '../components/agents/EditAgentModal'
 import LicenciaModal from '../components/agents/LicenciaModal'
@@ -52,12 +52,16 @@ export default function Nomina() {
   const selectedMes = Number(searchParams.get('mes')) || currentMonth
   const selectedAnio = Number(searchParams.get('anio')) || currentYear
 
+  const selectedTipo = searchParams.get('tipo') || 'OPERACION'
+
   const setSelectedServicioId = (id: number | '') =>
     setSearchParams((p) => { const n = new URLSearchParams(p); id ? n.set('svc', String(id)) : n.delete('svc'); return n }, { replace: true })
   const setSelectedMes = (mes: number) =>
     setSearchParams((p) => { const n = new URLSearchParams(p); n.set('mes', String(mes)); return n }, { replace: true })
   const setSelectedAnio = (anio: number) =>
     setSearchParams((p) => { const n = new URLSearchParams(p); n.set('anio', String(anio)); return n }, { replace: true })
+  const setSelectedTipo = (tipo: string) =>
+    setSearchParams((p) => { const n = new URLSearchParams(p); n.set('tipo', tipo); return n }, { replace: true })
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [sorting, setSorting] = useState<SortingState>([])
@@ -70,24 +74,48 @@ export default function Nomina() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [showBulkDelete, setShowBulkDelete] = useState(false)
 
+  // Reset filters, selection and sorting when switching services or tipo
+  useEffect(() => {
+    setFilters({})
+    setRowSelection({})
+    setSorting([])
+  }, [selectedServicioId, selectedTipo])
+
+  // Pre-compute as a stable boolean so `columns` useMemo doesn't recompute on every render.
+  // canRegisterLicencia is recreated each render (no useCallback in hook), putting it directly
+  // in deps would cause columns + table to recompute for every state change.
+  const canRegLicencia = useMemo(
+    () => (selectedServicioId ? canRegisterLicencia(selectedServicioId as number) : false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedServicioId, isAdmin],
+  )
+
+  // Refs let `columns` useMemo stay stable (empty deps) while cells always read fresh values.
+  // Without this, nominaEditable changing on every nómina load forces a full table rebuild (O(n)).
+  const nominaEditableRef = useRef(false)
+  const canRegLicenciaRef = useRef(false)
+  const selectedServicioIdRef = useRef<number | ''>('')
+
   const { data: servicios = [] } = useQuery({
     queryKey: ['servicios'],
     queryFn: () => serviciosApi.list().then((r) => r.data),
   })
 
-  const { data: nominas = [] } = useQuery({
-    queryKey: ['nominas', selectedServicioId, selectedMes, selectedAnio],
+  const { data: nominas = [], isLoading: loadingNominas } = useQuery({
+    queryKey: ['nominas', selectedServicioId, selectedMes, selectedAnio, selectedTipo],
     queryFn: () =>
       nominasApi.list({
         servicio_id: selectedServicioId || undefined,
         mes: selectedMes,
         anio: selectedAnio,
+        tipo: selectedTipo,
       }).then((r) => r.data),
     enabled: !!selectedServicioId,
+    staleTime: 30_000,
   })
 
   const nomina = nominas.find(
-    (n) => n.servicio_id === selectedServicioId && n.mes === selectedMes && n.anio === selectedAnio
+    (n) => n.servicio_id === selectedServicioId && n.mes === selectedMes && n.anio === selectedAnio && n.tipo === selectedTipo
   ) as NominaMensual | undefined
 
   const isCurrentMonth = selectedMes === currentMonth && selectedAnio === currentYear
@@ -96,12 +124,16 @@ export default function Nomina() {
     : false
   const nominaEditable = canEditNomina && nomina?.estado !== 'CERRADA' && nomina?.estado !== 'ARCHIVADA'
 
+  // Keep refs in sync every render so cell closures always read current values
+  nominaEditableRef.current = nominaEditable
+  canRegLicenciaRef.current = canRegLicencia
+  selectedServicioIdRef.current = selectedServicioId
+
   const { data: agentes = [], isLoading: loadingAgentes, refetch } = useQuery({
     queryKey: ['nomina-agentes', nomina?.id, filters],
     queryFn: () => nominasApi.agentes(nomina!.id, filters).then((r) => r.data),
     enabled: !!nomina?.id,
     staleTime: 30_000,
-    placeholderData: keepPreviousData,
   })
 
   const replicarMutation = useMutation({
@@ -239,11 +271,17 @@ export default function Nomina() {
       cell: ({ row }) => {
         const licencia = row.original.agente?.licencias?.[0]
         const cambio = row.original.agente?.cambios_temporales?.[0]
+        const vacacion = row.original.agente?.vacaciones?.[0]
         const noPresente = !row.original.presente_en_nomina
         const now = new Date()
         const tipoLicencia = licencia
           ? new Date(licencia.fecha_desde) > now ? 'PROGRAMADA' as const
             : new Date(licencia.fecha_hasta) < now ? 'FINALIZADA' as const
+            : 'VIGENTE' as const
+          : null
+        const tipoVacacion = vacacion
+          ? new Date(vacacion.fecha_desde) > now ? 'PROGRAMADA' as const
+            : new Date(vacacion.fecha_hasta) < now ? 'FINALIZADA' as const
             : 'VIGENTE' as const
           : null
         return (
@@ -252,6 +290,12 @@ export default function Nomina() {
               <div className="flex items-center gap-1.5 flex-wrap">
                 <LicenciaBadge tipo={tipoLicencia} />
                 <span className="text-xs text-gray-400">hasta {format(new Date(licencia.fecha_hasta), 'dd/MM/yy')}</span>
+              </div>
+            )}
+            {vacacion && tipoVacacion && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <VacacionBadge tipo={tipoVacacion} />
+                <span className="text-xs text-gray-400">hasta {format(new Date(vacacion.fecha_hasta), 'dd/MM/yy')}</span>
               </div>
             )}
             {cambio && <CambioTemporalBadge servicio={cambio.servicio_temporal?.nombre} />}
@@ -272,7 +316,7 @@ export default function Nomina() {
           >
             <Eye size={13} />
           </button>
-          {nominaEditable && (
+          {nominaEditableRef.current && (
             <button
               onClick={() => setEditAgent(row.original)}
               className="btn-ghost px-2 py-1 text-xs text-konecta"
@@ -281,7 +325,7 @@ export default function Nomina() {
               <Edit2 size={13} />
             </button>
           )}
-          {selectedServicioId && canRegisterLicencia(selectedServicioId as number) && (
+          {selectedServicioIdRef.current && canRegLicenciaRef.current && (
             <button
               onClick={() => setLicenciaAgent(row.original)}
               className="btn-ghost px-2 py-1 text-xs"
@@ -290,7 +334,7 @@ export default function Nomina() {
               <FileText size={13} />
             </button>
           )}
-          {nominaEditable && (
+          {nominaEditableRef.current && (
             <button
               onClick={() => handleDeleteAgente(row.original.id, row.original.nombre)}
               className="btn-ghost px-2 py-1 text-xs text-red-500 hover:bg-red-50"
@@ -302,7 +346,9 @@ export default function Nomina() {
         </div>
       ),
     },
-  ], [nominaEditable, selectedServicioId, navigate, handleDeleteAgente, canRegisterLicencia])
+  // navigate y handleDeleteAgente son siempre estables → columns NUNCA se reconstruye
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [navigate, handleDeleteAgente])
 
   const table = useReactTable({
     data: agentes,
@@ -339,7 +385,7 @@ export default function Nomina() {
               <button
                 className="btn-secondary"
                 onClick={() =>
-                  navigate(`/carga?servicio_id=${selectedServicioId}&mes=${selectedMes}&anio=${selectedAnio}`)
+                  navigate(`/carga?servicio_id=${selectedServicioId}&mes=${selectedMes}&anio=${selectedAnio}&formato=${selectedTipo === 'MEUCCI' ? 'meucci' : 'operacion'}`)
                 }
               >
                 <Upload size={14} /> Subir Excel
@@ -422,11 +468,26 @@ export default function Nomina() {
               </div>
             )}
           </div>
+          {/* Tipo selector */}
+          <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+            <button
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedTipo === 'OPERACION' ? 'bg-konecta text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              onClick={() => setSelectedTipo('OPERACION')}
+            >
+              Nómina Operación
+            </button>
+            <button
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedTipo === 'MEUCCI' ? 'bg-konecta text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              onClick={() => setSelectedTipo('MEUCCI')}
+            >
+              Nómina Meucci
+            </button>
+          </div>
         </div>
 
         {!selectedServicioId ? (
           <EmptyState icon={Filter} title="Seleccioná un servicio" description="Elegí un servicio y período para visualizar la nómina." />
-        ) : loadingAgentes ? (
+        ) : (loadingNominas || loadingAgentes) ? (
           <PageLoading text="Cargando nómina..." />
         ) : (
           <>
@@ -531,7 +592,7 @@ export default function Nomina() {
                   <EmptyState
                     icon={FileText}
                     title="Sin nómina para este período"
-                    description={`No existe nómina para ${MESES[selectedMes - 1]} ${selectedAnio} en este servicio.`}
+                    description={`No existe nómina ${selectedTipo === 'MEUCCI' ? 'Meucci' : 'de Operación'} para ${MESES[selectedMes - 1]} ${selectedAnio} en este servicio.`}
                   />
                   {isAdmin && (
                     <button

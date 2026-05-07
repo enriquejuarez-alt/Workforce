@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   UploadCloud,
   LayoutDashboard,
-  TrendingUp,
   Sliders,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -13,7 +12,6 @@ import { cn } from "@/lib/utils/cn";
 const NAV_ITEMS = [
   { href: "/", label: "Carga de archivos", icon: UploadCloud },
   { href: "/dashboard", label: "Resumen", icon: LayoutDashboard },
-  { href: "/curvas", label: "Curvas", icon: TrendingUp },
   { href: "/simulador", label: "Simulador", icon: Sliders },
 ];
 

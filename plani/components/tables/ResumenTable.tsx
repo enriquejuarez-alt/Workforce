@@ -72,10 +72,12 @@ export function ResumenTable({ resultados }: Props) {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Hs Brutas</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Reductor</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Hs Netas</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Hs Requeridas</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Hs Req. 100%</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Hs Req. 103%</th>
             <ThSort campo="cumplimiento" label="Cumplimiento" />
-            <ThSort campo="deltaHC103" label="Faltan para 103%" />
-            <ThSort campo="teoricoFacturable" label="Teórico facturar" />
+            <ThSort campo="deltaHC103" label="Desvíos al 103%" />
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Hs Fact. 100%</th>
+            <ThSort campo="teoricoFacturable" label="Hs Fact. 103%" />
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Recorte</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Capa</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Ag. Eq.</th>
@@ -101,12 +103,14 @@ export function ResumenTable({ resultados }: Props) {
                   <td className="px-4 py-3 tabular-nums text-gray-500">-{pctReductor}%</td>
                   <td className="px-4 py-3 tabular-nums text-gray-700">{fmtHoras(r.hsNetas)}</td>
                   <td className="px-4 py-3 tabular-nums text-gray-600">{fmtHoras(r.hsRequeridas)}</td>
+                  <td className="px-4 py-3 tabular-nums text-gray-600">{fmtHoras(r.hsRequeridas * 1.03)}</td>
                   <td className="px-4 py-3">
                     <BadgeCumplimiento nivel={nivel} valor={fmtPct(r.cumplimiento)} />
                   </td>
                   <td className={cn("px-4 py-3 tabular-nums font-medium", r.deltaHC103 > 0 ? "text-red-600" : "text-green-600")}>
-                    {fmtDelta(r.deltaHC103)}
+                    {fmtDelta(-r.deltaHC103)}
                   </td>
+                  <td className="px-4 py-3 tabular-nums text-[#0054A6] font-medium">{fmtHoras(r.hsFacturable100)}</td>
                   <td className="px-4 py-3 tabular-nums text-[#0054A6] font-medium">{fmtHoras(r.teoricoFacturable)}</td>
                   <td className={cn("px-4 py-3 tabular-nums", r.recorte > 0 ? "text-violet-600" : "text-gray-300")}>
                     {r.recorte > 0 ? fmtHoras(r.recorte) : "—"}
@@ -129,7 +133,7 @@ export function ResumenTable({ resultados }: Props) {
                 </tr>
                 {expandidoEq === r.servicio && tieneDeficit && (
                   <tr className="bg-blue-50 border-b border-blue-100">
-                    <td colSpan={13} className="px-6 py-3">
+                    <td colSpan={15} className="px-6 py-3">
                       <div className="flex items-center gap-6 text-xs">
                         <span className="text-gray-500">Agentes necesarios para cerrar el gap:</span>
                         <span className="text-gray-700">

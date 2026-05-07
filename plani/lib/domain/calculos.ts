@@ -182,6 +182,7 @@ export function calcularResultados(
 
     const tope = hsRequeridas * (topeFacturacion / 100);
     const teoricoFacturable = Math.min(hsNetas, tope);
+    const hsFacturable100 = Math.min(hsNetas, hsRequeridas);
     const recorte = Math.max(0, hsNetas - tope);
     const faltante = Math.max(0, hsRequeridas - hsNetas);
 
@@ -201,6 +202,7 @@ export function calcularResultados(
       hsSemanalPromedio,
       tope,
       teoricoFacturable,
+      hsFacturable100,
       recorte,
       faltante,
     });

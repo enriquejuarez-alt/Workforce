@@ -30,7 +30,7 @@ export default function CurvasPage() {
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-0.5">Curvas</h2>
           <p className="text-sm text-gray-500">
-            Horas requeridas vs. disponibles día a día · arrastrá el selector para hacer zoom
+            Horas requeridas vs. disponibles día a día · usá los presets, los botones ‹ › o ingresá el rango manualmente
           </p>
         </div>
 
@@ -86,7 +86,7 @@ export default function CurvasPage() {
                       Curva temporal
                     </h3>
                     <p className="text-xs text-gray-400 mb-4">
-                      Usá los botones ‹ › para navegar semana a semana, o arrastrá los tiradores del selector inferior para hacer zoom libre
+                      Usá los presets de días, los botones ‹ › para navegar, o escribí el rango exacto en los campos
                     </p>
                     <CurvaTemporalChart
                       matriz={matriz}

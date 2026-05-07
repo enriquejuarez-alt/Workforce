@@ -37,7 +37,7 @@ start "Frontend - Nomina" cmd /k "cd /d %~dp0frontend && npm run dev"
 timeout /t 2 /nobreak >nul
 
 echo [4/4] Iniciando Planificacion en puerto 3000...
-start "Planificacion - Walt" cmd /k "cd /d C:\Users\Dante\Desktop\Nomina\plani && pnpm dev"
+start "Planificacion - Walt" cmd /k "cd /d %~dp0plani && pnpm dev"
 echo.
 
 echo ============================================

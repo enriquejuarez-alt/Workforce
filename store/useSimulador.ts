@@ -24,6 +24,11 @@ export interface Escenario {
   timestamp: number;
 }
 
+export interface PeriodoReplan {
+  mes: number;  // 1-12
+  anio: number;
+}
+
 function ajustesInicial(): Record<ServicioKey, AjusteServicio> {
   return Object.fromEntries(
     SERVICIOS_KEYS.map((k) => [
@@ -37,6 +42,8 @@ interface SimuladorState {
   ajustes: Record<ServicioKey, AjusteServicio>;
   modificaciones: SimModificacion[];
   escenarios: Escenario[];
+  periodoDesde: PeriodoReplan | null;
+  periodoHasta: PeriodoReplan | null;
 
   setAjuste: (servicio: ServicioKey, patch: Partial<AjusteServicio>) => void;
   resetAjustes: () => void;
@@ -44,6 +51,8 @@ interface SimuladorState {
   bulkAddModificaciones: (mods: Omit<SimModificacion, "id">[]) => void;
   removeModificacion: (id: string) => void;
   clearModificaciones: () => void;
+  setPeriodoDesde: (p: PeriodoReplan | null) => void;
+  setPeriodoHasta: (p: PeriodoReplan | null) => void;
 
   saveEscenario: (nombre: string) => void;
   loadEscenario: (id: string) => void;
@@ -54,11 +63,16 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
   ajustes: ajustesInicial(),
   modificaciones: [],
   escenarios: [],
+  periodoDesde: null,
+  periodoHasta: null,
 
   setAjuste: (servicio, patch) =>
     set((state) => ({ ajustes: { ...state.ajustes, [servicio]: { ...state.ajustes[servicio], ...patch } } })),
 
-  resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [] }),
+  resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [], periodoDesde: null, periodoHasta: null }),
+
+  setPeriodoDesde: (p) => set({ periodoDesde: p }),
+  setPeriodoHasta: (p) => set({ periodoHasta: p }),
 
   addModificacion: (tipo, servicio, params) =>
     set((state) => ({
@@ -72,7 +86,7 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
     set((state) => ({
       modificaciones: [
         ...state.modificaciones,
-        ...mods.map((m) => ({ id: nextId("mod"), cantidad: 1, hsSemanal: 36, ...m })),
+        ...mods.map((m) => ({ id: nextId("mod"), ...m })),
       ],
     })),
 

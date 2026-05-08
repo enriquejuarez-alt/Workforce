@@ -1,115 +1,112 @@
 "use client";
 
-import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { RotateCcw, Download, TrendingUp, TrendingDown, Minus, CalendarRange } from "lucide-react";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { useResultados } from "@/store/useResultados";
-import { useSimulador } from "@/store/useSimulador";
-import { useUploads } from "@/store/useUploads";
+import { useSimulador, type PeriodoReplan } from "@/store/useSimulador";
+import { useResultadosSimulados } from "@/hooks/useResultadosSimulados";
 import { SimuladorTable } from "@/components/tables/SimuladorTable";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
-import {
-  calcularFactorProductivo,
-  calcularCumplimiento,
-  calcularDeltaHC103,
-  calcularAgentesEquivalentes,
-} from "@/lib/domain/calculos";
-import type { ResultadoServicio, ServicioKey } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
 
-export default function SimuladorPage() {
-  const { resultado, diasDelMes } = useResultados();
-  const { ajustes, modificaciones, resetAjustes } = useSimulador();
-  const { modoReductor } = useUploads();
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1, ANIO_ACTUAL + 2];
 
-  const resultadosSimulados: ResultadoServicio[] = useMemo(() => {
-    if (!resultado) return [];
+function PeriodoSelector() {
+  const { periodoDesde, periodoHasta, setPeriodoDesde, setPeriodoHasta } = useSimulador();
 
-    const deltaHC      = new Map<ServicioKey, number>();
-    const deltaHsTotal = new Map<ServicioKey, number>();
-    const reducerOvr   = new Map<ServicioKey, { deslogueo?: number; ausentismo?: number; rotacion?: number }>();
+  const selCls = "h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
 
-    for (const mod of modificaciones) {
-      const base = resultado.resultados.find((r) => r.servicio === mod.servicio);
-      if (!base) continue;
-
-      if (mod.tipo === "add_agents") {
-        deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) + mod.cantidad);
-        const hsExtra = mod.cantidad * (mod.hsSemanal ?? 36) * (diasDelMes / 7);
-        deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) + hsExtra);
-      }
-
-      if (mod.tipo === "remove_agents") {
-        const hsPorAgente = base.hsBrutas / Math.max(base.hcActivos, 1);
-        deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) - mod.cantidad);
-        deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - mod.cantidad * hsPorAgente);
-      }
-
-      if (mod.tipo === "change_contract" && mod.hsSemanal) {
-        const hsPorAgenteBase = base.hsBrutas / Math.max(base.hcActivos, 1);
-        const hsSemanalBase   = hsPorAgenteBase / (diasDelMes / 7);
-        const deltaHs = mod.cantidad * (mod.hsSemanal - hsSemanalBase) * (diasDelMes / 7);
-        deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) + deltaHs);
-      }
-
-      if (mod.tipo === "move_agents" && mod.servicioDestino) {
-        const hsPorAgente = base.hsBrutas / Math.max(base.hcActivos, 1);
-        deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) - mod.cantidad);
-        deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - mod.cantidad * hsPorAgente);
-        deltaHC.set(mod.servicioDestino, (deltaHC.get(mod.servicioDestino) ?? 0) + mod.cantidad);
-        deltaHsTotal.set(mod.servicioDestino, (deltaHsTotal.get(mod.servicioDestino) ?? 0) + mod.cantidad * hsPorAgente);
-      }
-
-      if (mod.tipo === "change_reducer") {
-        reducerOvr.set(mod.servicio, {
-          deslogueo:  mod.deslogueoOverride  ?? undefined,
-          ausentismo: mod.ausentismoOverride ?? undefined,
-          rotacion:   mod.rotacionOverride   ?? undefined,
-        });
-      }
+  const setMes = (campo: "desde" | "hasta", mes: number) => {
+    if (campo === "desde") {
+      const prev = periodoDesde ?? { mes, anio: ANIO_ACTUAL };
+      setPeriodoDesde({ ...prev, mes });
+    } else {
+      const prev = periodoHasta ?? { mes, anio: ANIO_ACTUAL };
+      setPeriodoHasta({ ...prev, mes });
     }
+  };
 
-    return resultado.resultados.map((base) => {
-      const ajuste = ajustes[base.servicio];
-      const ov     = reducerOvr.get(base.servicio) ?? {};
+  const setAnio = (campo: "desde" | "hasta", anio: number) => {
+    if (campo === "desde") {
+      const prev = periodoDesde ?? { mes: new Date().getMonth() + 1, anio };
+      setPeriodoDesde({ ...prev, anio });
+    } else {
+      const prev = periodoHasta ?? { mes: new Date().getMonth() + 1, anio };
+      setPeriodoHasta({ ...prev, anio });
+    }
+  };
 
-      const deslogueo  = ov.deslogueo  !== undefined ? ov.deslogueo  : ajuste.deslogueoOverride  !== null ? ajuste.deslogueoOverride  : base.reductoRes.deslogueo;
-      const ausentismo = ov.ausentismo !== undefined ? ov.ausentismo : ajuste.ausentismoOverride !== null ? ajuste.ausentismoOverride : base.reductoRes.ausentismo;
-      const rotacion   = ov.rotacion   !== undefined ? ov.rotacion   : ajuste.rotacionOverride   !== null ? ajuste.rotacionOverride   : base.reductoRes.rotacion;
+  const limpiar = () => { setPeriodoDesde(null); setPeriodoHasta(null); };
 
-      const factorProductivo  = calcularFactorProductivo(deslogueo, ausentismo, rotacion, modoReductor);
-      const hcExtraSimple     = ajuste.hcExtra;
-      const hcExtraMods       = deltaHC.get(base.servicio) ?? 0;
-      const hcExtra           = hcExtraSimple + hcExtraMods;
+  const activo = periodoDesde !== null || periodoHasta !== null;
 
-      const hsBrutasExtraSimple = hcExtraSimple > 0
-        ? hcExtraSimple * ajuste.hsSemanalExtra * (diasDelMes / 7)
-        : hcExtraSimple * (base.hsBrutas / Math.max(base.hcActivos, 1));
-      const hsBrutasExtraMods = deltaHsTotal.get(base.servicio) ?? 0;
+  return (
+    <div className={cn(
+      "flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 transition-colors",
+      activo ? "border-[#0054A6]/30 bg-[#0054A6]/5" : "border-gray-200 bg-white"
+    )}>
+      <CalendarRange className={cn("h-4 w-4 shrink-0", activo ? "text-[#0054A6]" : "text-gray-400")} />
+      <span className="text-xs font-medium text-gray-600 shrink-0">Período de replanificación</span>
 
-      const hcActivos    = base.hcActivos + hcExtra;
-      const hsBrutas     = base.hsBrutas + hsBrutasExtraSimple + hsBrutasExtraMods;
-      const hsNetas      = hsBrutas * factorProductivo;
-      const cumplimiento = calcularCumplimiento(hsNetas, base.hsRequeridas);
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-gray-400">Desde</span>
+        <select
+          value={periodoDesde?.mes ?? ""}
+          onChange={(e) => setMes("desde", parseInt(e.target.value))}
+          className={selCls}
+        >
+          <option value="">—</option>
+          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+        </select>
+        <select
+          value={periodoDesde?.anio ?? ""}
+          onChange={(e) => setAnio("desde", parseInt(e.target.value))}
+          className={selCls}
+        >
+          <option value="">—</option>
+          {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
 
-      const hsSemanalProm = hcActivos > 0
-        ? ((base.hcActivos * base.hsSemanalPromedio) +
-           (hcExtraSimple > 0 ? hcExtraSimple * ajuste.hsSemanalExtra : 0) +
-           (hsBrutasExtraMods / (diasDelMes / 7))) / hcActivos
-        : 36;
+      <span className="text-gray-300 text-sm">→</span>
 
-      const deltaHC103 = calcularDeltaHC103(hcActivos, factorProductivo, hsSemanalProm, diasDelMes, base.hsRequeridas);
-      const agentesEquivalentes = calcularAgentesEquivalentes(deltaHC103, factorProductivo, diasDelMes, hsSemanalProm);
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-gray-400">Hasta</span>
+        <select
+          value={periodoHasta?.mes ?? ""}
+          onChange={(e) => setMes("hasta", parseInt(e.target.value))}
+          className={selCls}
+        >
+          <option value="">—</option>
+          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+        </select>
+        <select
+          value={periodoHasta?.anio ?? ""}
+          onChange={(e) => setAnio("hasta", parseInt(e.target.value))}
+          className={selCls}
+        >
+          <option value="">—</option>
+          {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
 
-      const { tope } = base;
-      const teoricoFacturable = Math.min(hsNetas, tope);
-      const recorte = Math.max(0, hsNetas - tope);
-      const faltante = Math.max(0, base.hsRequeridas - hsNetas);
-      return { ...base, hcActivos, hsBrutas, factorProductivo, hsNetas, cumplimiento, deltaHC103, agentesEquivalentes, hsSemanalPromedio: hsSemanalProm, reductoRes: { deslogueo, ausentismo, rotacion }, tope, teoricoFacturable, recorte, faltante };
-    });
-  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes]);
+      {activo && (
+        <button onClick={limpiar} className="text-xs text-gray-400 hover:text-gray-600 transition-colors ml-auto">
+          Limpiar
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function SimuladorPage() {
+  const { resultado } = useResultados();
+  const { resetAjustes, periodoDesde, periodoHasta } = useSimulador();
+  const resultadosSimulados = useResultadosSimulados();
 
   const exportarExcel = () => {
     if (!resultado) return;
@@ -134,7 +131,11 @@ export default function SimuladorPage() {
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-0.5">Simulador de dotación</h2>
             <p className="text-sm text-gray-500">
-              {resultado.mes} · {resultado.diasDelMes} días · Construí un escenario y ve el impacto al instante
+              {resultado.mes} · {resultado.diasDelMes} días
+              {periodoDesde && periodoHasta
+                ? ` · Replanificando ${MESES[periodoDesde.mes - 1]} ${periodoDesde.anio} → ${MESES[periodoHasta.mes - 1]} ${periodoHasta.anio}`
+                : " · Construí un escenario y ve el impacto al instante"
+              }
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -147,6 +148,11 @@ export default function SimuladorPage() {
               Exportar
             </Button>
           </div>
+        </div>
+
+        {/* Período de replanificación */}
+        <div className="mb-4">
+          <PeriodoSelector />
         </div>
 
         {/* KPIs del escenario */}

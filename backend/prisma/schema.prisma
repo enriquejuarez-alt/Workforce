@@ -1,0 +1,533 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  ADMINISTRADOR
+  USUARIO
+}
+
+enum EstadoNomina {
+  BORRADOR
+  ACTIVA
+  CERRADA
+  ARCHIVADA
+}
+
+model Usuario {
+  id                  Int      @id @default(autoincrement())
+  nombre              String
+  email               String   @unique
+  password_hash       String
+  rol                 Rol      @default(USUARIO)
+  activo              Boolean  @default(true)
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+  ultimo_acceso       DateTime?
+
+  permisos             UsuarioServicioPermiso[]
+  importaciones        ImportacionNomina[]
+  auditorias           Auditoria[]
+  licencias_registradas        Licencia[]
+  licencia_importaciones       LicenciaImportacion[]
+  cambios_registrados          CambioServicioTemporal[]
+  bajas_creadas                HistoricoBaja[]          @relation("BajaCreador")
+  remociones_creadas           Remocion[]               @relation("RemocionCreador")
+  cambios_contrato_creados     CambioContrato[]
+  cambios_horario_creados      CambioHorario[]
+  capacitaciones_creadas       Capacitacion[]
+  vacacion_importaciones       VacacionImportacion[]
+  programaciones_creadas       ProgramacionMensual[]
+
+  @@map("usuarios")
+}
+
+model Servicio {
+  id                  Int      @id @default(autoincrement())
+  nombre              String   @unique
+  descripcion         String?
+  color               String   @default("#6366f1")
+  activo              Boolean  @default(true)
+  plani_config        Json?
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  permisos                UsuarioServicioPermiso[]
+  agentes                 Agente[]
+  nominas                 NominaMensual[]
+  auditorias              Auditoria[]
+  cambios_como_temporal   CambioServicioTemporal[] @relation("ServicioTemporal")
+  snapshots               AgenteNominaMensual[]
+  bajas                   HistoricoBaja[]
+  remociones              Remocion[]
+  cambios_contrato        CambioContrato[]
+  cambios_horario         CambioHorario[]
+  capacitaciones          Capacitacion[]
+  programaciones          ProgramacionMensual[]
+
+  @@map("servicios")
+}
+
+model UsuarioServicioPermiso {
+  id                                Int      @id @default(autoincrement())
+  usuario_id                        Int
+  servicio_id                       Int
+  puede_ver                         Boolean  @default(false)
+  puede_usar_filtros                Boolean  @default(false)
+  puede_editar_nomina_mes_corriente  Boolean  @default(false)
+  puede_ver_nominas_historicas       Boolean  @default(false)
+  puede_editar_nominas_historicas    Boolean  @default(false)
+  puede_cargar_excel                 Boolean  @default(false)
+  puede_exportar                     Boolean  @default(false)
+  puede_exportar_nominas_historicas  Boolean  @default(false)
+  puede_registrar_licencia           Boolean  @default(false)
+  puede_registrar_cambio_servicio    Boolean  @default(false)
+  puede_crear_agente                 Boolean  @default(false)
+  puede_desactivar_agente            Boolean  @default(false)
+  puede_comparar_nominas_mensuales   Boolean  @default(false)
+  campos_editables                   String[] @default([])
+  segmentos_permitidos               String[] @default([])
+  fecha_creacion                     DateTime @default(now())
+  fecha_actualizacion                DateTime @updatedAt
+  actualizado_por                    Int?
+
+  usuario  Usuario  @relation(fields: [usuario_id], references: [id])
+  servicio Servicio @relation(fields: [servicio_id], references: [id])
+
+  @@unique([usuario_id, servicio_id])
+  @@map("usuario_servicio_permisos")
+}
+
+model Agente {
+  id                  Int      @id @default(autoincrement())
+  dni                 String   @unique
+  usuario             String   @unique
+  nombre              String
+  superior            String?
+  segmento            String?
+  horarios            String?
+  estado              String?
+  contrato            String?
+  sitio               String?
+  modalidad           String?
+  jefe                String?
+  servicio_id         Int?
+  activo              Boolean  @default(true)
+  presente_ultima_carga Boolean @default(true)
+  observaciones       String?
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  servicio           Servicio?               @relation(fields: [servicio_id], references: [id])
+  licencias          Licencia[]
+  cambios_temporales CambioServicioTemporal[]
+  cambios_contrato   CambioContrato[]
+  cambios_horario    CambioHorario[]
+  capacitaciones     Capacitacion[]
+  snapshots          AgenteNominaMensual[]
+  bajas              HistoricoBaja[]
+  remociones         Remocion[]
+  vacaciones         Vacacion[]
+
+  @@map("agentes")
+}
+
+model NominaMensual {
+  id                  Int          @id @default(autoincrement())
+  servicio_id         Int
+  mes                 Int
+  anio                Int
+  tipo                String       @default("OPERACION")
+  estado              EstadoNomina @default(BORRADOR)
+  archivo_nombre      String?
+  cargado_por         Int?
+  fecha_carga         DateTime?
+  total_agentes       Int          @default(0)
+  agentes_creados     Int          @default(0)
+  agentes_actualizados Int         @default(0)
+  agentes_no_presentes Int         @default(0)
+  errores             Int          @default(0)
+  observaciones       String?
+  fecha_creacion      DateTime     @default(now())
+  fecha_actualizacion DateTime     @updatedAt
+
+  servicio       Servicio              @relation(fields: [servicio_id], references: [id])
+  snapshots      AgenteNominaMensual[]
+  importaciones  ImportacionNomina[]
+  auditorias     Auditoria[]
+  programaciones ProgramacionMensual[]
+
+  @@unique([servicio_id, mes, anio, tipo])
+  @@map("nominas_mensuales")
+}
+
+model AgenteNominaMensual {
+  id                Int      @id @default(autoincrement())
+  nomina_mensual_id Int
+  agente_id         Int
+  dni               String
+  usuario           String
+  nombre            String
+  superior          String?
+  segmento          String?
+  horarios          String?
+  estado            String?
+  contrato          String?
+  sitio             String?
+  modalidad         String?
+  jefe              String?
+  servicio_id       Int?
+  presente_en_nomina Boolean @default(true)
+  observaciones     String?
+  fecha_actualizacion DateTime @updatedAt
+
+  nomina_mensual NominaMensual @relation(fields: [nomina_mensual_id], references: [id])
+  agente         Agente        @relation(fields: [agente_id], references: [id])
+  servicio       Servicio?     @relation(fields: [servicio_id], references: [id])
+
+  @@unique([nomina_mensual_id, agente_id])
+  @@map("agente_nomina_mensual")
+}
+
+model LicenciaImportacion {
+  id                     Int      @id @default(autoincrement())
+  archivo_nombre         String
+  importado_por          Int
+  fecha_importacion      DateTime @default(now())
+  total_dias             Int      @default(0)
+  total_periodos         Int      @default(0)
+  agentes_encontrados    Int      @default(0)
+  agentes_no_encontrados Int      @default(0)
+
+  importador Usuario    @relation(fields: [importado_por], references: [id])
+  licencias  Licencia[]
+
+  @@map("licencia_importaciones")
+}
+
+model Licencia {
+  id               Int      @id @default(autoincrement())
+  agente_id        Int
+  fecha_desde      DateTime
+  fecha_hasta      DateTime
+  motivo           String?
+  observacion      String?
+  creado_por       Int
+  importacion_id   Int?
+  fecha_creacion   DateTime @default(now())
+
+  agente      Agente               @relation(fields: [agente_id], references: [id])
+  creador     Usuario              @relation(fields: [creado_por], references: [id])
+  importacion LicenciaImportacion? @relation(fields: [importacion_id], references: [id])
+
+  @@index([agente_id])
+  @@index([importacion_id])
+  @@index([fecha_desde, fecha_hasta])
+  @@map("licencias")
+}
+
+model CambioServicioTemporal {
+  id                   Int      @id @default(autoincrement())
+  agente_id            Int
+  servicio_original_id Int?
+  servicio_temporal_id Int?
+  fecha_desde          DateTime
+  fecha_hasta          DateTime
+  motivo               String?
+  observacion          String?
+  creado_por           Int
+  fecha_creacion       DateTime @default(now())
+
+  agente            Agente    @relation(fields: [agente_id], references: [id])
+  servicio_temporal Servicio? @relation("ServicioTemporal", fields: [servicio_temporal_id], references: [id])
+  creador           Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@map("cambios_servicio_temporal")
+}
+
+model ImportacionNomina {
+  id                  Int      @id @default(autoincrement())
+  nomina_mensual_id   Int
+  archivo_nombre      String
+  usuario_id          Int
+  fecha_importacion   DateTime @default(now())
+  total_filas         Int      @default(0)
+  agentes_creados     Int      @default(0)
+  agentes_actualizados Int     @default(0)
+  agentes_no_presentes Int     @default(0)
+  errores             Int      @default(0)
+  estado              String   @default("COMPLETADO")
+  detalle_errores     Json?
+
+  nomina_mensual NominaMensual @relation(fields: [nomina_mensual_id], references: [id])
+  usuario        Usuario       @relation(fields: [usuario_id], references: [id])
+
+  @@map("importaciones_nomina")
+}
+
+model HistoricoBaja {
+  id               Int      @id @default(autoincrement())
+  fecha            DateTime @db.Date
+  dni              String
+  nombre           String
+  usuario_sistema  String?
+  superior         String?
+  jefatura         String?
+  servicio_id      Int?
+  servicio_nombre  String?
+  tipo             String?
+  segmento         String?
+  horarios         String?
+  estado           String?
+  contrato         String?
+  sitio            String?
+  modalidad        String?
+  jefe             String?
+  observacion      String?
+  agente_id        Int?
+  creado_por       Int
+  fecha_creacion   DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  agente   Agente?   @relation(fields: [agente_id], references: [id])
+  creador  Usuario   @relation("BajaCreador", fields: [creado_por], references: [id])
+
+  @@index([dni])
+  @@index([servicio_id])
+  @@index([servicio_id, fecha])
+  @@map("historico_bajas")
+}
+
+model Remocion {
+  id                  Int      @id @default(autoincrement())
+  fecha               DateTime @db.Date
+  dni                 String
+  nombre              String
+  usuario_sistema     String?
+  superior            String?
+  jefatura            String?
+  servicio_id         Int?
+  servicio_nombre     String?
+  motivo              String?
+  segmento            String?
+  horarios            String?
+  estado              String?
+  contrato            String?
+  sitio               String?
+  modalidad           String?
+  jefe                String?
+  observacion         String?
+  agente_id           Int?
+  creado_por          Int
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  agente   Agente?   @relation(fields: [agente_id], references: [id])
+  creador  Usuario   @relation("RemocionCreador", fields: [creado_por], references: [id])
+
+  @@index([dni])
+  @@index([servicio_id])
+  @@index([servicio_id, fecha])
+  @@map("remociones")
+}
+
+model CambioContrato {
+  id                  Int       @id @default(autoincrement())
+  agente_id           Int
+  agente_dni          String
+  agente_nombre       String
+  servicio_id         Int?
+  tipo                String    // 'TEMPORAL' | 'DEFINITIVO'
+  contrato_anterior   String?
+  contrato_nuevo      String    // '30' | '35' | '36'
+  fecha_desde         DateTime  @db.Date
+  fecha_hasta         DateTime? @db.Date
+  motivo              String?
+  observacion         String?
+  creado_por          Int
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+
+  agente   Agente    @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("cambios_contrato")
+}
+
+model CambioHorario {
+  id                  Int       @id @default(autoincrement())
+  agente_id           Int
+  agente_dni          String
+  agente_nombre       String
+  servicio_id         Int?
+  tipo                String    // 'TEMPORAL' | 'DEFINITIVO'
+  horario_anterior    String?
+  horario_nuevo       String
+  fecha_desde         DateTime  @db.Date
+  fecha_hasta         DateTime? @db.Date
+  motivo              String?
+  observacion         String?
+  creado_por          Int
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+
+  agente   Agente    @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("cambios_horario")
+}
+
+model Capacitacion {
+  id                  Int      @id @default(autoincrement())
+  agente_id           Int?
+  agente_dni          String?
+  agente_nombre       String
+  usuario_sistema     String?
+  superior            String?
+  servicio_id         Int?
+  servicio_nombre     String?
+  segmento            String?
+  horarios            String?
+  estado              String?
+  contrato            String?
+  sitio               String?
+  modalidad           String?
+  jefe                String?
+  observacion         String?
+  tipo_formacion      String?
+  fecha_inicio        DateTime @db.Date
+  fecha_fin           DateTime @db.Date
+  dado_de_alta        Boolean  @default(false)
+  pendiente_alta      Boolean  @default(false)
+  fecha_alta          DateTime?
+  creado_por          Int
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  agente   Agente?   @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("capacitaciones")
+}
+
+model VacacionImportacion {
+  id                     Int      @id @default(autoincrement())
+  archivo_nombre         String
+  importado_por          Int
+  fecha_importacion      DateTime @default(now())
+  total_dias             Int      @default(0)
+  total_periodos         Int      @default(0)
+  agentes_encontrados    Int      @default(0)
+  agentes_no_encontrados Int      @default(0)
+
+  importador  Usuario    @relation(fields: [importado_por], references: [id])
+  vacaciones  Vacacion[]
+
+  @@map("vacacion_importaciones")
+}
+
+model Vacacion {
+  id             Int      @id @default(autoincrement())
+  agente_id      Int?
+  agente_dni     String
+  agente_nombre  String
+  fecha_desde    DateTime @db.Date
+  fecha_hasta    DateTime @db.Date
+  site           String?
+  servicio_wf    String?
+  importacion_id Int
+  fecha_creacion DateTime @default(now())
+
+  agente      Agente?             @relation(fields: [agente_id], references: [id])
+  importacion VacacionImportacion @relation(fields: [importacion_id], references: [id])
+
+  @@index([agente_dni])
+  @@index([importacion_id])
+  @@map("vacaciones")
+}
+
+model ProgramacionMensual {
+  id                  Int      @id @default(autoincrement())
+  servicio_id         Int
+  mes                 Int
+  anio                Int
+  semana              Int      @default(0)  // 0 = mes completo, 1-4 = semana específica
+  nomina_id           Int?     // nómina base para la simulación
+  estado              String   @default("BORRADOR")
+  creado_por          Int
+  fecha_creacion      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  servicio   Servicio          @relation(fields: [servicio_id], references: [id])
+  nomina     NominaMensual?    @relation(fields: [nomina_id], references: [id])
+  creador    Usuario           @relation(fields: [creado_por], references: [id])
+  requeridos RequeridoHorario[]
+  factor     FactorReduccion?
+
+  @@unique([servicio_id, mes, anio, semana])
+  @@map("programaciones_mensuales")
+}
+
+model RequeridoHorario {
+  id              Int      @id @default(autoincrement())
+  programacion_id Int
+  fecha           DateTime @db.Date
+  intervalo       String   // "08:00"
+  requeridos      Int
+  es_feriado      Boolean  @default(false)
+
+  programacion ProgramacionMensual @relation(fields: [programacion_id], references: [id], onDelete: Cascade)
+
+  @@unique([programacion_id, fecha, intervalo])
+  @@map("requeridos_horario")
+}
+
+model FactorReduccion {
+  id              Int   @id @default(autoincrement())
+  programacion_id Int   @unique
+  deslogueo       Float @default(0)
+  ausentismo      Float @default(0)
+  rotacion        Float @default(0)
+
+  programacion ProgramacionMensual @relation(fields: [programacion_id], references: [id], onDelete: Cascade)
+
+  @@map("factores_reduccion")
+}
+
+model Auditoria {
+  id                Int      @id @default(autoincrement())
+  usuario_id        Int?
+  accion            String
+  entidad           String?
+  entidad_id        String?
+  servicio_id       Int?
+  nomina_mensual_id Int?
+  campo_modificado  String?
+  valor_anterior    String?
+  valor_nuevo       String?
+  fecha_hora        DateTime @default(now())
+  ip                String?
+  user_agent        String?
+
+  usuario        Usuario?       @relation(fields: [usuario_id], references: [id])
+  servicio       Servicio?      @relation(fields: [servicio_id], references: [id])
+  nomina_mensual NominaMensual? @relation(fields: [nomina_mensual_id], references: [id])
+
+  @@map("auditorias")
+}

@@ -50,6 +50,7 @@ export const getPlaniNomina = async (req: AuthRequest, res: Response) => {
   try {
     const mes = parseInt(req.query.mes as string)
     const anio = parseInt(req.query.anio as string)
+    const servicioId = req.query.servicio_id ? parseInt(req.query.servicio_id as string) : undefined
 
     if (!mes || !anio || mes < 1 || mes > 12 || anio < 2000) {
       return res.status(400).json({ error: 'Parámetros mes y anio requeridos' })
@@ -58,7 +59,12 @@ export const getPlaniNomina = async (req: AuthRequest, res: Response) => {
     const snapshots = await prisma.agenteNominaMensual.findMany({
       where: {
         presente_en_nomina: true,
-        nomina_mensual: { mes, anio, estado: { in: ['ACTIVA', 'CERRADA', 'BORRADOR'] } },
+        nomina_mensual: {
+          mes,
+          anio,
+          estado: { in: ['ACTIVA', 'CERRADA', 'BORRADOR'] },
+          ...(servicioId ? { servicio_id: servicioId } : {}),
+        },
       },
       select: {
         dni: true,

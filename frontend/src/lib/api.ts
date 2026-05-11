@@ -281,8 +281,8 @@ export interface PlaniNominaExport {
 
 export const planiApi = {
   getConfig: () => api.get<{ servicios: PlaniServicioRef[] }>('/plani/config'),
-  getNomina: (mes: number, anio: number) =>
-    api.get<PlaniNominaExport>('/plani/nomina', { params: { mes, anio } }),
+  getNomina: (mes: number, anio: number, servicio_id?: number) =>
+    api.get<PlaniNominaExport>('/plani/nomina', { params: { mes, anio, ...(servicio_id ? { servicio_id } : {}) } }),
   updateServicioConfig: (id: number, config: PlaniServicioConfig) =>
     api.put<{ ok: boolean }>(`/servicios/${id}/plani-config`, config),
 }

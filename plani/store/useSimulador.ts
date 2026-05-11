@@ -37,6 +37,7 @@ interface SimuladorState {
   ajustes: Record<ServicioKey, AjusteServicio>;
   modificaciones: SimModificacion[];
   escenarios: Escenario[];
+  escenarioComparar: string | null;
 
   setAjuste: (servicio: ServicioKey, patch: Partial<AjusteServicio>) => void;
   resetAjustes: () => void;
@@ -44,6 +45,7 @@ interface SimuladorState {
   bulkAddModificaciones: (mods: Omit<SimModificacion, "id">[]) => void;
   removeModificacion: (id: string) => void;
   clearModificaciones: () => void;
+  setEscenarioComparar: (id: string | null) => void;
 
   saveEscenario: (nombre: string) => void;
   loadEscenario: (id: string) => void;
@@ -54,11 +56,12 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
   ajustes: ajustesInicial(),
   modificaciones: [],
   escenarios: [],
+  escenarioComparar: null,
 
   setAjuste: (servicio, patch) =>
     set((state) => ({ ajustes: { ...state.ajustes, [servicio]: { ...state.ajustes[servicio], ...patch } } })),
 
-  resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [] }),
+  resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [], escenarioComparar: null }),
 
   addModificacion: (tipo, servicio, params) =>
     set((state) => ({
@@ -80,6 +83,8 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
     set((state) => ({ modificaciones: state.modificaciones.filter((m) => m.id !== id) })),
 
   clearModificaciones: () => set({ modificaciones: [] }),
+
+  setEscenarioComparar: (id) => set({ escenarioComparar: id }),
 
   saveEscenario: (nombre) => {
     const { modificaciones } = get();

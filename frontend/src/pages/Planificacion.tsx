@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, ExternalLink, RefreshCw, Download, ChevronDown } from 'lucide-react'
-import { planiApi } from '../lib/api'
+import { planiApi, serviciosApi } from '../lib/api'
+import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 
 const PLANI_BASE = 'http://localhost:3000'
@@ -39,6 +40,12 @@ export default function Planificacion() {
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [anio, setAnio] = useState(now.getFullYear())
+  const [servicioId, setServicioId] = useState<number | ''>('')
+
+  const { data: servicios = [] } = useQuery({
+    queryKey: ['servicios'],
+    queryFn: () => serviciosApi.list().then((r) => r.data),
+  })
 
   const searchParams = new URLSearchParams(location.search)
   const page = searchParams.get('page') ?? 'carga'
@@ -91,7 +98,7 @@ export default function Planificacion() {
     }
     setCargando(true)
     try {
-      const { data } = await planiApi.getNomina(mes, anio)
+      const { data } = await planiApi.getNomina(mes, anio, servicioId || undefined)
       if (data.agentes.length === 0) {
         toast.error(`No hay nóminas activas para ${MESES.find(m => m.value === mes)?.label} ${anio}`)
         return
@@ -157,6 +164,19 @@ export default function Planificacion() {
                     max={2099}
                     onChange={(e) => setAnio(Number(e.target.value))}
                   />
+                </div>
+                <div className="mb-3">
+                  <p className="text-xs text-gray-500 mb-1">Servicio</p>
+                  <select
+                    className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                    value={servicioId}
+                    onChange={(e) => setServicioId(e.target.value ? Number(e.target.value) : '')}
+                  >
+                    <option value="">Todos los servicios</option>
+                    {(servicios as any[]).filter((s) => s.activo).map((s) => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   className="btn-primary w-full text-xs py-1.5 flex items-center justify-center gap-1.5"

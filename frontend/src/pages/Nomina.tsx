@@ -9,7 +9,7 @@ import {
 import {
   Filter, Download, ChevronLeft, ChevronRight, ChevronsLeft,
   ChevronsRight, Edit2, Eye, Lock, SortAsc, SortDesc, X,
-  RefreshCw, FileText, Users, Upload, Copy, Trash2,
+  RefreshCw, FileText, Users, Upload, Copy, Trash2, Building2,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
@@ -95,6 +95,7 @@ export default function Nomina() {
   const nominaEditableRef = useRef(false)
   const canRegLicenciaRef = useRef(false)
   const selectedServicioIdRef = useRef<number | ''>('')
+  const selectedServicioColorRef = useRef<string>('#6366f1')
 
   const { data: servicios = [] } = useQuery({
     queryKey: ['servicios'],
@@ -128,6 +129,7 @@ export default function Nomina() {
   nominaEditableRef.current = nominaEditable
   canRegLicenciaRef.current = canRegLicencia
   selectedServicioIdRef.current = selectedServicioId
+  selectedServicioColorRef.current = (servicios as Servicio[]).find((s) => s.id === selectedServicioId)?.color || '#6366f1'
 
   const { data: agentes = [], isLoading: loadingAgentes, refetch } = useQuery({
     queryKey: ['nomina-agentes', nomina?.id, filters],
@@ -248,9 +250,20 @@ export default function Nomina() {
       header: 'Agente',
       accessorFn: (r) => r.nombre,
       cell: ({ row }) => (
-        <div>
-          <p className="font-semibold text-gray-800 text-sm">{row.original.nombre}</p>
-          <p className="text-xs text-gray-400">{row.original.usuario} · DNI {row.original.dni}</p>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-bold"
+            style={{ backgroundColor: selectedServicioColorRef.current }}
+          >
+            {row.original.nombre.trim().split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()}
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">{row.original.nombre}</p>
+            <p className="text-xs text-gray-400">
+              {row.original.usuario && <>{row.original.usuario}</>}
+              {row.original.dni && <> · DNI {row.original.dni}</>}
+            </p>
+          </div>
         </div>
       ),
     },
@@ -394,11 +407,7 @@ export default function Nomina() {
             {isAdmin && nomina && (
               <button
                 className="btn-secondary"
-                onClick={() => {
-                  const nextMes = selectedMes === 12 ? 1 : selectedMes + 1
-                  const nextAnio = selectedMes === 12 ? selectedAnio + 1 : selectedAnio
-                  setShowReplicar(true)
-                }}
+                onClick={() => setShowReplicar(true)}
                 disabled={replicarMutation.isPending}
               >
                 <Copy size={14} />
@@ -423,254 +432,298 @@ export default function Nomina() {
       />
 
       <div className="flex-1 overflow-hidden flex flex-col p-6 gap-4">
-        {/* Selector de período */}
-        <div className="card p-4">
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <label className="label-base">Servicio</label>
-              <select
-                className="input-base w-52"
-                value={selectedServicioId}
-                onChange={(e) => setSelectedServicioId(e.target.value ? parseInt(e.target.value) : '')}
+
+        {/* Servicio pills */}
+        <div className="flex items-center gap-3">
+          <Building2 size={16} className="text-gray-400 shrink-0" />
+          <div className="flex flex-wrap gap-2">
+            {(servicios as Servicio[]).filter((s) => s.activo).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedServicioId(s.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  selectedServicioId === s.id
+                    ? 'text-white border-transparent'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-800'
+                }`}
+                style={selectedServicioId === s.id ? { backgroundColor: s.color, borderColor: s.color } : {}}
               >
-                <option value="">Seleccionar servicio...</option>
-                {servicios.filter((s) => s.activo).map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Mes</label>
-              <select className="input-base w-36" value={selectedMes} onChange={(e) => setSelectedMes(parseInt(e.target.value))}>
-                {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Año</label>
-              <select className="input-base w-24" value={selectedAnio} onChange={(e) => setSelectedAnio(parseInt(e.target.value))}>
-                {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-            {nomina && (
-              <div className="flex items-center gap-3 ml-auto">
-                <NominaEstadoBadge estado={nomina.estado} />
-                {nominaEditable ? (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
-                    <Edit2 size={12} /> Editable
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-gray-500">
-                    <Lock size={12} /> Solo lectura
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          {/* Tipo selector */}
-          <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-            <button
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedTipo === 'OPERACION' ? 'bg-konecta text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              onClick={() => setSelectedTipo('OPERACION')}
-            >
-              Nómina Operación
-            </button>
-            <button
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedTipo === 'MEUCCI' ? 'bg-konecta text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              onClick={() => setSelectedTipo('MEUCCI')}
-            >
-              Nómina Meucci
-            </button>
+                {s.nombre}
+              </button>
+            ))}
           </div>
         </div>
 
+        {/* Period + tipo + nomina status */}
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Mes</p>
+            <select className="input-field text-sm h-9 w-36" value={selectedMes} onChange={(e) => setSelectedMes(parseInt(e.target.value))}>
+              {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Año</p>
+            <select className="input-field text-sm h-9 w-24" value={selectedAnio} onChange={(e) => setSelectedAnio(parseInt(e.target.value))}>
+              {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex rounded-xl border border-gray-200 overflow-hidden self-end">
+            <button
+              onClick={() => setSelectedTipo('OPERACION')}
+              className={`px-4 py-2 text-xs font-semibold transition-colors ${
+                selectedTipo === 'OPERACION' ? 'bg-konecta text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Operación
+            </button>
+            <button
+              onClick={() => setSelectedTipo('MEUCCI')}
+              className={`px-4 py-2 text-xs font-semibold border-l border-gray-200 transition-colors ${
+                selectedTipo === 'MEUCCI' ? 'bg-konecta text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Meucci
+            </button>
+          </div>
+
+          {nomina && (
+            <div className="ml-auto flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100">
+              <NominaEstadoBadge estado={nomina.estado} />
+              <span className="w-px h-4 bg-gray-200" />
+              <span className="text-xs font-bold text-gray-700">{nomina.total_agentes} agentes</span>
+              {nomina.agentes_no_presentes > 0 && (
+                <span className="text-xs text-red-400 font-medium">· {nomina.agentes_no_presentes} no presentes</span>
+              )}
+              <span className="w-px h-4 bg-gray-200" />
+              {nominaEditable ? (
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
+                  <Edit2 size={11} /> Editable
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
+                  <Lock size={11} /> Solo lectura
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
         {!selectedServicioId ? (
-          <EmptyState icon={Filter} title="Seleccioná un servicio" description="Elegí un servicio y período para visualizar la nómina." />
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState icon={Building2} title="Seleccioná un servicio" description="Elegí un servicio arriba y un período para visualizar la nómina." />
+          </div>
         ) : (loadingNominas || loadingAgentes) ? (
           <PageLoading text="Cargando nómina..." />
+        ) : !nomina ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <EmptyState
+              icon={FileText}
+              title="Sin nómina para este período"
+              description={`No existe nómina ${selectedTipo === 'MEUCCI' ? 'Meucci' : 'de Operación'} para ${MESES[selectedMes - 1]} ${selectedAnio} en este servicio.`}
+            />
+            {isAdmin && (
+              <button
+                className="btn-primary"
+                onClick={() => navigate(`/carga?servicio_id=${selectedServicioId}&mes=${selectedMes}&anio=${selectedAnio}`)}
+              >
+                <Upload size={14} /> Subir Excel para este período
+              </button>
+            )}
+          </div>
+        ) : agentes.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState icon={Users} title="Sin agentes" description="No hay agentes en esta nómina." />
+          </div>
         ) : (
           <>
-            {/* Filtros */}
-            <div className="card p-3">
-              <div className="flex items-center justify-between">
-                <button
-                  className="btn-ghost"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Filter size={14} />
-                  Filtros
-                  {filterCount > 0 && (
-                    <span className="ml-1 bg-konecta text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                      {filterCount}
-                    </span>
-                  )}
-                </button>
-                <p className="text-xs text-gray-500">
-                  Mostrando {table.getRowModel().rows.length} de {agentes.length} agentes
-                </p>
+            {/* Filter bar */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  showFilters || filterCount > 0
+                    ? 'bg-konecta/10 text-konecta border-konecta/20'
+                    : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
+                }`}
+              >
+                <Filter size={13} />
+                Filtros
                 {filterCount > 0 && (
-                  <button className="btn-ghost text-red-500" onClick={() => setFilters({})}>
-                    <X size={12} /> Limpiar filtros
-                  </button>
+                  <span className="ml-0.5 bg-konecta text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                    {filterCount}
+                  </span>
                 )}
-              </div>
-
-              {showFilters && (
-                <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                  <input
-                    className="input-base text-xs col-span-2"
-                    placeholder="Buscar nombre, DNI o usuario..."
-                    value={filters.search || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                  />
-                  <select
-                    className="input-base text-xs"
-                    value={filters.superior || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, superior: e.target.value }))}
-                  >
-                    <option value="">Todos los superiores</option>
-                    {filterOptions.superior.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  <select
-                    className="input-base text-xs"
-                    value={filters.segmento || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, segmento: e.target.value }))}
-                  >
-                    <option value="">Todos los segmentos</option>
-                    {filterOptions.segmento.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  <select
-                    className="input-base text-xs"
-                    value={filters.estado || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, estado: e.target.value }))}
-                  >
-                    <option value="">Todos los estados</option>
-                    {filterOptions.estado.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  <select
-                    className="input-base text-xs"
-                    value={filters.contrato || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, contrato: e.target.value }))}
-                  >
-                    <option value="">Todos los contratos</option>
-                    {filterOptions.contrato.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  <select
-                    className="input-base text-xs"
-                    value={filters.modalidad || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, modalidad: e.target.value }))}
-                  >
-                    <option value="">Todas las modalidades</option>
-                    {filterOptions.modalidad.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  <select
-                    className="input-base text-xs"
-                    value={filters.sitio || ''}
-                    onChange={(e) => setFilters((f) => ({ ...f, sitio: e.target.value }))}
-                  >
-                    <option value="">Todos los sitios</option>
-                    {filterOptions.sitio.map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded"
-                      checked={filters.no_presente === 'true'}
-                      onChange={(e) => setFilters((f) => ({ ...f, no_presente: e.target.checked ? 'true' : '' }))}
-                    />
-                    Solo no presentes
-                  </label>
-                </div>
+              </button>
+              <span className="text-xs text-gray-400">
+                {table.getRowModel().rows.length} de {agentes.length} agentes
+              </span>
+              {filterCount > 0 && (
+                <button
+                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors"
+                  onClick={() => setFilters({})}
+                >
+                  <X size={11} /> Limpiar filtros
+                </button>
               )}
             </div>
 
-            {/* Tabla */}
-            <div className="card flex-1 overflow-hidden flex flex-col">
-              {!nomina ? (
-                <div className="flex flex-col items-center justify-center h-full gap-4 py-12">
-                  <EmptyState
-                    icon={FileText}
-                    title="Sin nómina para este período"
-                    description={`No existe nómina ${selectedTipo === 'MEUCCI' ? 'Meucci' : 'de Operación'} para ${MESES[selectedMes - 1]} ${selectedAnio} en este servicio.`}
+            {showFilters && (
+              <div className="card p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <input
+                  className="input-field text-xs col-span-2"
+                  placeholder="Buscar nombre, DNI o usuario..."
+                  value={filters.search || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                />
+                <select
+                  className="input-field text-xs"
+                  value={filters.superior || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, superior: e.target.value }))}
+                >
+                  <option value="">Todos los superiores</option>
+                  {filterOptions.superior.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select
+                  className="input-field text-xs"
+                  value={filters.segmento || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, segmento: e.target.value }))}
+                >
+                  <option value="">Todos los segmentos</option>
+                  {filterOptions.segmento.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select
+                  className="input-field text-xs"
+                  value={filters.estado || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, estado: e.target.value }))}
+                >
+                  <option value="">Todos los estados</option>
+                  {filterOptions.estado.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select
+                  className="input-field text-xs"
+                  value={filters.contrato || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, contrato: e.target.value }))}
+                >
+                  <option value="">Todos los contratos</option>
+                  {filterOptions.contrato.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select
+                  className="input-field text-xs"
+                  value={filters.modalidad || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, modalidad: e.target.value }))}
+                >
+                  <option value="">Todas las modalidades</option>
+                  {filterOptions.modalidad.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select
+                  className="input-field text-xs"
+                  value={filters.sitio || ''}
+                  onChange={(e) => setFilters((f) => ({ ...f, sitio: e.target.value }))}
+                >
+                  <option value="">Todos los sitios</option>
+                  {filterOptions.sitio.map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    checked={filters.no_presente === 'true'}
+                    onChange={(e) => setFilters((f) => ({ ...f, no_presente: e.target.checked ? 'true' : '' }))}
                   />
-                  {isAdmin && (
-                    <button
-                      className="btn-primary"
-                      onClick={() =>
-                        navigate(`/carga?servicio_id=${selectedServicioId}&mes=${selectedMes}&anio=${selectedAnio}`)
-                      }
-                    >
-                      <Upload size={14} /> Subir Excel para este período
-                    </button>
-                  )}
-                </div>
-              ) : agentes.length === 0 ? (
-                <EmptyState icon={Users} title="Sin agentes" description="No hay agentes en esta nómina." />
-              ) : (
-                <>
-                  <div className="overflow-x-auto flex-1">
-                    <table className="w-full border-collapse">
-                      <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
-                        {table.getHeaderGroups().map((hg) => (
-                          <tr key={hg.id}>
-                            {hg.headers.map((h) => (
-                              <th key={h.id} className="table-th cursor-pointer select-none"
-                                onClick={h.column.getToggleSortingHandler()}
-                              >
-                                <div className="flex items-center gap-1">
-                                  {flexRender(h.column.columnDef.header, h.getContext())}
-                                  {h.column.getIsSorted() === 'asc' && <SortAsc size={11} />}
-                                  {h.column.getIsSorted() === 'desc' && <SortDesc size={11} />}
-                                </div>
-                              </th>
-                            ))}
-                          </tr>
-                        ))}
-                      </thead>
-                      <tbody>
-                        {table.getRowModel().rows.map((row) => (
-                          <tr key={row.id} className={`table-tr ${!row.original.presente_en_nomina ? 'bg-red-50/30' : ''}`}>
-                            {row.getVisibleCells().map((cell) => (
-                              <td key={cell.id} className="table-td">
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  Solo no presentes
+                </label>
+              </div>
+            )}
 
-                  {/* Pagination */}
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <button className="btn-ghost py-1" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}>
-                        <ChevronsLeft size={14} />
-                      </button>
-                      <button className="btn-ghost py-1" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-                        <ChevronLeft size={14} />
-                      </button>
-                      <span className="text-xs text-gray-600">
-                        Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
-                      </span>
-                      <button className="btn-ghost py-1" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-                        <ChevronRight size={14} />
-                      </button>
-                      <button className="btn-ghost py-1" onClick={() => table.setPageIndex(table.getPageCount() - 1)} disabled={!table.getCanNextPage()}>
-                        <ChevronsRight size={14} />
-                      </button>
-                    </div>
-                    <select
-                      className="input-base w-24 text-xs"
-                      value={table.getState().pagination.pageSize}
-                      onChange={(e) => table.setPageSize(parseInt(e.target.value))}
-                    >
-                      {[10, 25, 50, 100].map((s) => <option key={s} value={s}>{s} / página</option>)}
-                    </select>
-                  </div>
-                </>
-              )}
+            {/* Table */}
+            <div className="card flex-1 overflow-hidden flex flex-col">
+              <div className="overflow-x-auto flex-1">
+                <table className="w-full border-collapse">
+                  <thead>
+                    {table.getHeaderGroups().map((hg) => (
+                      <tr key={hg.id} className="border-b border-gray-100 bg-gray-50/60">
+                        {hg.headers.map((h) => (
+                          <th
+                            key={h.id}
+                            className="table-th cursor-pointer select-none"
+                            onClick={h.column.getToggleSortingHandler()}
+                          >
+                            <div className="flex items-center gap-1">
+                              {flexRender(h.column.columnDef.header, h.getContext())}
+                              {h.column.getIsSorted() === 'asc' && <SortAsc size={11} />}
+                              {h.column.getIsSorted() === 'desc' && <SortDesc size={11} />}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {table.getRowModel().rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors ${
+                          !row.original.presente_en_nomina ? 'bg-red-50/30' : ''
+                        }`}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td key={cell.id} className="table-td">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 shrink-0">
+                <div className="flex items-center gap-1">
+                  <button
+                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    onClick={() => table.setPageIndex(0)}
+                    disabled={!table.getCanPreviousPage()}
+                  >
+                    <ChevronsLeft size={14} />
+                  </button>
+                  <button
+                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    onClick={() => table.previousPage()}
+                    disabled={!table.getCanPreviousPage()}
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-xs text-gray-500 px-2">
+                    Página <span className="font-semibold text-gray-700">{table.getState().pagination.pageIndex + 1}</span> de <span className="font-semibold text-gray-700">{table.getPageCount()}</span>
+                  </span>
+                  <button
+                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    onClick={() => table.nextPage()}
+                    disabled={!table.getCanNextPage()}
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                    disabled={!table.getCanNextPage()}
+                  >
+                    <ChevronsRight size={14} />
+                  </button>
+                </div>
+                <select
+                  className="input-field w-28 text-xs"
+                  value={table.getState().pagination.pageSize}
+                  onChange={(e) => table.setPageSize(parseInt(e.target.value))}
+                >
+                  {[10, 25, 50, 100].map((s) => <option key={s} value={s}>{s} / página</option>)}
+                </select>
+              </div>
             </div>
           </>
         )}

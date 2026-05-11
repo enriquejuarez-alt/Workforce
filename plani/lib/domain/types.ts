@@ -201,6 +201,8 @@ export interface ResultadoServicio {
 
 export interface ResultadoGeneral {
   mes: string;
+  mesNum: number;   // 1-12
+  anioNum: number;
   diasDelMes: number;
   resultados: ResultadoServicio[];
   totalHCActivos: number;

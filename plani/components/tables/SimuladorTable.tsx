@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Plus, Trash2, ArrowRight, Users, UserMinus, Shuffle,
-  FileSignature, Wand2, Save, FolderOpen, X,
+  FileSignature, Wand2, Save, FolderOpen, X, Settings2, RotateCcw,
 } from "lucide-react";
 import type { ResultadoServicio } from "@/lib/domain/types";
 import { type ServicioKey } from "@/lib/domain/types";
@@ -121,6 +121,193 @@ function BalanceBadge({ sim }: { sim: ResultadoServicio }) {
   );
 }
 
+// ── ReductoresEditor ─────────────────────────────────────────────────────────
+
+function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServicio[] }) {
+  const { ajustes, setAjuste } = useSimulador();
+  const [open, setOpen] = useState(false);
+
+  const editorInputCls = "w-16 h-7 bg-white border border-gray-300 rounded-lg px-2 text-xs tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
+
+  const tieneOverrides = resultadosBase.some((r) => {
+    const aj = ajustes[r.servicio];
+    return aj.deslogueoOverride !== null || aj.ausentismoOverride !== null || aj.rotacionOverride !== null;
+  });
+
+  const resetAll = () => {
+    for (const r of resultadosBase) {
+      setAjuste(r.servicio as ServicioKey, { deslogueoOverride: null, ausentismoOverride: null, rotacionOverride: null });
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "w-full flex items-center justify-between gap-3 px-5 py-3 text-sm transition-colors",
+          open ? "bg-violet-50 border-b border-violet-100" : "hover:bg-gray-50"
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <Settings2 className={cn("h-4 w-4", open ? "text-violet-600" : "text-gray-400")} />
+          <span className={cn("font-semibold", open ? "text-violet-700" : "text-gray-700")}>
+            Modificar reductores
+          </span>
+          {tieneOverrides && (
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+              Con cambios
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-gray-400">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-gray-500">
+              Sobreescribí los reductores por servicio para este escenario. Dejá vacío para usar el valor base.
+            </p>
+            {tieneOverrides && (
+              <button
+                onClick={resetAll}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition-colors shrink-0 ml-4"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Resetear todo
+              </button>
+            )}
+          </div>
+
+          <div className="overflow-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left pb-2 text-gray-500 font-medium pr-4">Servicio</th>
+                  <th className="text-center pb-2 text-gray-500 font-medium px-2 whitespace-nowrap">Deslogueo %</th>
+                  <th className="text-center pb-2 text-gray-500 font-medium px-2 whitespace-nowrap">Ausentismo %</th>
+                  <th className="text-center pb-2 text-gray-500 font-medium px-2 whitespace-nowrap">Rotación %</th>
+                  <th className="pb-2 px-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {resultadosBase.map((r) => {
+                  const aj = ajustes[r.servicio as ServicioKey];
+                  const base = r.reductoRes;
+                  const hasOverride = aj.deslogueoOverride !== null || aj.ausentismoOverride !== null || aj.rotacionOverride !== null;
+
+                  return (
+                    <tr key={r.servicio} className={cn("border-b border-gray-50", hasOverride && "bg-violet-50/40")}>
+                      <td className="py-2 pr-4 font-medium text-gray-700 whitespace-nowrap">
+                        {hasOverride && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-violet-500 inline-block" />}
+                        {r.servicio}
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          placeholder={`${(base.deslogueo * 100).toFixed(1)}`}
+                          value={aj.deslogueoOverride !== null ? (aj.deslogueoOverride * 100).toFixed(1) : ""}
+                          onChange={(e) => {
+                            const v = e.target.value === "" ? null : parseFloat(e.target.value) / 100;
+                            setAjuste(r.servicio as ServicioKey, { deslogueoOverride: v });
+                          }}
+                          className={cn(editorInputCls, aj.deslogueoOverride !== null && "border-violet-400 bg-violet-50")}
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          placeholder={`${(base.ausentismo * 100).toFixed(1)}`}
+                          value={aj.ausentismoOverride !== null ? (aj.ausentismoOverride * 100).toFixed(1) : ""}
+                          onChange={(e) => {
+                            const v = e.target.value === "" ? null : parseFloat(e.target.value) / 100;
+                            setAjuste(r.servicio as ServicioKey, { ausentismoOverride: v });
+                          }}
+                          className={cn(editorInputCls, aj.ausentismoOverride !== null && "border-violet-400 bg-violet-50")}
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          placeholder={`${(base.rotacion * 100).toFixed(1)}`}
+                          value={aj.rotacionOverride !== null ? (aj.rotacionOverride * 100).toFixed(1) : ""}
+                          onChange={(e) => {
+                            const v = e.target.value === "" ? null : parseFloat(e.target.value) / 100;
+                            setAjuste(r.servicio as ServicioKey, { rotacionOverride: v });
+                          }}
+                          className={cn(editorInputCls, aj.rotacionOverride !== null && "border-violet-400 bg-violet-50")}
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        {hasOverride && (
+                          <button
+                            onClick={() => setAjuste(r.servicio as ServicioKey, { deslogueoOverride: null, ausentismoOverride: null, rotacionOverride: null })}
+                            className="text-gray-300 hover:text-red-400 transition-colors"
+                            title="Resetear este servicio"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ReductoresCell ────────────────────────────────────────────────────────────
+
+function ReductoresCell({
+  base,
+  sim,
+}: {
+  base: ResultadoServicio;
+  sim: ResultadoServicio;
+}) {
+  const rows = [
+    { label: "Desl.", base: base.reductoRes.deslogueo, sim: sim.reductoRes.deslogueo },
+    { label: "Aus.",  base: base.reductoRes.ausentismo, sim: sim.reductoRes.ausentismo },
+    { label: "Rot.",  base: base.reductoRes.rotacion,   sim: sim.reductoRes.rotacion  },
+  ];
+
+  return (
+    <div className="space-y-0.5">
+      {rows.map(({ label, base: bv, sim: sv }) => {
+        const changed = Math.abs(sv - bv) > 0.0005;
+        return (
+          <div key={label} className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-400 w-7 shrink-0">{label}</span>
+            <span className={cn("text-[10px] tabular-nums font-medium", changed ? "text-violet-600" : "text-gray-600")}>
+              {(sv * 100).toFixed(1)}%
+            </span>
+            {changed && (
+              <span className="text-[9px] text-gray-400 tabular-nums">
+                ({(bv * 100).toFixed(1)})
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── EscenarioBuilder ─────────────────────────────────────────────────────────
 
 function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: ServicioKey[]; resultadosSimulados: ResultadoServicio[] }) {
@@ -141,11 +328,6 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
     const params: Record<string, unknown> = { cantidad };
     if (tipoActivo === "add_agents" || tipoActivo === "change_contract") params.hsSemanal = hsSemanal;
     if (tipoActivo === "move_agents") params.servicioDestino = destino;
-    if (tipoActivo === "change_reducer") {
-      params.deslogueoOverride  = desl / 100;
-      params.ausentismoOverride = aus  / 100;
-      params.rotacionOverride   = rot  / 100;
-    }
     addModificacion(tipoActivo as never, servicio, params as never);
   };
 
@@ -303,19 +485,17 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
             </>
           )}
 
-          {tipoActivo !== "change_reducer" && (
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
-              <input
-                type="number"
-                value={cantidad}
-                min={1}
-                max={500}
-                onChange={(e) => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
-                className={inputCls}
-              />
-            </div>
-          )}
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
+            <input
+              type="number"
+              value={cantidad}
+              min={1}
+              max={500}
+              onChange={(e) => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
+              className={inputCls}
+            />
+          </div>
 
           {(tipoActivo === "add_agents" || tipoActivo === "change_contract") && (
             <div>
@@ -387,6 +567,7 @@ export function SimuladorTable({ resultadosBase, resultadosSimulados }: Props) {
   return (
     <div className="space-y-5">
       <EscenarioBuilder servicios={servicios} resultadosSimulados={resultadosSimulados} />
+      <ReductoresEditor resultadosBase={resultadosBase} />
 
       <div className="overflow-auto rounded-xl border border-gray-200 shadow-sm">
         <table className="w-full text-sm">
@@ -398,6 +579,7 @@ export function SimuladorTable({ resultadosBase, resultadosSimulados }: Props) {
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Cumpl. actual</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Cumpl. simulado</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Δ</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Reductores</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Balance para 103%</th>
             </tr>
           </thead>
@@ -439,6 +621,9 @@ export function SimuladorTable({ resultadosBase, resultadosSimulados }: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <DeltaBadge diff={diff} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <ReductoresCell base={base} sim={sim} />
                   </td>
                   <td className="px-4 py-3">
                     <BalanceBadge sim={sim} />

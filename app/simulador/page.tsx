@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { RotateCcw, Download, TrendingUp, TrendingDown, Minus, CalendarRange } from "lucide-react";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { useResultados } from "@/store/useResultados";
-import { useSimulador, type PeriodoReplan } from "@/store/useSimulador";
-import { useResultadosSimulados } from "@/hooks/useResultadosSimulados";
+import { useSimulador } from "@/store/useSimulador";
+import { useResultadosSimulados, calcularDiasEfectivos } from "@/hooks/useResultadosSimulados";
 import { SimuladorTable } from "@/components/tables/SimuladorTable";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
@@ -15,89 +15,116 @@ const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto"
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1, ANIO_ACTUAL + 2];
 
+function diasEnMes(mes: number, anio: number): number {
+  return new Date(anio, mes, 0).getDate();
+}
+
+function fmtFecha(dia: number, mes: number, anio: number): string {
+  return `${dia} ${MESES[mes - 1].slice(0, 3)} ${anio}`;
+}
+
 function PeriodoSelector() {
   const { periodoDesde, periodoHasta, setPeriodoDesde, setPeriodoHasta } = useSimulador();
+  const { resultado, diasDelMes } = useResultados();
 
   const selCls = "h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
+  const selDiaCls = "w-14 " + selCls;
 
-  const setMes = (campo: "desde" | "hasta", mes: number) => {
-    if (campo === "desde") {
-      const prev = periodoDesde ?? { mes, anio: ANIO_ACTUAL };
-      setPeriodoDesde({ ...prev, mes });
-    } else {
-      const prev = periodoHasta ?? { mes, anio: ANIO_ACTUAL };
-      setPeriodoHasta({ ...prev, mes });
-    }
-  };
+  const hoy = new Date();
+  const DEFAULTS = { dia: 1, mes: hoy.getMonth() + 1, anio: hoy.getFullYear() };
 
-  const setAnio = (campo: "desde" | "hasta", anio: number) => {
+  const update = (campo: "desde" | "hasta", patch: Partial<{ dia: number; mes: number; anio: number }>) => {
     if (campo === "desde") {
-      const prev = periodoDesde ?? { mes: new Date().getMonth() + 1, anio };
-      setPeriodoDesde({ ...prev, anio });
+      const prev = periodoDesde ?? DEFAULTS;
+      const next = { ...prev, ...patch };
+      const maxDia = diasEnMes(next.mes, next.anio);
+      setPeriodoDesde({ ...next, dia: Math.min(next.dia, maxDia) });
     } else {
-      const prev = periodoHasta ?? { mes: new Date().getMonth() + 1, anio };
-      setPeriodoHasta({ ...prev, anio });
+      const prev = periodoHasta ?? DEFAULTS;
+      const next = { ...prev, ...patch };
+      const maxDia = diasEnMes(next.mes, next.anio);
+      setPeriodoHasta({ ...next, dia: Math.min(next.dia, maxDia) });
     }
   };
 
   const limpiar = () => { setPeriodoDesde(null); setPeriodoHasta(null); };
 
-  const activo = periodoDesde !== null || periodoHasta !== null;
+  const activo = periodoDesde !== null && periodoHasta !== null;
+
+  const diasEfectivos = resultado && activo
+    ? calcularDiasEfectivos(periodoDesde, periodoHasta, resultado.mesNum, resultado.anioNum, diasDelMes)
+    : null;
+
+  const diasDesde = periodoDesde ? diasEnMes(periodoDesde.mes, periodoDesde.anio) : 31;
+  const diasHasta = periodoHasta ? diasEnMes(periodoHasta.mes, periodoHasta.anio) : 31;
+
+  const renderPicker = (campo: "desde" | "hasta") => {
+    const val = campo === "desde" ? periodoDesde : periodoHasta;
+    const maxDias = campo === "desde" ? diasDesde : diasHasta;
+    return (
+      <div className="flex items-center gap-1">
+        <select value={val?.dia ?? ""} onChange={(e) => update(campo, { dia: parseInt(e.target.value) })} className={selDiaCls}>
+          <option value="">d</option>
+          {Array.from({ length: maxDias }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+        <select value={val?.mes ?? ""} onChange={(e) => update(campo, { mes: parseInt(e.target.value) })} className={selCls}>
+          <option value="">mes</option>
+          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+        </select>
+        <select value={val?.anio ?? ""} onChange={(e) => update(campo, { anio: parseInt(e.target.value) })} className={selCls}>
+          <option value="">año</option>
+          {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
+    );
+  };
 
   return (
     <div className={cn(
-      "flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 transition-colors",
+      "rounded-xl border px-4 py-3 transition-colors",
       activo ? "border-[#0054A6]/30 bg-[#0054A6]/5" : "border-gray-200 bg-white"
     )}>
-      <CalendarRange className={cn("h-4 w-4 shrink-0", activo ? "text-[#0054A6]" : "text-gray-400")} />
-      <span className="text-xs font-medium text-gray-600 shrink-0">Período de replanificación</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <CalendarRange className={cn("h-4 w-4 shrink-0", activo ? "text-[#0054A6]" : "text-gray-400")} />
+        <span className="text-xs font-medium text-gray-600 shrink-0">Período de vigencia</span>
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-gray-400">Desde</span>
-        <select
-          value={periodoDesde?.mes ?? ""}
-          onChange={(e) => setMes("desde", parseInt(e.target.value))}
-          className={selCls}
-        >
-          <option value="">—</option>
-          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-        </select>
-        <select
-          value={periodoDesde?.anio ?? ""}
-          onChange={(e) => setAnio("desde", parseInt(e.target.value))}
-          className={selCls}
-        >
-          <option value="">—</option>
-          {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">Desde</span>
+          {renderPicker("desde")}
+        </div>
+
+        <span className="text-gray-300 text-sm">→</span>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">Hasta</span>
+          {renderPicker("hasta")}
+        </div>
+
+        {activo && (
+          <button onClick={limpiar} className="text-xs text-gray-400 hover:text-gray-600 transition-colors ml-auto">
+            Limpiar
+          </button>
+        )}
       </div>
 
-      <span className="text-gray-300 text-sm">→</span>
-
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-gray-400">Hasta</span>
-        <select
-          value={periodoHasta?.mes ?? ""}
-          onChange={(e) => setMes("hasta", parseInt(e.target.value))}
-          className={selCls}
-        >
-          <option value="">—</option>
-          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-        </select>
-        <select
-          value={periodoHasta?.anio ?? ""}
-          onChange={(e) => setAnio("hasta", parseInt(e.target.value))}
-          className={selCls}
-        >
-          <option value="">—</option>
-          {ANIOS.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-      </div>
-
-      {activo && (
-        <button onClick={limpiar} className="text-xs text-gray-400 hover:text-gray-600 transition-colors ml-auto">
-          Limpiar
-        </button>
+      {activo && diasEfectivos !== null && (
+        <div className="mt-2.5 flex items-center gap-2">
+          <span className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+            diasEfectivos > 0 ? "bg-[#0054A6]/10 text-[#0054A6]" : "bg-red-50 text-red-600"
+          )}>
+            {diasEfectivos > 0
+              ? `${diasEfectivos} día${diasEfectivos !== 1 ? "s" : ""} efectivos en el mes cargado`
+              : "El período no intersecta el mes cargado"}
+          </span>
+          {diasEfectivos > 0 && diasEfectivos < diasDelMes && (
+            <span className="text-xs text-gray-400">
+              Los cambios se prorratean sobre {diasEfectivos}/{diasDelMes} días
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -133,7 +160,7 @@ export default function SimuladorPage() {
             <p className="text-sm text-gray-500">
               {resultado.mes} · {resultado.diasDelMes} días
               {periodoDesde && periodoHasta
-                ? ` · Replanificando ${MESES[periodoDesde.mes - 1]} ${periodoDesde.anio} → ${MESES[periodoHasta.mes - 1]} ${periodoHasta.anio}`
+                ? ` · Vigencia ${fmtFecha(periodoDesde.dia, periodoDesde.mes, periodoDesde.anio)} → ${fmtFecha(periodoHasta.dia, periodoHasta.mes, periodoHasta.anio)}`
                 : " · Construí un escenario y ve el impacto al instante"
               }
             </p>

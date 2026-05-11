@@ -25,7 +25,8 @@ export interface Escenario {
 }
 
 export interface PeriodoReplan {
-  mes: number;  // 1-12
+  dia: number;   // 1-31
+  mes: number;   // 1-12
   anio: number;
 }
 

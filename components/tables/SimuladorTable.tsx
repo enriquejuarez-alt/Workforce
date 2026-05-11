@@ -510,6 +510,43 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
   );
 }
 
+// ── ReductoresCell ────────────────────────────────────────────────────────────
+
+function ReductoresCell({
+  base,
+  sim,
+}: {
+  base: ResultadoServicio;
+  sim: ResultadoServicio;
+}) {
+  const rows = [
+    { label: "Desl.", base: base.reductoRes.deslogueo, sim: sim.reductoRes.deslogueo },
+    { label: "Aus.",  base: base.reductoRes.ausentismo, sim: sim.reductoRes.ausentismo },
+    { label: "Rot.",  base: base.reductoRes.rotacion,   sim: sim.reductoRes.rotacion  },
+  ];
+
+  return (
+    <div className="space-y-0.5">
+      {rows.map(({ label, base: bv, sim: sv }) => {
+        const changed = Math.abs(sv - bv) > 0.0005;
+        return (
+          <div key={label} className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-400 w-7 shrink-0">{label}</span>
+            <span className={cn("text-[10px] tabular-nums font-medium", changed ? "text-violet-600" : "text-gray-600")}>
+              {(sv * 100).toFixed(1)}%
+            </span>
+            {changed && (
+              <span className="text-[9px] text-gray-400 tabular-nums">
+                ({(bv * 100).toFixed(1)})
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── DeltaBadge ────────────────────────────────────────────────────────────────
 
 function DeltaBadge({ diff }: { diff: number }) {
@@ -542,6 +579,7 @@ export function SimuladorTable({ resultadosBase, resultadosSimulados }: Props) {
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Cumpl. actual</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Cumpl. simulado</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Δ</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Reductores</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Balance para 103%</th>
             </tr>
           </thead>
@@ -583,6 +621,9 @@ export function SimuladorTable({ resultadosBase, resultadosSimulados }: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <DeltaBadge diff={diff} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <ReductoresCell base={base} sim={sim} />
                   </td>
                   <td className="px-4 py-3">
                     <BalanceBadge sim={sim} />

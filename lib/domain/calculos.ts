@@ -216,15 +216,17 @@ export function calcularResultados(
   const cumplimientoTotal = calcularCumplimiento(totalHsNetas, totalHsRequeridas);
 
   const primeraMatriz = matrices.values().next().value as MatrizServicio | undefined;
-  const mes = primeraMatriz?.dias[0]?.fecha
-    ? primeraMatriz.dias[0].fecha.toLocaleDateString("es-AR", {
-        month: "long",
-        year: "numeric",
-      })
+  const primerFecha = primeraMatriz?.dias[0]?.fecha;
+  const mes = primerFecha
+    ? primerFecha.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
     : "Sin fecha";
+  const mesNum  = primerFecha ? primerFecha.getMonth() + 1 : new Date().getMonth() + 1;
+  const anioNum = primerFecha ? primerFecha.getFullYear() : new Date().getFullYear();
 
   return {
     mes,
+    mesNum,
+    anioNum,
     diasDelMes,
     resultados,
     totalHCActivos,

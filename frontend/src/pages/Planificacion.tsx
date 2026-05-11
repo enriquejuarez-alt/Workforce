@@ -76,6 +76,26 @@ export default function Planificacion() {
       if (event.data?.type === 'PLANI_PAGE_CHANGE' && typeof event.data.page === 'string') {
         navigate(`/planificacion?page=${event.data.page}`)
       }
+      if (event.data?.type === 'PLANI_REQUEST_NOMINA') {
+        const { servicioId: sid, mes: m, anio: a } = event.data
+        async function fetchAndSend() {
+          try {
+            const { data } = await planiApi.getNomina(m, a, sid || undefined)
+            if (data.agentes.length === 0) {
+              toast.error(`No hay nóminas activas para ese período`)
+              return
+            }
+            iframeRef.current?.contentWindow?.postMessage(
+              { type: 'PLANI_NOMINA', agentes: data.agentes, mes: data.mes, anio: data.anio },
+              PLANI_BASE
+            )
+            toast.success(`${data.agentes.length} agentes cargados en Walt`)
+          } catch {
+            toast.error('Error al obtener la nómina')
+          }
+        }
+        fetchAndSend()
+      }
     }
 
     window.addEventListener('message', handleMessage)

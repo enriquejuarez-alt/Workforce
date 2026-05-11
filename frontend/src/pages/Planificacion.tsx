@@ -73,6 +73,9 @@ export default function Planificacion() {
         setPlaniReady(true)
         sendInit()
       }
+      if (event.data?.type === 'PLANI_REQUEST_CONFIG') {
+        sendInit()
+      }
       if (event.data?.type === 'PLANI_PAGE_CHANGE' && typeof event.data.page === 'string') {
         navigate(`/planificacion?page=${event.data.page}`)
       }

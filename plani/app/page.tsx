@@ -98,6 +98,14 @@ export default function UploadPage() {
     if (agentesDesdeApi) setCargandoNomina(false);
   }, [agentesDesdeApi]);
 
+  // Si no tenemos la lista de servicios (PLANI_INIT puede haberse perdido),
+  // la pedimos activamente al padre.
+  useEffect(() => {
+    if (!serviciosNomina && typeof window !== "undefined" && window.parent !== window) {
+      window.parent.postMessage({ type: "PLANI_REQUEST_CONFIG" }, "*");
+    }
+  }, [serviciosNomina]);
+
   const handleCP = useCallback(
     async (file: File, buffer: ArrayBuffer) => {
       setLoadingCP(true);

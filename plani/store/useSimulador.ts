@@ -24,6 +24,12 @@ export interface Escenario {
   timestamp: number;
 }
 
+export interface PeriodoReplan {
+  dia: number;   // 1-31
+  mes: number;   // 1-12
+  anio: number;
+}
+
 function ajustesInicial(): Record<ServicioKey, AjusteServicio> {
   return Object.fromEntries(
     SERVICIOS_KEYS.map((k) => [
@@ -38,6 +44,8 @@ interface SimuladorState {
   modificaciones: SimModificacion[];
   escenarios: Escenario[];
   escenarioComparar: string | null;
+  periodoDesde: PeriodoReplan | null;
+  periodoHasta: PeriodoReplan | null;
 
   setAjuste: (servicio: ServicioKey, patch: Partial<AjusteServicio>) => void;
   resetAjustes: () => void;
@@ -46,6 +54,8 @@ interface SimuladorState {
   removeModificacion: (id: string) => void;
   clearModificaciones: () => void;
   setEscenarioComparar: (id: string | null) => void;
+  setPeriodoDesde: (p: PeriodoReplan | null) => void;
+  setPeriodoHasta: (p: PeriodoReplan | null) => void;
 
   saveEscenario: (nombre: string) => void;
   loadEscenario: (id: string) => void;
@@ -57,11 +67,13 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
   modificaciones: [],
   escenarios: [],
   escenarioComparar: null,
+  periodoDesde: null,
+  periodoHasta: null,
 
   setAjuste: (servicio, patch) =>
     set((state) => ({ ajustes: { ...state.ajustes, [servicio]: { ...state.ajustes[servicio], ...patch } } })),
 
-  resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [], escenarioComparar: null }),
+  resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [], escenarioComparar: null, periodoDesde: null, periodoHasta: null }),
 
   addModificacion: (tipo, servicio, params) =>
     set((state) => ({
@@ -75,7 +87,7 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
     set((state) => ({
       modificaciones: [
         ...state.modificaciones,
-        ...mods.map((m) => ({ id: nextId("mod"), cantidad: 1, hsSemanal: 36, ...m })),
+        ...mods.map((m) => ({ id: nextId("mod"), ...m })),
       ],
     })),
 
@@ -85,6 +97,9 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
   clearModificaciones: () => set({ modificaciones: [] }),
 
   setEscenarioComparar: (id) => set({ escenarioComparar: id }),
+
+  setPeriodoDesde: (p) => set({ periodoDesde: p }),
+  setPeriodoHasta: (p) => set({ periodoHasta: p }),
 
   saveEscenario: (nombre) => {
     const { modificaciones } = get();

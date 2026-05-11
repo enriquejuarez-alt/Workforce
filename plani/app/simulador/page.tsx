@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   RotateCcw, Download, TrendingUp, TrendingDown, Minus,
-  AlertTriangle, Clock, GitCompare, X, Save, ChevronDown,
+  AlertTriangle, Clock, GitCompare, X, Save, ChevronDown, CalendarRange,
 } from "lucide-react";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { useResultados } from "@/store/useResultados";
@@ -24,14 +24,47 @@ import type { ResultadoServicio, ServicioKey } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
 import { fmtPct } from "@/lib/utils/formato";
 
-// ── helpers de cálculo ────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+const MESES_NOMBRES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const ANIO_ACTUAL   = new Date().getFullYear();
+const ANIOS_OPT     = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1, ANIO_ACTUAL + 2];
+
+function diasEnMes(mes: number, anio: number): number {
+  return new Date(anio, mes, 0).getDate();
+}
+
+function fmtFechaSim(dia: number, mes: number, anio: number): string {
+  return `${dia} ${MESES_NOMBRES[mes - 1].slice(0, 3)} ${anio}`;
+}
+
+function calcularDiasEfectivos(
+  periodoDesde: { dia: number; mes: number; anio: number } | null,
+  periodoHasta: { dia: number; mes: number; anio: number } | null,
+  mesActual: number,
+  anioActual: number,
+  diasDelMes: number
+): number {
+  if (!periodoDesde || !periodoHasta) return diasDelMes;
+  const mesStart = new Date(anioActual, mesActual - 1, 1);
+  const mesEnd   = new Date(anioActual, mesActual - 1, diasDelMes);
+  const desde    = new Date(periodoDesde.anio, periodoDesde.mes - 1, periodoDesde.dia);
+  const hasta    = new Date(periodoHasta.anio, periodoHasta.mes - 1, periodoHasta.dia);
+  const inicio   = desde < mesStart ? mesStart : desde;
+  const fin      = hasta > mesEnd   ? mesEnd   : hasta;
+  if (inicio > fin) return 0;
+  return Math.round((fin.getTime() - inicio.getTime()) / 86_400_000) + 1;
+}
+
+// ── cálculo de resultados simulados ──────────────────────────────────────────
 
 function calcularResultadosSimulados(
   resultado: NonNullable<ReturnType<typeof useResultados.getState>["resultado"]>,
   ajustes: ReturnType<typeof useSimulador.getState>["ajustes"],
   modificaciones: ReturnType<typeof useSimulador.getState>["modificaciones"],
   modoReductor: string,
-  diasDelMes: number
+  diasDelMes: number,
+  diasEfectivos: number
 ): ResultadoServicio[] {
   const deltaHC      = new Map<ServicioKey, number>();
   const deltaHsTotal = new Map<ServicioKey, number>();
@@ -43,19 +76,19 @@ function calcularResultadosSimulados(
 
     if (mod.tipo === "add_agents") {
       deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) + mod.cantidad);
-      deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) + mod.cantidad * (mod.hsSemanal ?? 36) * (diasDelMes / 7));
+      deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) + mod.cantidad * (mod.hsSemanal ?? 36) * (diasEfectivos / 7));
     }
     if (mod.tipo === "remove_agents") {
-      const hsPorAgente = base.hsBrutas / Math.max(base.hcActivos, 1);
+      const hsPorAgente = (base.hsBrutas / Math.max(base.hcActivos, 1)) * (diasEfectivos / diasDelMes);
       deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) - mod.cantidad);
       deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - mod.cantidad * hsPorAgente);
     }
     if (mod.tipo === "change_contract" && mod.hsSemanal) {
       const hsSemanalBase = base.hsBrutas / Math.max(base.hcActivos, 1) / (diasDelMes / 7);
-      deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) + mod.cantidad * (mod.hsSemanal - hsSemanalBase) * (diasDelMes / 7));
+      deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) + mod.cantidad * (mod.hsSemanal - hsSemanalBase) * (diasEfectivos / 7));
     }
     if (mod.tipo === "move_agents" && mod.servicioDestino) {
-      const hsPorAgente = base.hsBrutas / Math.max(base.hcActivos, 1);
+      const hsPorAgente = (base.hsBrutas / Math.max(base.hcActivos, 1)) * (diasEfectivos / diasDelMes);
       deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) - mod.cantidad);
       deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - mod.cantidad * hsPorAgente);
       deltaHC.set(mod.servicioDestino, (deltaHC.get(mod.servicioDestino) ?? 0) + mod.cantidad);
@@ -81,8 +114,8 @@ function calcularResultadosSimulados(
     const factorProductivo = calcularFactorProductivo(deslogueo, ausentismo, rotacion, modoReductor as any);
     const hcExtra    = ajuste.hcExtra + (deltaHC.get(base.servicio) ?? 0);
     const hsBrutasExtraSimple = ajuste.hcExtra > 0
-      ? ajuste.hcExtra * ajuste.hsSemanalExtra * (diasDelMes / 7)
-      : ajuste.hcExtra * (base.hsBrutas / Math.max(base.hcActivos, 1));
+      ? ajuste.hcExtra * ajuste.hsSemanalExtra * (diasEfectivos / 7)
+      : ajuste.hcExtra * (base.hsBrutas / Math.max(base.hcActivos, 1)) * (diasEfectivos / diasDelMes);
     const hsBrutasExtraMods = deltaHsTotal.get(base.servicio) ?? 0;
 
     const hcActivos    = base.hcActivos + hcExtra;
@@ -93,7 +126,7 @@ function calcularResultadosSimulados(
     const hsSemanalProm = hcActivos > 0
       ? ((base.hcActivos * base.hsSemanalPromedio) +
          (ajuste.hcExtra > 0 ? ajuste.hcExtra * ajuste.hsSemanalExtra : 0) +
-         (hsBrutasExtraMods / (diasDelMes / 7))) / hcActivos
+         (diasEfectivos > 0 ? hsBrutasExtraMods / (diasEfectivos / 7) : 0)) / hcActivos
       : 36;
 
     const deltaHC103 = calcularDeltaHC103(hcActivos, factorProductivo, hsSemanalProm, diasDelMes, base.hsRequeridas);
@@ -105,6 +138,77 @@ function calcularResultadosSimulados(
 
     return { ...base, hcActivos, hsBrutas, factorProductivo, hsNetas, cumplimiento, deltaHC103, agentesEquivalentes, hsSemanalPromedio: hsSemanalProm, reductoRes: { deslogueo, ausentismo, rotacion }, tope, teoricoFacturable, recorte, faltante };
   });
+}
+
+// ── Selector de período de vigencia ──────────────────────────────────────────
+
+function PeriodoSelector() {
+  const { periodoDesde, periodoHasta, setPeriodoDesde, setPeriodoHasta } = useSimulador();
+  const { resultado, diasDelMes } = useResultados();
+
+  const selCls = "h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
+  const DEFAULTS = { dia: 1, mes: new Date().getMonth() + 1, anio: new Date().getFullYear() };
+
+  const update = (campo: "desde" | "hasta", patch: Partial<{ dia: number; mes: number; anio: number }>) => {
+    if (campo === "desde") {
+      const prev = periodoDesde ?? DEFAULTS;
+      const next = { ...prev, ...patch };
+      setPeriodoDesde({ ...next, dia: Math.min(next.dia, diasEnMes(next.mes, next.anio)) });
+    } else {
+      const prev = periodoHasta ?? DEFAULTS;
+      const next = { ...prev, ...patch };
+      setPeriodoHasta({ ...next, dia: Math.min(next.dia, diasEnMes(next.mes, next.anio)) });
+    }
+  };
+
+  const activo = periodoDesde !== null && periodoHasta !== null;
+  const diasEf = resultado && activo
+    ? calcularDiasEfectivos(periodoDesde, periodoHasta, resultado.mesNum, resultado.anioNum, diasDelMes)
+    : null;
+
+  const renderPicker = (campo: "desde" | "hasta") => {
+    const val = campo === "desde" ? periodoDesde : periodoHasta;
+    const max = val ? diasEnMes(val.mes, val.anio) : 31;
+    return (
+      <div className="flex items-center gap-1">
+        <select value={val?.dia ?? ""} onChange={(e) => update(campo, { dia: parseInt(e.target.value) })} className="w-14 h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6]">
+          <option value="">d</option>
+          {Array.from({ length: max }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select value={val?.mes ?? ""} onChange={(e) => update(campo, { mes: parseInt(e.target.value) })} className={selCls}>
+          <option value="">mes</option>
+          {MESES_NOMBRES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+        </select>
+        <select value={val?.anio ?? ""} onChange={(e) => update(campo, { anio: parseInt(e.target.value) })} className={selCls}>
+          <option value="">año</option>
+          {ANIOS_OPT.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </div>
+    );
+  };
+
+  return (
+    <div className={cn("rounded-xl border px-4 py-3 mb-4 transition-colors", activo ? "border-[#0054A6]/30 bg-[#0054A6]/5" : "border-gray-200 bg-white")}>
+      <div className="flex flex-wrap items-center gap-3">
+        <CalendarRange className={cn("h-4 w-4 shrink-0", activo ? "text-[#0054A6]" : "text-gray-400")} />
+        <span className="text-xs font-medium text-gray-600 shrink-0">Período de vigencia</span>
+        <div className="flex items-center gap-1.5"><span className="text-xs text-gray-400">Desde</span>{renderPicker("desde")}</div>
+        <span className="text-gray-300">→</span>
+        <div className="flex items-center gap-1.5"><span className="text-xs text-gray-400">Hasta</span>{renderPicker("hasta")}</div>
+        {activo && <button onClick={() => { setPeriodoDesde(null); setPeriodoHasta(null); }} className="text-xs text-gray-400 hover:text-gray-600 ml-auto">Limpiar</button>}
+      </div>
+      {activo && diasEf !== null && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium", diasEf > 0 ? "bg-[#0054A6]/10 text-[#0054A6]" : "bg-red-50 text-red-600")}>
+            {diasEf > 0 ? `${diasEf} días efectivos en el mes cargado` : "El período no intersecta el mes cargado"}
+          </span>
+          {diasEf > 0 && diasEf < diasDelMes && (
+            <span className="text-xs text-gray-400">Los cambios se prorratean sobre {diasEf}/{diasDelMes} días</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Alertas por franja ────────────────────────────────────────────────────────
@@ -196,17 +300,19 @@ function ComparacionPanel({ resultadosActual, resultadosBase }: {
   resultadosActual: ResultadoServicio[];
   resultadosBase: ResultadoServicio[];
 }) {
-  const { escenarios, escenarioComparar, setEscenarioComparar, ajustes } = useSimulador();
-  const { diasDelMes } = useResultados();
+  const { escenarios, escenarioComparar, setEscenarioComparar, ajustes, periodoDesde, periodoHasta } = useSimulador();
+  const { diasDelMes, resultado } = useResultados();
   const { modoReductor } = useUploads();
-  const { resultado } = useResultados();
 
   const escenarioSel = escenarios.find((e) => e.id === escenarioComparar);
+  const diasEfComp = resultado
+    ? calcularDiasEfectivos(periodoDesde, periodoHasta, resultado.mesNum, resultado.anioNum, diasDelMes)
+    : diasDelMes;
 
   const resultadosGuardado = useMemo(() => {
     if (!escenarioSel || !resultado) return [];
-    return calcularResultadosSimulados(resultado, ajustes, escenarioSel.modificaciones, modoReductor, diasDelMes);
-  }, [escenarioSel, resultado, ajustes, modoReductor, diasDelMes]);
+    return calcularResultadosSimulados(resultado, ajustes, escenarioSel.modificaciones, modoReductor, diasDelMes, diasEfComp);
+  }, [escenarioSel, resultado, ajustes, modoReductor, diasDelMes, diasEfComp]);
 
   if (escenarios.length === 0) {
     return (
@@ -345,13 +451,17 @@ function GuardarEscenario() {
 
 export default function SimuladorPage() {
   const { resultado, diasDelMes } = useResultados();
-  const { ajustes, modificaciones, resetAjustes } = useSimulador();
+  const { ajustes, modificaciones, resetAjustes, periodoDesde, periodoHasta } = useSimulador();
   const { modoReductor } = useUploads();
+
+  const diasEfectivos = resultado
+    ? calcularDiasEfectivos(periodoDesde, periodoHasta, resultado.mesNum, resultado.anioNum, diasDelMes)
+    : diasDelMes;
 
   const resultadosSimulados: ResultadoServicio[] = useMemo(() => {
     if (!resultado) return [];
-    return calcularResultadosSimulados(resultado, ajustes, modificaciones, modoReductor, diasDelMes);
-  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes]);
+    return calcularResultadosSimulados(resultado, ajustes, modificaciones, modoReductor, diasDelMes, diasEfectivos);
+  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes, diasEfectivos]);
 
   const exportarExcel = () => {
     if (!resultado) return;
@@ -376,7 +486,11 @@ export default function SimuladorPage() {
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-0.5">Simulador de dotación</h2>
             <p className="text-sm text-gray-500">
-              {resultado.mes} · {resultado.diasDelMes} días · Construí un escenario y ve el impacto al instante
+              {resultado.mes} · {resultado.diasDelMes} días
+              {periodoDesde && periodoHasta
+                ? ` · Vigencia ${fmtFechaSim(periodoDesde.dia, periodoDesde.mes, periodoDesde.anio)} → ${fmtFechaSim(periodoHasta.dia, periodoHasta.mes, periodoHasta.anio)}`
+                : " · Construí un escenario y ve el impacto al instante"
+              }
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -391,6 +505,8 @@ export default function SimuladorPage() {
             </Button>
           </div>
         </div>
+
+        <PeriodoSelector />
 
         {/* KPIs del escenario */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

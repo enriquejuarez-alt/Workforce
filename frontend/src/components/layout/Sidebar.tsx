@@ -4,7 +4,7 @@ import {
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, GraduationCap, Palmtree,
   CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, TrendingDown, GitCommitVertical,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { useSidebarStore } from '../../store/sidebar'
@@ -21,6 +21,8 @@ const NAV_ITEMS = [
   { to: '/capacitaciones', icon: GraduationCap, label: 'Formador' },
   { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
   { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
+  { to: '/ausentismo', icon: TrendingDown, label: 'Ausentismo' },
+  { to: '/historial-agente', icon: GitCommitVertical, label: 'Historial Agente' },
 ]
 
 const PROGRAMACION_ITEMS = [

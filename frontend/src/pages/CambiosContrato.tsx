@@ -63,6 +63,8 @@ export default function CambiosContrato() {
   const [agentQuery, setAgentQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [dniInput, setDniInput] = useState('')
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -105,6 +107,21 @@ export default function CambiosContrato() {
       closeForm()
     },
     onError: (e: any) => toast.error(e.response?.data?.error || 'Error al crear'),
+  })
+
+  const bulkCreateMutation = useMutation({
+    mutationFn: (data: any) => cambiosContratoApi.bulk(data).then((r) => r.data),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['cambios-contrato'] })
+      if (data.creados.length > 0) {
+        toast.success(`${data.creados.length} cambio${data.creados.length > 1 ? 's' : ''} registrado${data.creados.length > 1 ? 's' : ''}`)
+      }
+      if (data.no_encontrados.length > 0) {
+        toast.error(`DNI no encontrados: ${data.no_encontrados.join(', ')}`)
+      }
+      if (data.creados.length > 0) closeForm()
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || 'Error al crear en lote'),
   })
 
   const updateMutation = useMutation({
@@ -167,10 +184,25 @@ export default function CambiosContrato() {
     setEditId(null)
     setForm(FORM_EMPTY)
     setAgentQuery('')
+    setBulkMode(false)
+    setDniInput('')
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (bulkMode) {
+      const dnis = dniInput.split(/[,\n]+/).map((d) => d.trim()).filter(Boolean)
+      bulkCreateMutation.mutate({
+        agente_dnis: dnis,
+        tipo: form.tipo,
+        contrato_nuevo: form.contrato_nuevo,
+        fecha_desde: form.fecha_desde,
+        fecha_hasta: form.tipo === 'TEMPORAL' ? form.fecha_hasta || null : null,
+        motivo: form.motivo || null,
+        observacion: form.observacion || null,
+      })
+      return
+    }
     const payload = {
       agente_id: parseInt(form.agente_id),
       tipo: form.tipo,
@@ -187,9 +219,14 @@ export default function CambiosContrato() {
     }
   }
 
-  const isBusy = createMutation.isPending || updateMutation.isPending
-  const canSubmit = !!form.agente_id && !!form.contrato_nuevo && !!form.fecha_desde &&
-    (form.tipo === 'DEFINITIVO' || !!form.fecha_hasta)
+  const parsedDnis = bulkMode
+    ? dniInput.split(/[,\n]+/).map((d) => d.trim()).filter(Boolean)
+    : []
+
+  const isBusy = createMutation.isPending || updateMutation.isPending || bulkCreateMutation.isPending
+  const canSubmit = bulkMode
+    ? parsedDnis.length > 0 && !!form.contrato_nuevo && !!form.fecha_desde && (form.tipo === 'DEFINITIVO' || !!form.fecha_hasta)
+    : !!form.agente_id && !!form.contrato_nuevo && !!form.fecha_desde && (form.tipo === 'DEFINITIVO' || !!form.fecha_hasta)
 
   return (
     <div className="space-y-6">
@@ -350,62 +387,92 @@ export default function CambiosContrato() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              {/* Agent search */}
-              <div ref={searchRef} className="relative">
-                <label className="form-label">Agente</label>
-                {form.agente_id ? (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">{form.agente_nombre}</p>
-                      <p className="text-xs text-blue-600">
-                        DNI: {form.agente_dni}
-                        {form.contrato_anterior && ` · Contrato actual: ${form.contrato_anterior} hs`}
-                      </p>
-                    </div>
-                    {!editId && (
-                      <button type="button" onClick={clearAgent} className="text-blue-400 hover:text-blue-600 p-1">
-                        <X size={14} />
-                      </button>
+              {/* Agent search / bulk toggle */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="form-label mb-0">{bulkMode ? 'DNIs' : 'Agente'}</label>
+                  {!editId && (
+                    <button
+                      type="button"
+                      onClick={() => { setBulkMode((v) => !v); setDniInput(''); clearAgent() }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {bulkMode ? 'Buscar por nombre' : 'Agregar varios DNI'}
+                    </button>
+                  )}
+                </div>
+
+                {bulkMode ? (
+                  <div>
+                    <textarea
+                      value={dniInput}
+                      onChange={(e) => setDniInput(e.target.value)}
+                      placeholder={'Ej: 39882976,44567876,55123456\n(separados por coma o salto de línea)'}
+                      rows={3}
+                      className="input-field text-sm resize-none font-mono"
+                      autoFocus
+                    />
+                    {parsedDnis.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">{parsedDnis.length} DNI{parsedDnis.length > 1 ? 's' : ''} ingresado{parsedDnis.length > 1 ? 's' : ''}</p>
                     )}
                   </div>
                 ) : (
-                  <>
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        value={agentQuery}
-                        onChange={(e) => { setAgentQuery(e.target.value); setShowResults(true) }}
-                        onFocus={() => agentQuery.length >= 2 && setShowResults(true)}
-                        placeholder="Buscar por nombre o DNI..."
-                        className="input-field pl-9 text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    {showResults && agentQuery.length >= 2 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                        {agentResults.length === 0 ? (
-                          <p className="px-4 py-3 text-sm text-gray-500">Sin resultados</p>
-                        ) : (
-                          agentResults.map((a) => (
-                            <button
-                              key={a.id}
-                              type="button"
-                              onClick={() => selectAgent(a)}
-                              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                            >
-                              <p className="text-sm font-medium text-gray-900">{a.nombre}</p>
-                              <p className="text-xs text-gray-500">
-                                DNI: {a.dni}
-                                {a.contrato ? ` · ${a.contrato} hs` : ''}
-                                {a.servicio ? ` · ${a.servicio.nombre}` : ''}
-                              </p>
-                            </button>
-                          ))
+                  <div ref={searchRef} className="relative">
+                    {form.agente_id ? (
+                      <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-blue-900">{form.agente_nombre}</p>
+                          <p className="text-xs text-blue-600">
+                            DNI: {form.agente_dni}
+                            {form.contrato_anterior && ` · Contrato actual: ${form.contrato_anterior} hs`}
+                          </p>
+                        </div>
+                        {!editId && (
+                          <button type="button" onClick={clearAgent} className="text-blue-400 hover:text-blue-600 p-1">
+                            <X size={14} />
+                          </button>
                         )}
                       </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            value={agentQuery}
+                            onChange={(e) => { setAgentQuery(e.target.value); setShowResults(true) }}
+                            onFocus={() => agentQuery.length >= 2 && setShowResults(true)}
+                            placeholder="Buscar por nombre o DNI..."
+                            className="input-field pl-9 text-sm"
+                            autoFocus
+                          />
+                        </div>
+                        {showResults && agentQuery.length >= 2 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                            {agentResults.length === 0 ? (
+                              <p className="px-4 py-3 text-sm text-gray-500">Sin resultados</p>
+                            ) : (
+                              agentResults.map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => selectAgent(a)}
+                                  className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                                >
+                                  <p className="text-sm font-medium text-gray-900">{a.nombre}</p>
+                                  <p className="text-xs text-gray-500">
+                                    DNI: {a.dni}
+                                    {a.contrato ? ` · ${a.contrato} hs` : ''}
+                                    {a.servicio ? ` · ${a.servicio.nombre}` : ''}
+                                  </p>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -524,7 +591,13 @@ export default function CambiosContrato() {
                   disabled={isBusy || !canSubmit}
                   className="flex-1 btn-primary disabled:opacity-50"
                 >
-                  {isBusy ? 'Guardando...' : editId ? 'Guardar cambios' : 'Registrar'}
+                  {isBusy
+                  ? 'Guardando...'
+                  : editId
+                    ? 'Guardar cambios'
+                    : bulkMode && parsedDnis.length > 0
+                      ? `Registrar para ${parsedDnis.length} agente${parsedDnis.length > 1 ? 's' : ''}`
+                      : 'Registrar'}
                 </button>
               </div>
             </form>

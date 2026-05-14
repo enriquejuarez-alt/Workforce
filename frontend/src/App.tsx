@@ -26,6 +26,8 @@ const Calendario = lazy(() => import('./pages/Calendario'))
 const Programacion = lazy(() => import('./pages/Programacion'))
 const ProgramacionDetalle = lazy(() => import('./pages/ProgramacionDetalle'))
 const Distribucion = lazy(() => import('./pages/Distribucion'))
+const Ausentismo = lazy(() => import('./pages/Ausentismo'))
+const HistorialAgente = lazy(() => import('./pages/HistorialAgente'))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -58,6 +60,8 @@ export default function App() {
             <Route path="remociones" element={<Navigate to="/bajas" replace />} />
             <Route path="vacaciones" element={<Vacaciones />} />
             <Route path="comparacion" element={<Comparacion />} />
+            <Route path="ausentismo" element={<Ausentismo />} />
+            <Route path="historial-agente" element={<HistorialAgente />} />
             <Route path="planificacion" element={<Planificacion />} />
             <Route path="soporte" element={<Soporte />} />
             <Route path="calendario" element={<Calendario />} />

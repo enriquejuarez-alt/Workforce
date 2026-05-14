@@ -396,7 +396,7 @@ export interface DashboardData {
 }
 
 export interface TimelineEvento {
-  tipo: 'LICENCIA' | 'CAMBIO_TEMPORAL' | 'CAMBIO_CONTRATO' | 'CAPACITACION' | 'REMOCION' | 'VACACION'
+  tipo: 'LICENCIA' | 'CAMBIO_TEMPORAL' | 'CAMBIO_CONTRATO' | 'CAPACITACION' | 'REMOCION' | 'VACACION' | 'BAJA'
   fecha_inicio: string
   fecha_fin: string | null
   descripcion: string

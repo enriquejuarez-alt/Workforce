@@ -185,6 +185,7 @@ export const getAgenteTimeline = async (req: AuthRequest, res: Response) => {
         capacitaciones: { orderBy: { fecha_inicio: 'asc' } },
         remociones: { orderBy: { fecha: 'asc' } },
         vacaciones: { orderBy: { fecha_desde: 'asc' } },
+        bajas: { orderBy: { fecha: 'asc' } },
       },
     })
     if (!agente) return res.status(404).json({ error: 'Agente no encontrado' })
@@ -246,6 +247,15 @@ export const getAgenteTimeline = async (req: AuthRequest, res: Response) => {
         fecha_fin: fmt(v.fecha_hasta),
         descripcion: 'Vacaciones',
         detalle: v.servicio_wf ?? null,
+      })
+    }
+    for (const b of (agente as any).bajas) {
+      eventos.push({
+        tipo: 'BAJA',
+        fecha_inicio: fmt(b.fecha),
+        fecha_fin: null,
+        descripcion: b.tipo || 'Baja',
+        detalle: b.observacion ?? null,
       })
     }
 

@@ -14,7 +14,7 @@ import { getDashboard } from '../controllers/dashboard'
 import { listAuditoria } from '../controllers/auditoria'
 import { exportNomina } from '../controllers/export'
 import { listBajas, createBaja, updateBaja, deleteBaja, importBajas, getTiposBajas, getOpciones } from '../controllers/bajas'
-import { listCambiosContrato, createCambioContrato, updateCambioContrato, deleteCambioContrato } from '../controllers/cambiosContrato'
+import { listCambiosContrato, createCambioContrato, updateCambioContrato, deleteCambioContrato, bulkCreateCambiosContrato } from '../controllers/cambiosContrato'
 import { listCambiosHorario, createCambioHorario, updateCambioHorario, deleteCambioHorario } from '../controllers/cambiosHorario'
 import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
@@ -22,6 +22,7 @@ import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVa
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
+import { getReporteAusentismo, exportReporteAusentismo } from '../controllers/reportes'
 import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, previewRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, exportConversor, getCronograma, setNomina } from '../controllers/programacion'
 import { analizarNomina, procesarDistribucion, descargarDistribucion, cruzarNominas } from '../controllers/distribucion'
 
@@ -97,6 +98,7 @@ router.put('/bajas/:id', authenticate, updateBaja)
 router.delete('/bajas/:id', authenticate, requireAdmin, deleteBaja)
 
 router.get('/cambios-contrato', authenticate, listCambiosContrato)
+router.post('/cambios-contrato/bulk', authenticate, bulkCreateCambiosContrato)
 router.post('/cambios-contrato', authenticate, createCambioContrato)
 router.put('/cambios-contrato/:id', authenticate, updateCambioContrato)
 router.delete('/cambios-contrato/:id', authenticate, requireAdmin, deleteCambioContrato)
@@ -139,6 +141,9 @@ router.get('/vacaciones', authenticate, listVacaciones)
 router.get('/vacaciones/importaciones', authenticate, requireAdmin, listImportacionesVacaciones)
 router.delete('/vacaciones/:id', authenticate, requireAdmin, deleteVacacion)
 router.delete('/vacaciones/importaciones/:id', authenticate, requireAdmin, deleteImportacionVacaciones)
+
+router.get('/reportes/ausentismo/export', authenticate, exportReporteAusentismo)
+router.get('/reportes/ausentismo', authenticate, getReporteAusentismo)
 
 router.get('/plani/config', authenticate, getPlaniConfig)
 router.get('/plani/nomina', authenticate, getPlaniNomina)

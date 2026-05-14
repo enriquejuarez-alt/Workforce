@@ -162,6 +162,7 @@ export const remocionesApi = {
 export const cambiosContratoApi = {
   list: (params?: Record<string, any>) => api.get<CambioContrato[]>('/cambios-contrato', { params }),
   create: (data: any) => api.post<CambioContrato>('/cambios-contrato', data),
+  bulk: (data: any) => api.post<{ creados: CambioContrato[]; no_encontrados: string[] }>('/cambios-contrato/bulk', data),
   update: (id: number, data: any) => api.put<CambioContrato>(`/cambios-contrato/${id}`, data),
   delete: (id: number) => api.delete(`/cambios-contrato/${id}`),
 }
@@ -183,6 +184,12 @@ export const exportApi = {
 // Notificaciones
 export const notificacionesApi = {
   get: () => api.get('/notificaciones'),
+}
+
+// Reportes
+export const reportesApi = {
+  ausentismo: (params?: Record<string, any>) => api.get<any>('/reportes/ausentismo', { params }),
+  exportAusentismo: (params?: Record<string, any>) => api.get('/reportes/ausentismo/export', { params, responseType: 'blob' }),
 }
 
 // Soporte

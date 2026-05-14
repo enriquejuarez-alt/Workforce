@@ -145,6 +145,81 @@ export const updateCambioContrato = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const bulkCreateCambiosContrato = async (req: AuthRequest, res: Response) => {
+  try {
+    const { agente_dnis, tipo, contrato_nuevo, fecha_desde, fecha_hasta, motivo, observacion } = req.body
+
+    if (!agente_dnis || !Array.isArray(agente_dnis) || agente_dnis.length === 0) {
+      return res.status(400).json({ error: 'agente_dnis debe ser un array no vacío' })
+    }
+    if (!tipo || !contrato_nuevo || !fecha_desde) {
+      return res.status(400).json({ error: 'tipo, contrato_nuevo y fecha_desde son requeridos' })
+    }
+    if (!['TEMPORAL', 'DEFINITIVO'].includes(tipo)) {
+      return res.status(400).json({ error: 'tipo debe ser TEMPORAL o DEFINITIVO' })
+    }
+    if (!CONTRATOS_VALIDOS.includes(contrato_nuevo)) {
+      return res.status(400).json({ error: 'contrato_nuevo debe ser 30, 35 o 36' })
+    }
+    if (tipo === 'TEMPORAL' && !fecha_hasta) {
+      return res.status(400).json({ error: 'fecha_hasta es requerida para cambios temporales' })
+    }
+    if (fecha_hasta && new Date(fecha_hasta) < new Date(fecha_desde)) {
+      return res.status(400).json({ error: 'fecha_hasta debe ser mayor o igual a fecha_desde' })
+    }
+
+    const dnis = (agente_dnis as string[]).map((d) => d.trim()).filter(Boolean)
+    const agentes = await prisma.agente.findMany({ where: { dni: { in: dnis } } })
+    const agentMap = new Map(agentes.map((a) => [a.dni, a]))
+    const no_encontrados = dnis.filter((d) => !agentMap.has(d))
+
+    const prismaAny = prisma as any
+    const creados: any[] = []
+
+    for (const agente of agentes) {
+      const cambio = await prismaAny.cambioContrato.create({
+        data: {
+          agente_id: agente.id,
+          agente_dni: agente.dni,
+          agente_nombre: agente.nombre,
+          servicio_id: agente.servicio_id,
+          tipo,
+          contrato_anterior: agente.contrato,
+          contrato_nuevo,
+          fecha_desde: new Date(fecha_desde),
+          fecha_hasta: fecha_hasta ? new Date(fecha_hasta) : null,
+          motivo: motivo || null,
+          observacion: observacion || null,
+          creado_por: req.user!.userId,
+        },
+        include: {
+          servicio: { select: { id: true, nombre: true, color: true } },
+          creador: { select: { id: true, nombre: true } },
+        },
+      })
+
+      await createAuditLog({
+        usuario_id: req.user!.userId,
+        accion: 'REGISTRAR_CAMBIO_CONTRATO',
+        entidad: 'CambioContrato',
+        entidad_id: String(cambio.id),
+        servicio_id: agente.servicio_id ?? undefined,
+        valor_anterior: agente.contrato ?? '',
+        valor_nuevo: `${tipo}: ${contrato_nuevo} hs desde ${fecha_desde}`,
+      })
+
+      creados.push({
+        ...cambio,
+        estado_calculado: calcularEstado(tipo, new Date(fecha_desde), fecha_hasta ? new Date(fecha_hasta) : null),
+      })
+    }
+
+    return res.status(201).json({ creados, no_encontrados })
+  } catch {
+    return res.status(500).json({ error: 'Error al crear cambios de contrato en lote' })
+  }
+}
+
 export const deleteCambioContrato = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)

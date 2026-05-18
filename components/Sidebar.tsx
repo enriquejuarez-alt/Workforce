@@ -7,6 +7,8 @@ import {
   LayoutDashboard,
   TrendingUp,
   Sliders,
+  CalendarOff,
+  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -15,6 +17,8 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Resumen", icon: LayoutDashboard },
   { href: "/curvas", label: "Curvas", icon: TrendingUp },
   { href: "/simulador", label: "Simulador", icon: Sliders },
+  { href: "/franco", label: "Franco", icon: CalendarOff },
+  { href: "/configuracion", label: "Configuración", icon: Settings2 },
 ];
 
 export function Sidebar() {

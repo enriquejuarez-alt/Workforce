@@ -172,6 +172,17 @@ export interface Pase {
 
 // ─── Resultado por servicio ────────────────────────────────────────────────────
 
+export interface FrancoAjuste {
+  /** Fraction of roster available on a worst-case franco day (e.g. 0.75 for 4-day window) */
+  factorDisponible: number;
+  /** HC needed at 103% before accounting for franco */
+  hcNecesarioBruto: number;
+  /** HC needed in roster to guarantee 103% coverage on franco days */
+  hcConFranco: number;
+  /** Extra agents in roster needed solely due to franco (hcConFranco - hcNecesarioBruto) */
+  extra: number;
+}
+
 export interface ResultadoServicio {
   servicio: ServicioKey;
   hcActivos: number;
@@ -197,6 +208,8 @@ export interface ResultadoServicio {
   hsFacturable100: number;
   recorte: number;
   faltante: number;
+  // Franco dimensionamiento
+  francoAjuste: FrancoAjuste | null;
 }
 
 export interface ResultadoGeneral {

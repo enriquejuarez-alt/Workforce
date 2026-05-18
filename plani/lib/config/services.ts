@@ -1,3 +1,10 @@
+export interface FrancoConfig {
+  /** Days in the franco rotation window (e.g. 4 for Thu–Sun) */
+  diasVentana: number;
+  /** Fraction of agents subject to franco (0–1). 1.0 = all agents */
+  fraccionAfectada: number;
+}
+
 export interface ServiceDefinition {
   key: string;
   label: string;
@@ -7,7 +14,11 @@ export interface ServiceDefinition {
   segmentosNomina: string[];
   /** All reductor name aliases that map to this service */
   reductorNombres: string[];
+  /** Franco rotation config for 36hs contracts (Thu–Sun window) */
+  francoConfig?: FrancoConfig;
 }
+
+const FRANCO_36HS: FrancoConfig = { diasVentana: 4, fraccionAfectada: 1.0 };
 
 export const SERVICIOS: ServiceDefinition[] = [
   {
@@ -16,6 +27,7 @@ export const SERVICIOS: ServiceDefinition[] = [
     hojaCP: ["PTF", "CBS", "Soporte CBS"],
     segmentosNomina: ["SOPORTE-CBS", "SOPORTE CBS", "CBS"],
     reductorNombres: ["SOPORTE-CBS", "SOPORTE CBS"],
+    francoConfig: FRANCO_36HS,
   },
   {
     key: "SOPORTE-CONECTIVIDAD",
@@ -23,6 +35,7 @@ export const SERVICIOS: ServiceDefinition[] = [
     hojaCP: ["Sop_Conectividad", "Conectividad", "SOPORTE-CONECTIVIDAD"],
     segmentosNomina: ["SOPORTE-CONECTIVIDAD", "SOPORTE CONECTIVIDAD"],
     reductorNombres: ["SOPORTE-CONECTIVIDAD", "SOPORTE CONECTIVIDAD"],
+    francoConfig: FRANCO_36HS,
   },
   {
     key: "SOPORTE-ENTRETENIMIENTO",
@@ -30,6 +43,7 @@ export const SERVICIOS: ServiceDefinition[] = [
     hojaCP: ["Entretenimiento", "SOPORTE-ENTRETENIMIENTO"],
     segmentosNomina: ["SOPORTE-ENTRETENIMIENTO", "SOPORTE ENTRETENIMIENTO"],
     reductorNombres: ["SOPORTE-ENTRETENIMIENTO", "SOPORTE ENTRETENIMIENTO"],
+    francoConfig: FRANCO_36HS,
   },
   {
     key: "SOPORTE-MOVIL",
@@ -37,6 +51,7 @@ export const SERVICIOS: ServiceDefinition[] = [
     hojaCP: ["Esp_Movil", "Esp.Movil", "Esp Movil", "SOPORTE-MOVIL"],
     segmentosNomina: ["SOPORTE-MOVIL", "SOPORTE MOVIL", "ESP MOVIL"],
     reductorNombres: ["SOPORTE-MOVIL", "SOPORTE MOVIL"],
+    francoConfig: FRANCO_36HS,
   },
   {
     key: "SOPORTE-RRSS",
@@ -44,6 +59,7 @@ export const SERVICIOS: ServiceDefinition[] = [
     hojaCP: ["Digital", "SOPORTE-RRSS", "RRSS"],
     segmentosNomina: ["SOPORTE-RRSS", "SOPORTE RRSS", "RRSS"],
     reductorNombres: ["SOPORTE-RRSS", "SOPORTE RRSS"],
+    francoConfig: FRANCO_36HS,
   },
 ];
 

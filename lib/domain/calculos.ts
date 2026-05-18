@@ -1,6 +1,7 @@
 import type {
   Agente,
   AgentesEquivalentes,
+  FrancoAjuste,
   MatrizServicio,
   ModoReductor,
   Reductor,
@@ -11,6 +12,7 @@ import type {
 import {
   getServiciosKeys,
   resolverServicioPorReductorRuntime,
+  getFrancoConfigRuntime,
 } from "../config/servicesRuntime";
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
@@ -185,6 +187,15 @@ export function calcularResultados(
     const recorte = Math.max(0, hsNetas - tope);
     const faltante = Math.max(0, hsRequeridas - hsNetas);
 
+    const francoConfig = getFrancoConfigRuntime(servicio);
+    let francoAjuste: FrancoAjuste | null = null;
+    if (francoConfig && francoConfig.fraccionAfectada > 0) {
+      const factorDisponible = 1 - francoConfig.fraccionAfectada / francoConfig.diasVentana;
+      const hcNecesarioBruto = grupo.hcActivos + deltaHC103;
+      const hcConFranco = factorDisponible > 0 ? hcNecesarioBruto / factorDisponible : hcNecesarioBruto;
+      francoAjuste = { factorDisponible, hcNecesarioBruto, hcConFranco, extra: hcConFranco - hcNecesarioBruto };
+    }
+
     resultados.push({
       servicio,
       hcActivos: grupo.hcActivos,
@@ -203,6 +214,7 @@ export function calcularResultados(
       teoricoFacturable,
       recorte,
       faltante,
+      francoAjuste,
     });
   }
 

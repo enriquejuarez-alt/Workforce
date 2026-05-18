@@ -229,7 +229,8 @@ export default function CambiosContrato() {
     : !!form.agente_id && !!form.contrato_nuevo && !!form.fecha_desde && (form.tipo === 'DEFINITIVO' || !!form.fecha_hasta)
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -615,6 +616,7 @@ export default function CambiosContrato() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+    </div>
     </div>
   )
 }

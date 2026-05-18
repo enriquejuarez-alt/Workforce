@@ -8,7 +8,7 @@ export default function AccesoDenegado() {
   const user = useAuthStore((s) => s.user)
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="h-full flex items-center justify-center bg-gray-50">
       <div className="text-center max-w-md px-6">
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">

@@ -146,7 +146,7 @@ export default function Planificacion() {
   const currentSrc = buildSrc(page)
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="h-11 bg-white border-b border-gray-200 flex items-center justify-between px-5 shrink-0">
         <span className="text-sm font-semibold text-gray-700">

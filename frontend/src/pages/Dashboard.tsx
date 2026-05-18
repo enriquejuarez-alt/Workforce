@@ -44,14 +44,23 @@ export default function Dashboard() {
         subtitle={`${format(new Date(), "EEEE d 'de' MMMM 'de' yyyy", { locale: es })}`}
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-6 space-y-8">
         {/* Selector de servicio */}
         <div className="flex items-center gap-3">
-          <Building2 size={16} className="text-gray-400 shrink-0" />
+          <Building2 size={15} className="text-gray-400 shrink-0" />
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setSelectedServicioId('')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedServicioId === '' ? 'bg-konecta text-white border-konecta' : 'bg-white text-gray-600 border-gray-200 hover:border-konecta hover:text-konecta'}`}
+              style={{
+                padding: '3px 12px',
+                borderRadius: 9999,
+                fontSize: 10.5,
+                fontWeight: 600,
+                border: selectedServicioId === '' ? '1px solid #0054A6' : '1px solid #E5E7EB',
+                background: selectedServicioId === '' ? '#0054A6' : '#FFFFFF',
+                color: selectedServicioId === '' ? '#FFFFFF' : '#4B5563',
+                transition: 'all 150ms',
+              }}
             >
               Todos
             </button>
@@ -59,8 +68,16 @@ export default function Dashboard() {
               <button
                 key={s.id}
                 onClick={() => setSelectedServicioId(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${selectedServicioId === s.id ? 'text-white border-transparent' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-800'}`}
-                style={selectedServicioId === s.id ? { backgroundColor: s.color, borderColor: s.color } : {}}
+                style={{
+                  padding: '3px 12px',
+                  borderRadius: 9999,
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  border: selectedServicioId === s.id ? `1px solid ${s.color}` : '1px solid #E5E7EB',
+                  background: selectedServicioId === s.id ? s.color : '#FFFFFF',
+                  color: selectedServicioId === s.id ? '#FFFFFF' : '#4B5563',
+                  transition: 'all 150ms',
+                }}
               >
                 {s.nombre}
               </button>
@@ -73,12 +90,12 @@ export default function Dashboard() {
           <p className="section-title mb-3">
             Resumen de agentes — mes corriente
             {selectedServicioId !== '' && (
-              <span className="ml-2 text-xs font-normal text-gray-400">
+              <span className="ml-2 normal-case font-normal text-gray-400" style={{ fontSize: 11, letterSpacing: 0 }}>
                 · {(servicios as any[]).find((s) => s.id === selectedServicioId)?.nombre}
               </span>
             )}
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <KpiCard title="Total en nómina" value={data?.total_agentes ?? 0} icon={Users} color="blue" />
             <KpiCard title="Activos" value={data?.agentes_activos ?? 0} icon={UserCheck} color="green"
               subtitle="Estado ACTIVO en nómina" />
@@ -92,14 +109,23 @@ export default function Dashboard() {
         {/* Breakdown por estado */}
         {data?.estado_breakdown && data.estado_breakdown.length > 0 && (
           <div className="card p-5">
-            <p className="text-sm font-bold text-gray-700 mb-3">Distribución por estado (nómina mes corriente)</p>
+            <p className="section-title mb-3">Distribución por estado</p>
             <div className="flex flex-wrap gap-2">
               {data.estado_breakdown
                 .sort((a: any, b: any) => b.cantidad - a.cantidad)
                 .map((e: any) => (
-                  <div key={e.estado} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200">
-                    <span className="text-sm font-bold text-gray-800">{e.cantidad}</span>
-                    <span className="text-xs text-gray-500">{e.estado || 'Sin estado'}</span>
+                  <div
+                    key={e.estado}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border"
+                    style={{ background: '#F8FAFC', borderColor: '#E5E7EB' }}
+                  >
+                    <span
+                      className="font-bold tabular-nums"
+                      style={{ fontSize: 13, color: '#0F172A' }}
+                    >
+                      {e.cantidad}
+                    </span>
+                    <span style={{ fontSize: 11.5, color: '#6B7280' }}>{e.estado || 'Sin estado'}</span>
                   </div>
                 ))}
             </div>
@@ -109,7 +135,7 @@ export default function Dashboard() {
         {/* KPIs operativos */}
         <div>
           <p className="section-title mb-3">Estado operativo</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <KpiCard title="Licencias vigentes" value={data?.licencias_vigentes ?? 0} icon={Clock} color="yellow" />
             <KpiCard title="Licencias programadas" value={data?.licencias_programadas ?? 0} icon={Clock} color="blue" />
             <KpiCard title="Vacaciones en el mes" value={data?.vacaciones_mes?.length ?? 0} icon={Palmtree} color="purple"
@@ -241,7 +267,7 @@ export default function Dashboard() {
         )}
 
         {user?.rol === 'ADMINISTRADOR' && data?.usuarios_activos !== null && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <KpiCard title="Usuarios activos" value={data?.usuarios_activos ?? 0} icon={Users} color="purple" />
             <KpiCard title="Nóminas cerradas" value={data?.nominas_cerradas ?? 0} icon={FileSpreadsheet} color="gray" />
           </div>

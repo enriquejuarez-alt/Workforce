@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import CommandBar from './CommandBar'
 import SoporteWidget from '../ui/SoporteWidget'
 import CommandPalette from '../ui/CommandPalette'
 import { useSidebarStore } from '../../store/sidebar'
@@ -30,7 +31,8 @@ export default function Layout() {
       <div
         className={`flex-1 flex flex-col overflow-hidden transition-all duration-200 ${collapsed ? 'ml-16' : 'ml-64'}`}
       >
-        <main className="flex-1 overflow-y-auto">
+        <CommandBar />
+        <main className="flex-1 overflow-hidden flex flex-col">
           <Outlet />
         </main>
       </div>

@@ -252,16 +252,23 @@ export default function Nomina() {
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-bold"
-            style={{ backgroundColor: selectedServicioColorRef.current }}
+            className="flex items-center justify-center shrink-0 text-white font-bold"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              backgroundColor: selectedServicioColorRef.current,
+              fontSize: 11,
+              boxShadow: '0 0 0 2px white, 0 1px 3px rgba(15,23,42,0.12)',
+            }}
           >
             {row.original.nombre.trim().split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()}
           </div>
           <div>
-            <p className="font-semibold text-gray-800 text-sm">{row.original.nombre}</p>
-            <p className="text-xs text-gray-400">
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#0F172A' }}>{row.original.nombre}</p>
+            <p style={{ fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10.5, color: '#9CA3AF' }}>
               {row.original.usuario && <>{row.original.usuario}</>}
-              {row.original.dni && <> · DNI {row.original.dni}</>}
+              {row.original.dni && <> · {row.original.dni}</>}
             </p>
           </div>
         </div>
@@ -321,10 +328,15 @@ export default function Nomina() {
       header: 'Acciones',
       id: 'actions',
       cell: ({ row }) => (
-        <div className="flex items-center gap-1.5">
+        <div
+          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-[120ms]"
+        >
           <button
             onClick={() => navigate(`/nomina/agente/${row.original.agente_id}`)}
-            className="btn-ghost px-2 py-1 text-xs"
+            className="flex items-center justify-center rounded-lg bg-transparent hover:bg-white hover:text-konecta transition-all duration-150"
+            style={{ width: 28, height: 28, color: '#6B7280' }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
             title="Ver detalle"
           >
             <Eye size={13} />
@@ -332,7 +344,10 @@ export default function Nomina() {
           {nominaEditableRef.current && (
             <button
               onClick={() => setEditAgent(row.original)}
-              className="btn-ghost px-2 py-1 text-xs text-konecta"
+              className="flex items-center justify-center rounded-lg bg-transparent hover:bg-white hover:text-konecta transition-all duration-150"
+              style={{ width: 28, height: 28, color: '#6B7280' }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
               title="Editar"
             >
               <Edit2 size={13} />
@@ -341,7 +356,10 @@ export default function Nomina() {
           {selectedServicioIdRef.current && canRegLicenciaRef.current && (
             <button
               onClick={() => setLicenciaAgent(row.original)}
-              className="btn-ghost px-2 py-1 text-xs"
+              className="flex items-center justify-center rounded-lg bg-transparent hover:bg-white hover:text-konecta transition-all duration-150"
+              style={{ width: 28, height: 28, color: '#6B7280' }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
               title="Registrar licencia"
             >
               <FileText size={13} />
@@ -350,7 +368,10 @@ export default function Nomina() {
           {nominaEditableRef.current && (
             <button
               onClick={() => handleDeleteAgente(row.original.id, row.original.nombre)}
-              className="btn-ghost px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+              className="flex items-center justify-center rounded-lg bg-transparent hover:bg-red-50 transition-all duration-150"
+              style={{ width: 28, height: 28, color: '#EF4444' }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}
               title="Eliminar de la nómina"
             >
               <Trash2 size={13} />
@@ -391,32 +412,33 @@ export default function Nomina() {
   return (
     <div className="flex flex-col h-full">
       <Header
-        title="Nómina de Agentes"
+        title="Nómina"
+        titleAccent="de Agentes"
         actions={
           <div className="flex items-center gap-2">
             {isAdmin && selectedServicioId && (
               <button
-                className="btn-secondary"
+                className="btn-secondary btn-up"
                 onClick={() =>
                   navigate(`/carga?servicio_id=${selectedServicioId}&mes=${selectedMes}&anio=${selectedAnio}&formato=${selectedTipo === 'MEUCCI' ? 'meucci' : 'operacion'}`)
                 }
               >
-                <Upload size={14} /> Subir Excel
+                <Upload size={14} className="ic" /> Subir Excel
               </button>
             )}
             {isAdmin && nomina && (
               <button
-                className="btn-secondary"
+                className="btn-secondary btn-rotate"
                 onClick={() => setShowReplicar(true)}
                 disabled={replicarMutation.isPending}
               >
-                <Copy size={14} />
+                <Copy size={14} className="ic" />
                 {replicarMutation.isPending ? 'Replicando...' : 'Replicar nómina'}
               </button>
             )}
             {nomina && selectedServicioId && canExport(selectedServicioId as number, !isCurrentMonth) && (
-              <button className="btn-secondary" onClick={handleExport}>
-                <Download size={14} /> Exportar
+              <button className="btn-secondary btn-down" onClick={handleExport}>
+                <Download size={14} className="ic" /> Exportar
               </button>
             )}
             {isAdmin && nomina && (
@@ -435,18 +457,25 @@ export default function Nomina() {
 
         {/* Servicio pills */}
         <div className="flex items-center gap-3">
-          <Building2 size={16} className="text-gray-400 shrink-0" />
+          <Building2 size={15} className="text-gray-400 shrink-0" />
           <div className="flex flex-wrap gap-2">
             {(servicios as Servicio[]).filter((s) => s.activo).map((s) => (
               <button
                 key={s.id}
                 onClick={() => setSelectedServicioId(s.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                  selectedServicioId === s.id
-                    ? 'text-white border-transparent'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-800'
-                }`}
-                style={selectedServicioId === s.id ? { backgroundColor: s.color, borderColor: s.color } : {}}
+                className="transition-all duration-150"
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 9999,
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  border: selectedServicioId === s.id
+                    ? `1px solid ${s.color}`
+                    : '1px solid #E5E7EB',
+                  background: selectedServicioId === s.id ? s.color : '#FFFFFF',
+                  color: selectedServicioId === s.id ? '#FFFFFF' : '#4B5563',
+                  letterSpacing: '0.02em',
+                }}
               >
                 {s.nombre}
               </button>
@@ -457,13 +486,13 @@ export default function Nomina() {
         {/* Period + tipo + nomina status */}
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Mes</p>
+            <p className="label-base">Mes</p>
             <select className="input-field text-sm h-9 w-36" value={selectedMes} onChange={(e) => setSelectedMes(parseInt(e.target.value))}>
               {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Año</p>
+            <p className="label-base">Año</p>
             <select className="input-field text-sm h-9 w-24" value={selectedAnio} onChange={(e) => setSelectedAnio(parseInt(e.target.value))}>
               {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -491,10 +520,12 @@ export default function Nomina() {
           </div>
 
           {nomina && (
-            <div className="ml-auto flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100">
+            <div className="ml-auto flex items-center gap-3 px-4 py-2 rounded-xl border"
+              style={{ background: '#F8FAFC', borderColor: '#E5E7EB' }}
+            >
               <NominaEstadoBadge estado={nomina.estado} />
               <span className="w-px h-4 bg-gray-200" />
-              <span className="text-xs font-bold text-gray-700">{nomina.total_agentes} agentes</span>
+              <span className="text-xs font-bold text-gray-700 tabular-nums">{nomina.total_agentes} agentes</span>
               {nomina.agentes_no_presentes > 0 && (
                 <span className="text-xs text-red-400 font-medium">· {nomina.agentes_no_presentes} no presentes</span>
               )}
@@ -544,26 +575,31 @@ export default function Nomina() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150"
+                style={
                   showFilters || filterCount > 0
-                    ? 'bg-konecta/10 text-konecta border-konecta/20'
-                    : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
-                }`}
+                    ? { background: '#EAF2FB', color: '#0054A6', borderColor: '#CCE0F5' }
+                    : { background: '#F8FAFC', color: '#4B5563', borderColor: '#E5E7EB' }
+                }
               >
                 <Filter size={13} />
                 Filtros
                 {filterCount > 0 && (
-                  <span className="ml-0.5 bg-konecta text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                  <span
+                    className="flex items-center justify-center text-[10px] text-white font-bold rounded-full"
+                    style={{ width: 16, height: 16, background: '#0054A6', marginLeft: 2 }}
+                  >
                     {filterCount}
                   </span>
                 )}
               </button>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs tabular-nums" style={{ color: '#9CA3AF' }}>
                 {table.getRowModel().rows.length} de {agentes.length} agentes
               </span>
               {filterCount > 0 && (
                 <button
-                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 transition-colors"
+                  className="flex items-center gap-1 text-xs transition-colors"
+                  style={{ color: '#EF4444' }}
                   onClick={() => setFilters({})}
                 >
                   <X size={11} /> Limpiar filtros
@@ -643,19 +679,20 @@ export default function Nomina() {
             <div className="card flex-1 overflow-hidden flex flex-col">
               <div className="overflow-x-auto flex-1">
                 <table className="w-full border-collapse">
-                  <thead>
+                  <thead className="sticky top-0 z-[1]">
                     {table.getHeaderGroups().map((hg) => (
-                      <tr key={hg.id} className="border-b border-gray-100 bg-gray-50/60">
+                      <tr key={hg.id}>
                         {hg.headers.map((h) => (
                           <th
                             key={h.id}
                             className="table-th cursor-pointer select-none"
+                            style={{ borderBottom: '1px solid #E5E7EB' }}
                             onClick={h.column.getToggleSortingHandler()}
                           >
                             <div className="flex items-center gap-1">
                               {flexRender(h.column.columnDef.header, h.getContext())}
-                              {h.column.getIsSorted() === 'asc' && <SortAsc size={11} />}
-                              {h.column.getIsSorted() === 'desc' && <SortDesc size={11} />}
+                              {h.column.getIsSorted() === 'asc' && <SortAsc size={10} className="text-konecta" />}
+                              {h.column.getIsSorted() === 'desc' && <SortDesc size={10} className="text-konecta" />}
                             </div>
                           </th>
                         ))}
@@ -663,53 +700,71 @@ export default function Nomina() {
                     ))}
                   </thead>
                   <tbody>
-                    {table.getRowModel().rows.map((row) => (
-                      <tr
-                        key={row.id}
-                        className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors ${
-                          !row.original.presente_en_nomina ? 'bg-red-50/30' : ''
-                        }`}
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="table-td">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {table.getRowModel().rows.map((row) => {
+                      const isSelected = row.getIsSelected()
+                      const notPresent = !row.original.presente_en_nomina
+                      return (
+                        <tr
+                          key={row.id}
+                          className="table-tr group"
+                          style={
+                            isSelected
+                              ? { background: '#CCE0F5', boxShadow: 'inset 3px 0 0 #0054A6' }
+                              : notPresent
+                              ? { background: 'rgba(254,226,226,0.35)' }
+                              : undefined
+                          }
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <td key={cell.id} className="table-td">
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          ))}
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 shrink-0">
+              <div
+                className="flex items-center justify-between px-4 py-3 shrink-0"
+                style={{ borderTop: '1px solid #E5E7EB', background: '#F8FAFC' }}
+              >
                 <div className="flex items-center gap-1">
                   <button
-                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    className="flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                    style={{ width: 32, height: 32 }}
                     onClick={() => table.setPageIndex(0)}
                     disabled={!table.getCanPreviousPage()}
                   >
                     <ChevronsLeft size={14} />
                   </button>
                   <button
-                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    className="flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                    style={{ width: 32, height: 32 }}
                     onClick={() => table.previousPage()}
                     disabled={!table.getCanPreviousPage()}
                   >
                     <ChevronLeft size={14} />
                   </button>
-                  <span className="text-xs text-gray-500 px-2">
-                    Página <span className="font-semibold text-gray-700">{table.getState().pagination.pageIndex + 1}</span> de <span className="font-semibold text-gray-700">{table.getPageCount()}</span>
+                  <span className="text-xs text-gray-500 px-3 tabular-nums">
+                    <span className="font-semibold text-gray-700">{table.getState().pagination.pageIndex + 1}</span>
+                    {' '}de{' '}
+                    <span className="font-semibold text-gray-700">{table.getPageCount()}</span>
                   </span>
                   <button
-                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    className="flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                    style={{ width: 32, height: 32 }}
                     onClick={() => table.nextPage()}
                     disabled={!table.getCanNextPage()}
                   >
                     <ChevronRight size={14} />
                   </button>
                   <button
-                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                    className="flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                    style={{ width: 32, height: 32 }}
                     onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                     disabled={!table.getCanNextPage()}
                   >
@@ -815,32 +870,51 @@ export default function Nomina() {
       {/* Bulk action bar */}
       {Object.keys(rowSelection).length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-          <div className="flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 pointer-events-auto">
-            <span className="text-sm font-semibold tabular-nums">
+          <div
+            className="flex items-center gap-3 px-5 py-3 rounded-2xl pointer-events-auto"
+            style={{
+              background: 'linear-gradient(90deg, #0054A6 0%, #1A6EC2 100%)',
+              color: '#FFFFFF',
+              fontSize: 12.5,
+              fontWeight: 500,
+              boxShadow: '0 12px 24px -6px rgba(0,84,166,0.52), 0 3px 6px -2px rgba(0,84,166,0.30)',
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}
+          >
+            <span className="font-semibold tabular-nums">
               {Object.keys(rowSelection).length} seleccionado{Object.keys(rowSelection).length !== 1 ? 's' : ''}
             </span>
-            <span className="w-px h-4 bg-white/20" />
+            <span className="w-px h-4" style={{ background: 'rgba(255,255,255,0.22)' }} />
             <button
               onClick={handleBulkExport}
-              className="flex items-center gap-1.5 text-sm hover:text-blue-300 transition-colors"
+              className="flex items-center gap-1.5 transition-colors"
+              style={{ color: 'rgba(255,255,255,0.85)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#FFFFFF')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
             >
               <Download size={14} /> Exportar CSV
             </button>
             {isAdmin && (
               <>
-                <span className="w-px h-4 bg-white/20" />
+                <span className="w-px h-4" style={{ background: 'rgba(255,255,255,0.22)' }} />
                 <button
                   onClick={() => setShowBulkDelete(true)}
-                  className="flex items-center gap-1.5 text-sm hover:text-red-300 transition-colors"
+                  className="flex items-center gap-1.5 transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.85)' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#FCA5A5')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
                 >
                   <Trash2 size={14} /> Eliminar
                 </button>
               </>
             )}
-            <span className="w-px h-4 bg-white/20" />
+            <span className="w-px h-4" style={{ background: 'rgba(255,255,255,0.22)' }} />
             <button
               onClick={() => setRowSelection({})}
-              className="text-white/50 hover:text-white transition-colors"
+              className="transition-colors"
+              style={{ color: 'rgba(255,255,255,0.55)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#FFFFFF')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}
             >
               <X size={14} />
             </button>

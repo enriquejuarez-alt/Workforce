@@ -8,22 +8,30 @@ export const listAgents = async (req: AuthRequest, res: Response) => {
   try {
     const { servicio_id, search, estado, activo } = req.query
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
+    const isLider = req.user?.rol === 'LIDER'
 
     let where: any = {}
     if (activo !== undefined) where.activo = activo === 'true'
-    if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
     if (estado) where.estado = estado
+
+    // LIDER: forzar filtro por su servicio, ignorar servicio_id del query
+    if (isLider) {
+      if (!req.user?.servicioId) return res.status(403).json({ error: 'Líder sin servicio asignado' })
+      where.servicio_id = req.user.servicioId
+    } else {
+      if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
+      if (!adminUser && servicio_id) {
+        const permiso = await getUserPermission(req.user!.userId, parseInt(servicio_id as string))
+        if (!permiso?.puede_ver) return res.status(403).json({ error: 'Sin permiso' })
+      }
+    }
+
     if (search) {
       where.OR = [
         { dni: { contains: search as string, mode: 'insensitive' } },
         { usuario: { contains: search as string, mode: 'insensitive' } },
         { nombre: { contains: search as string, mode: 'insensitive' } },
       ]
-    }
-
-    if (!adminUser && servicio_id) {
-      const permiso = await getUserPermission(req.user!.userId, parseInt(servicio_id as string))
-      if (!permiso?.puede_ver) return res.status(403).json({ error: 'Sin permiso' })
     }
 
     const agentes = await prisma.agente.findMany({

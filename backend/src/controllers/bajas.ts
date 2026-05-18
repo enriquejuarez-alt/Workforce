@@ -21,23 +21,30 @@ export const listBajas = async (req: AuthRequest, res: Response) => {
   try {
     const { servicio_id, search, tipo, fecha_desde, fecha_hasta, page = '1', limit = '50' } = req.query
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
+    const isLider = req.user?.rol === 'LIDER'
     const pageNum = Math.max(1, parseInt(page as string))
     const limitNum = Math.min(200, Math.max(1, parseInt(limit as string)))
 
-    let serviciosPermitidos: number[] | null = null
-    if (!adminUser) {
+    const where: any = {}
+
+    if (isLider) {
+      // LIDER: forzar filtro por su servicio
+      if (!req.user?.servicioId) return res.status(403).json({ error: 'Líder sin servicio asignado' })
+      where.servicio_id = req.user.servicioId
+    } else if (!adminUser) {
+      // USUARIO/WORKFORCE: filtrar por permisos de servicio
       const permisos = await prisma.usuarioServicioPermiso.findMany({
         where: { usuario_id: req.user!.userId, puede_ver: true },
         select: { servicio_id: true },
       })
-      serviciosPermitidos = permisos.map((p) => p.servicio_id)
-    }
-
-    const where: any = {}
-    if (servicio_id) {
-      where.servicio_id = parseInt(servicio_id as string)
-    } else if (serviciosPermitidos !== null) {
-      where.servicio_id = { in: serviciosPermitidos }
+      const serviciosPermitidos = permisos.map((p) => p.servicio_id)
+      if (servicio_id) {
+        where.servicio_id = parseInt(servicio_id as string)
+      } else {
+        where.servicio_id = { in: serviciosPermitidos }
+      }
+    } else {
+      if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
     }
     if (tipo) where.tipo = { equals: tipo as string, mode: 'insensitive' }
     if (fecha_desde) where.fecha = { ...where.fecha, gte: new Date(fecha_desde as string) }
@@ -73,6 +80,7 @@ export const listBajas = async (req: AuthRequest, res: Response) => {
 export const createBaja = async (req: AuthRequest, res: Response) => {
   try {
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
+    const isLider = req.user?.rol === 'LIDER'
     const {
       fecha, dni, nombre, usuario_sistema, superior, jefatura,
       servicio_id, servicio_nombre, tipo,
@@ -83,7 +91,18 @@ export const createBaja = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Fecha, DNI y nombre son obligatorios' })
     }
 
-    if (!adminUser && servicio_id) {
+    if (isLider) {
+      // LIDER: solo puede dar de baja agentes de su propio servicio
+      if (!req.user?.servicioId) return res.status(403).json({ error: 'Líder sin servicio asignado' })
+      const agentePorDni = await prisma.agente.findFirst({ where: { dni: String(dni).trim() } })
+      if (agentePorDni && agentePorDni.servicio_id !== req.user.servicioId) {
+        return res.status(403).json({ error: 'Solo podés cargar bajas de agentes de tu propio servicio' })
+      }
+      // También validar que el servicio_id enviado coincida
+      if (servicio_id && parseInt(servicio_id) !== req.user.servicioId) {
+        return res.status(403).json({ error: 'Solo podés cargar bajas de tu propio servicio' })
+      }
+    } else if (!adminUser && servicio_id) {
       const permiso = await prisma.usuarioServicioPermiso.findFirst({
         where: { usuario_id: req.user!.userId, servicio_id: parseInt(servicio_id), puede_ver: true },
       })

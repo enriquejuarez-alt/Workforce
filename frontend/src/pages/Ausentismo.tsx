@@ -165,7 +165,7 @@ export default function Ausentismo() {
                     />
                     <Tooltip
                       contentStyle={{ fontSize: 12 }}
-                      formatter={(value: any, name: string) => [value, name.charAt(0).toUpperCase() + name.slice(1)]}
+                      formatter={(value: any, name: any) => [value, name?.charAt(0).toUpperCase() + name?.slice(1)]}
                     />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="licencias" name="Licencias" stackId="a" fill="#3b82f6" />

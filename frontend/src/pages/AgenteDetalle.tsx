@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical, Stethoscope, RefreshCw, ScrollText, GraduationCap, DoorOpen, Palmtree } from 'lucide-react'
+import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical, Stethoscope, RefreshCw, ScrollText, GraduationCap, DoorOpen, Palmtree, UserX } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { agentesApi } from '../lib/api'
@@ -19,6 +19,7 @@ const TIMELINE_CFG: Record<TimelineEvento['tipo'], { label: string; Icon: Lucide
   CAPACITACION:    { label: 'Capacitación',    Icon: GraduationCap,    iconColor: 'text-emerald-400', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-600' },
   REMOCION:        { label: 'Remoción',        Icon: DoorOpen,         iconColor: 'text-orange-400',  bg: 'bg-orange-50',  badge: 'bg-orange-100 text-orange-600' },
   VACACION:        { label: 'Vacaciones',      Icon: Palmtree,         iconColor: 'text-sky-400',     bg: 'bg-sky-50',     badge: 'bg-sky-100 text-sky-600' },
+  BAJA:            { label: 'Baja',            Icon: UserX,            iconColor: 'text-gray-500',    bg: 'bg-gray-100',   badge: 'bg-gray-200 text-gray-700' },
 }
 
 export default function AgenteDetalle() {

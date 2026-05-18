@@ -10,6 +10,9 @@ datasource db {
 enum Rol {
   ADMINISTRADOR
   USUARIO
+  WORKFORCE
+  CAPACITADOR
+  LIDER
 }
 
 enum EstadoNomina {
@@ -25,10 +28,13 @@ model Usuario {
   email               String   @unique
   password_hash       String
   rol                 Rol      @default(USUARIO)
+  servicio_id         Int?
   activo              Boolean  @default(true)
   fecha_creacion      DateTime @default(now())
   fecha_actualizacion DateTime @updatedAt
   ultimo_acceso       DateTime?
+
+  servicio             Servicio? @relation(fields: [servicio_id], references: [id])
 
   permisos             UsuarioServicioPermiso[]
   importaciones        ImportacionNomina[]
@@ -58,6 +64,7 @@ model Servicio {
   fecha_actualizacion DateTime @updatedAt
 
   permisos                UsuarioServicioPermiso[]
+  lideres                 Usuario[]
   agentes                 Agente[]
   nominas                 NominaMensual[]
   auditorias              Auditoria[]

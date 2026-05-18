@@ -27,3 +27,21 @@ export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction
   }
   return next()
 }
+
+// Permite solo a los roles indicados
+export const requireRole = (...roles: string[]) =>
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.rol)) {
+      return res.status(403).json({ error: 'Su rol no tiene acceso a este recurso' })
+    }
+    return next()
+  }
+
+// Bloquea a los roles indicados, deja pasar al resto
+export const blockRole = (...roles: string[]) =>
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user && roles.includes(req.user.rol)) {
+      return res.status(403).json({ error: 'Su rol no tiene acceso a este módulo' })
+    }
+    return next()
+  }

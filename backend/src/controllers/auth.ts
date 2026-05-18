@@ -27,7 +27,7 @@ export const login = async (req: Request, res: Response) => {
       data: { ultimo_acceso: new Date() },
     })
 
-    const token = signToken({ userId: user.id, email: user.email, rol: user.rol })
+    const token = signToken({ userId: user.id, email: user.email, rol: user.rol, servicioId: user.servicio_id ?? null })
 
     await createAuditLog({
       usuario_id: user.id,

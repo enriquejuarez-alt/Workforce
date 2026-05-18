@@ -7,6 +7,7 @@ export interface JWTPayload {
   userId: number
   email: string
   rol: string
+  servicioId: number | null
 }
 
 export const signToken = (payload: JWTPayload): string => {

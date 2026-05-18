@@ -10,39 +10,41 @@ import { useAuthStore } from '../../store/auth'
 import { useSidebarStore } from '../../store/sidebar'
 import { authApi } from '../../lib/api'
 import toast from 'react-hot-toast'
+import { canAccess, isAdminRole, ROL_LABELS } from '../../utils/roles'
+import type { Rol } from '../../types'
 
 const NAV_ITEMS = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/nomina', icon: FileSpreadsheet, label: 'Nómina' },
-  { to: '/licencias', icon: ClipboardList, label: 'Licencias' },
-  { to: '/calendario', icon: CalendarDays, label: 'Calendario' },
-  { to: '/cambios', icon: ArrowLeftRight, label: 'Cambios' },
-  { to: '/bajas', icon: UserMinus, label: 'Bajas y Remociones' },
-  { to: '/capacitaciones', icon: GraduationCap, label: 'Formador' },
-  { to: '/vacaciones', icon: Palmtree, label: 'Vacaciones' },
-  { to: '/comparacion', icon: GitCompare, label: 'Comparar Nóminas' },
-  { to: '/ausentismo', icon: TrendingDown, label: 'Ausentismo' },
+  { to: '/dashboard',        icon: LayoutDashboard,   label: 'Dashboard' },
+  { to: '/nomina',           icon: FileSpreadsheet,   label: 'Nómina' },
+  { to: '/licencias',        icon: ClipboardList,     label: 'Licencias' },
+  { to: '/calendario',       icon: CalendarDays,      label: 'Calendario' },
+  { to: '/cambios',          icon: ArrowLeftRight,    label: 'Cambios' },
+  { to: '/bajas',            icon: UserMinus,         label: 'Bajas y Remociones' },
+  { to: '/capacitaciones',   icon: GraduationCap,     label: 'Formador' },
+  { to: '/vacaciones',       icon: Palmtree,          label: 'Vacaciones' },
+  { to: '/comparacion',      icon: GitCompare,        label: 'Comparar Nóminas' },
+  { to: '/ausentismo',       icon: TrendingDown,      label: 'Ausentismo' },
   { to: '/historial-agente', icon: GitCommitVertical, label: 'Historial Agente' },
 ]
 
 const PROGRAMACION_ITEMS = [
   { to: '/programacion', icon: CalendarClock, label: 'Programación' },
-  { to: '/distribucion', icon: Shuffle, label: 'Distribución' },
+  { to: '/distribucion', icon: Shuffle,       label: 'Distribución' },
 ]
 
 const ADMIN_ITEMS = [
-  { to: '/carga', icon: Upload, label: 'Carga de Nómina' },
-  { to: '/importaciones', icon: History, label: 'Historial Importaciones' },
-  { to: '/usuarios', icon: Users, label: 'Usuarios' },
-  { to: '/servicios', icon: Building2, label: 'Servicios' },
-  { to: '/auditoria', icon: Activity, label: 'Auditoría' },
+  { to: '/carga',         icon: Upload,    label: 'Carga de Nómina' },
+  { to: '/importaciones', icon: History,   label: 'Historial Importaciones' },
+  { to: '/usuarios',      icon: Users,     label: 'Usuarios' },
+  { to: '/servicios',     icon: Building2, label: 'Servicios' },
+  { to: '/auditoria',     icon: Activity,  label: 'Auditoría' },
 ]
 
 const WALT_ITEMS = [
-  { page: 'carga',       icon: UploadCloud,     label: 'Carga de archivos' },
-  { page: 'dashboard',   icon: LayoutDashboard, label: 'Resumen' },
-  { page: 'curvas',      icon: TrendingUp,       label: 'Curvas' },
-  { page: 'simulador',   icon: Sliders,          label: 'Simulador' },
+  { page: 'carga',     icon: UploadCloud,     label: 'Carga de archivos' },
+  { page: 'dashboard', icon: LayoutDashboard, label: 'Resumen' },
+  { page: 'curvas',    icon: TrendingUp,      label: 'Curvas' },
+  { page: 'simulador', icon: Sliders,         label: 'Simulador' },
 ]
 
 const navClass = (isActive: boolean, collapsed: boolean) =>
@@ -63,11 +65,35 @@ const SectionLabel = ({ children, collapsed }: { children: React.ReactNode; coll
     </p>
   )
 
+function NavItem({ to, icon: Icon, label, collapsed }: {
+  to: string; icon: React.ElementType; label: string; collapsed: boolean
+}) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) => navClass(isActive, collapsed)}
+      title={collapsed ? label : undefined}
+    >
+      {({ isActive }) => (
+        <>
+          <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
+            <Icon size={15} />
+          </span>
+          {!collapsed && <span className="flex-1 truncate">{label}</span>}
+          {!collapsed && isActive && (
+            <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+          )}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
 export default function Sidebar() {
   const { user, clearAuth } = useAuthStore()
   const { collapsed, toggle } = useSidebarStore()
-  const isAdmin = user?.rol === 'ADMINISTRADOR'
   const location = useLocation()
+  const rol = user?.rol as Rol | undefined
 
   const handleLogout = async () => {
     try { await authApi.logout() } catch {}
@@ -78,6 +104,12 @@ export default function Sidebar() {
   const searchParams = new URLSearchParams(location.search)
   const activePage = searchParams.get('page') ?? 'carga'
   const inWalt = location.pathname === '/planificacion'
+
+  // Filtrar ítems según la matriz de permisos
+  const visibleNav = NAV_ITEMS.filter(({ to }) => canAccess(rol, to))
+  const showProgramacion = PROGRAMACION_ITEMS.some(({ to }) => canAccess(rol, to))
+  const showWalt = canAccess(rol, '/planificacion')
+  const showAdmin = isAdminRole(rol)
 
   return (
     <aside
@@ -108,108 +140,61 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 scrollbar-thin">
-        <div>
-          <SectionLabel collapsed={collapsed}>Principal</SectionLabel>
-          {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) => navClass(isActive, collapsed)}
-              title={collapsed ? label : undefined}
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
-                    <Icon size={15} />
-                  </span>
-                  {!collapsed && <span className="flex-1 truncate">{label}</span>}
-                  {!collapsed && isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
-
-        {isAdmin && (
-          <div className="mt-2">
-            <SectionLabel collapsed={collapsed}>Administración</SectionLabel>
-            {ADMIN_ITEMS.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) => navClass(isActive, collapsed)}
-                title={collapsed ? label : undefined}
-              >
-                {({ isActive }) => (
-                  <>
-                    <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
-                      <Icon size={15} />
-                    </span>
-                    {!collapsed && <span className="flex-1 truncate">{label}</span>}
-                    {!collapsed && isActive && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
-                    )}
-                  </>
-                )}
-              </NavLink>
+        {visibleNav.length > 0 && (
+          <div>
+            <SectionLabel collapsed={collapsed}>Principal</SectionLabel>
+            {visibleNav.map(({ to, icon, label }) => (
+              <NavItem key={to} to={to} icon={icon} label={label} collapsed={collapsed} />
             ))}
           </div>
         )}
 
-        {/* Walt section */}
-        <div className="mt-2">
-          <SectionLabel collapsed={collapsed}>Planificación</SectionLabel>
-          {WALT_ITEMS.map(({ page, icon: Icon, label }) => {
-            const isActive = inWalt && activePage === page
-            return (
-              <NavLink
-                key={page}
-                to={`/planificacion?page=${page}`}
-                className={navClass(isActive, collapsed)}
-                title={collapsed ? label : undefined}
-              >
-                {() => (
-                  <>
-                    <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
-                      <Icon size={15} />
-                    </span>
-                    {!collapsed && <span className="flex-1 truncate">{label}</span>}
-                    {!collapsed && isActive && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
-                    )}
-                  </>
-                )}
-              </NavLink>
-            )
-          })}
-        </div>
+        {showAdmin && (
+          <div className="mt-2">
+            <SectionLabel collapsed={collapsed}>Administración</SectionLabel>
+            {ADMIN_ITEMS.map(({ to, icon, label }) => (
+              <NavItem key={to} to={to} icon={icon} label={label} collapsed={collapsed} />
+            ))}
+          </div>
+        )}
 
-        {/* Programación section */}
-        <div className="mt-2">
-          <SectionLabel collapsed={collapsed}>Programación</SectionLabel>
-          {PROGRAMACION_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) => navClass(isActive, collapsed)}
-              title={collapsed ? label : undefined}
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
-                    <Icon size={15} />
-                  </span>
-                  {!collapsed && <span className="flex-1 truncate">{label}</span>}
-                  {!collapsed && isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+        {showWalt && (
+          <div className="mt-2">
+            <SectionLabel collapsed={collapsed}>Planificación</SectionLabel>
+            {WALT_ITEMS.map(({ page, icon: Icon, label }) => {
+              const isActive = inWalt && activePage === page
+              return (
+                <NavLink
+                  key={page}
+                  to={`/planificacion?page=${page}`}
+                  className={navClass(isActive, collapsed)}
+                  title={collapsed ? label : undefined}
+                >
+                  {() => (
+                    <>
+                      <span className={`shrink-0 transition-colors ${isActive ? 'text-white' : 'text-white/50'}`}>
+                        <Icon size={15} />
+                      </span>
+                      {!collapsed && <span className="flex-1 truncate">{label}</span>}
+                      {!collapsed && isActive && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-konecta-light shrink-0" />
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
+                </NavLink>
+              )
+            })}
+          </div>
+        )}
+
+        {showProgramacion && (
+          <div className="mt-2">
+            <SectionLabel collapsed={collapsed}>Programación</SectionLabel>
+            {PROGRAMACION_ITEMS.map(({ to, icon, label }) => (
+              <NavItem key={to} to={to} icon={icon} label={label} collapsed={collapsed} />
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* User footer */}
@@ -239,13 +224,18 @@ export default function Sidebar() {
             </>
           )}
         </div>
-        {!collapsed && isAdmin && (
-          <div className="mt-1.5 px-2">
+
+        {!collapsed && rol && (
+          <div className="mt-1.5 px-2 flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-konecta-light/80">
-              <Shield size={10} /> Administrador
+              <Shield size={10} /> {ROL_LABELS[rol]}
             </span>
+            {user?.servicio?.nombre && (
+              <span className="text-[10px] text-white/30 truncate">· {user.servicio.nombre}</span>
+            )}
           </div>
         )}
+
         {collapsed && (
           <button
             onClick={handleLogout}

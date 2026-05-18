@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal'
 import Badge from '../components/ui/Badge'
 import { usersApi, serviciosApi } from '../lib/api'
 import type { Usuario, Servicio, UsuarioServicioPermiso } from '../types'
+import { ROL_LABELS, ROL_BADGE_VARIANT } from '../utils/roles'
 import { PageLoading } from '../components/ui/LoadingSpinner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -125,8 +126,8 @@ export default function Usuarios() {
                     </div>
                   </td>
                   <td className="table-td">
-                    <Badge variant={user.rol === 'ADMINISTRADOR' ? 'orange' : 'purple'}>
-                      {user.rol === 'ADMINISTRADOR' ? 'Admin' : 'Supervisor'}
+                    <Badge variant={ROL_BADGE_VARIANT[user.rol] as any}>
+                      {ROL_LABELS[user.rol]}
                     </Badge>
                   </td>
                   <td className="table-td">
@@ -135,7 +136,13 @@ export default function Usuarios() {
                     </Badge>
                   </td>
                   <td className="table-td">
-                    {user.permisos && user.permisos.length > 0 ? (
+                    {/* Líder: mostrar servicio directo */}
+                    {user.rol === 'LIDER' && user.servicio ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: user.servicio.color }} />
+                        {user.servicio.nombre}
+                      </span>
+                    ) : user.permisos && user.permisos.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {user.permisos.map((p) => (
                           <span
@@ -204,18 +211,32 @@ export default function Usuarios() {
 }
 
 function UserFormModal({ user, onClose, onSaved }: { user?: Usuario; onClose: () => void; onSaved: () => void }) {
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: {
       nombre: user?.nombre || '',
       email: user?.email || '',
       password: '',
       rol: user?.rol || 'USUARIO',
+      servicio_id: user?.servicio_id ? String(user.servicio_id) : '',
     },
   })
 
+  const rolSeleccionado = watch('rol')
+
+  const { data: servicios = [] } = useQuery({
+    queryKey: ['servicios'],
+    queryFn: () => serviciosApi.list().then((r) => r.data),
+  })
+  const serviciosActivos = (servicios as Servicio[]).filter((s) => s.activo)
+
   const mutation = useMutation({
-    mutationFn: (data: any) =>
-      user ? usersApi.update(user.id, data) : usersApi.create(data),
+    mutationFn: (data: any) => {
+      const payload = {
+        ...data,
+        servicio_id: data.servicio_id ? parseInt(data.servicio_id) : null,
+      }
+      return user ? usersApi.update(user.id, payload) : usersApi.create(payload)
+    },
     onSuccess: () => { toast.success(user ? 'Usuario actualizado' : 'Usuario creado'); onSaved() },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Error'),
   })
@@ -250,10 +271,29 @@ function UserFormModal({ user, onClose, onSaved }: { user?: Usuario; onClose: ()
         <div>
           <label className="label-base">Rol</label>
           <select {...register('rol')} className="input-base">
-            <option value="USUARIO">Supervisor</option>
+            <option value="USUARIO">Supervisor (legacy)</option>
+            <option value="WORKFORCE">Workforce</option>
+            <option value="CAPACITADOR">Capacitador</option>
+            <option value="LIDER">Líder de servicio</option>
             <option value="ADMINISTRADOR">Administrador</option>
           </select>
         </div>
+        {rolSeleccionado === 'LIDER' && (
+          <div>
+            <label className="label-base">Servicio asignado *</label>
+            <select
+              {...register('servicio_id', { required: rolSeleccionado === 'LIDER' ? 'Requerido para Líder' : false })}
+              className="input-base"
+            >
+              <option value="">— Seleccionar servicio —</option>
+              {serviciosActivos.map((s) => (
+                <option key={s.id} value={String(s.id)}>{s.nombre}</option>
+              ))}
+            </select>
+            {errors.servicio_id && <p className="text-xs text-red-600 mt-1">{errors.servicio_id.message}</p>}
+            <p className="text-xs text-gray-400 mt-1">El Líder solo verá datos de este servicio.</p>
+          </div>
+        )}
       </div>
     </Modal>
   )

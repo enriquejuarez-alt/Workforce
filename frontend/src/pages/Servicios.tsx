@@ -130,9 +130,9 @@ function ServicioFormModal({ servicio, onClose, onSaved }: { servicio?: Servicio
   const color = watch('color')
   const [showPlani, setShowPlani] = useState(false)
   const [planiKey, setPlaniKey] = useState((servicio as any)?.plani_config?.key ?? '')
-  const [planiHojas, setPlaniHojas] = useState(((servicio as any)?.plani_config?.hojaCP ?? []).join('\n'))
-  const [planiSegmentos, setPlaniSegmentos] = useState(((servicio as any)?.plani_config?.segmentos ?? []).join('\n'))
-  const [planiReductores, setPlaniReductores] = useState(((servicio as any)?.plani_config?.reductores ?? []).join('\n'))
+  const [planiHojas, setPlaniHojas] = useState<string>(((servicio as any)?.plani_config?.hojaCP ?? []).join('\n'))
+  const [planiSegmentos, setPlaniSegmentos] = useState<string>(((servicio as any)?.plani_config?.segmentos ?? []).join('\n'))
+  const [planiReductores, setPlaniReductores] = useState<string>(((servicio as any)?.plani_config?.reductores ?? []).join('\n'))
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {

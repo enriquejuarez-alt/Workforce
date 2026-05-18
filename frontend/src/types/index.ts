@@ -1,4 +1,4 @@
-export type Rol = 'ADMINISTRADOR' | 'USUARIO'
+export type Rol = 'ADMINISTRADOR' | 'USUARIO' | 'WORKFORCE' | 'CAPACITADOR' | 'LIDER'
 export type EstadoNomina = 'BORRADOR' | 'ACTIVA' | 'CERRADA' | 'ARCHIVADA'
 export type EstadoLicencia = 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
 
@@ -7,10 +7,12 @@ export interface Usuario {
   nombre: string
   email: string
   rol: Rol
+  servicio_id: number | null
   activo: boolean
   fecha_creacion: string
   ultimo_acceso: string | null
   permisos?: UsuarioServicioPermiso[]
+  servicio?: Servicio
 }
 
 export interface Servicio {

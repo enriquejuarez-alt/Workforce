@@ -1,5 +1,5 @@
 import { SERVICIOS, normalizar } from "./services";
-import type { ServiceDefinition } from "./services";
+import type { ServiceDefinition, FrancoConfig } from "./services";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 
 /**
@@ -71,4 +71,9 @@ export function getHojasCPRuntime(servicioKey: string): string[] {
   const def = getServiciosActivos().find((s) => s.key === servicioKey);
   if (!def) return [];
   return Array.isArray(def.hojaCP) ? def.hojaCP : [def.hojaCP];
+}
+
+export function getFrancoConfigRuntime(servicioKey: string): FrancoConfig | undefined {
+  const def = getServiciosActivos().find((s) => s.key === servicioKey);
+  return def?.francoConfig;
 }

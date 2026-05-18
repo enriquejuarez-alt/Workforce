@@ -81,6 +81,7 @@ export function ResumenTable({ resultados }: Props) {
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Recorte</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Capa</th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Ag. Eq.</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">HC c/Franco</th>
           </tr>
         </thead>
         <tbody>
@@ -89,6 +90,7 @@ export function ResumenTable({ resultados }: Props) {
             const pctReductor = ((1 - r.factorProductivo) * 100).toFixed(1);
             const eq = r.agentesEquivalentes;
             const tieneDeficit = r.deltaHC103 > 0;
+            const fa = r.francoAjuste;
 
             return (
               <React.Fragment key={r.servicio}>
@@ -130,11 +132,21 @@ export function ResumenTable({ resultados }: Props) {
                       <span className="text-xs text-gray-300">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    {fa ? (
+                      <div className="text-xs tabular-nums">
+                        <span className="font-semibold text-orange-600">{Math.ceil(fa.hcConFranco)}</span>
+                        <span className="text-gray-400 ml-1">(+{Math.ceil(fa.extra)})</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                  </td>
                 </tr>
                 {expandidoEq === r.servicio && tieneDeficit && (
                   <tr className="bg-blue-50 border-b border-blue-100">
-                    <td colSpan={15} className="px-6 py-3">
-                      <div className="flex items-center gap-6 text-xs">
+                    <td colSpan={16} className="px-6 py-3">
+                      <div className="flex flex-wrap items-center gap-6 text-xs">
                         <span className="text-gray-500">Agentes necesarios para cerrar el gap:</span>
                         <span className="text-gray-700">
                           <span className="text-gray-400">30 hs:</span>{" "}
@@ -152,6 +164,16 @@ export function ResumenTable({ resultados }: Props) {
                           <span className="text-gray-400">Mix actual:</span>{" "}
                           <strong className="text-amber-600">{Math.ceil(eq.mix)} personas</strong>
                         </span>
+                        {fa && (
+                          <>
+                            <span className="text-gray-300">|</span>
+                            <span className="text-gray-500">Plantel total c/franco (jue–dom):</span>
+                            <span className="text-gray-700">
+                              <strong className="text-orange-600">{Math.ceil(fa.hcConFranco)}</strong>
+                              <span className="text-gray-400 ml-1">({((1 - fa.factorDisponible) * 100).toFixed(0)}% en franco)</span>
+                            </span>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

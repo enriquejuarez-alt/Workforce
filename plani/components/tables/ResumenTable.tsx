@@ -108,7 +108,7 @@ export function ResumenTable({ resultados }: Props) {
                     <BadgeCumplimiento nivel={nivel} valor={fmtPct(r.cumplimiento)} />
                   </td>
                   <td className={cn("px-4 py-3 tabular-nums font-medium", r.deltaHC103 > 0 ? "text-red-600" : "text-green-600")}>
-                    {fmtDelta(-r.deltaHC103)}
+                    {fmtDelta(r.deltaHC103)}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-[#0054A6] font-medium">{fmtHoras(r.hsFacturable100)}</td>
                   <td className="px-4 py-3 tabular-nums text-[#0054A6] font-medium">{fmtHoras(r.teoricoFacturable)}</td>

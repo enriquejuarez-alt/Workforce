@@ -445,9 +445,14 @@ export interface SimulacionResultado {
   dia_num: number
   intervalo: string
   requeridos: number
+  limite_inferior: number
+  limite_superior: number
   asignados: number
+  faltante: number
+  sobrante: number
   estado: 'UNDER' | 'LIMITE' | 'OK' | 'OVER'
   agentes: string[]
+  es_feriado: boolean
 }
 
 export interface MovimientoSugerido {

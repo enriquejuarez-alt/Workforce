@@ -1,6 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
+import { useConfigStore } from './store/config'
+import { configuracionApi } from './lib/api'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
 import { PageLoading } from './components/ui/LoadingSpinner'
@@ -31,6 +33,23 @@ const Distribucion = lazy(() => import('./pages/Distribucion'))
 const Ausentismo = lazy(() => import('./pages/Ausentismo'))
 const HistorialAgente = lazy(() => import('./pages/HistorialAgente'))
 const AccesoDenegado = lazy(() => import('./pages/AccesoDenegado'))
+const Configuracion = lazy(() => import('./pages/Configuracion'))
+
+/** Carga la configuración de roles desde el backend al autenticarse */
+function ConfigLoader() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const setRolPaths = useConfigStore((s) => s.setRolPaths)
+  const reset = useConfigStore((s) => s.reset)
+
+  useEffect(() => {
+    if (!isAuthenticated) { reset(); return }
+    configuracionApi.getRolConfig()
+      .then((r) => setRolPaths(r.data))
+      .catch(() => { /* fallback a defaults ya en el store */ })
+  }, [isAuthenticated])
+
+  return null
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -67,6 +86,7 @@ function PathGuard({ path, children }: { path: string; children: React.ReactNode
 export default function App() {
   return (
     <BrowserRouter>
+      <ConfigLoader />
       <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -95,12 +115,13 @@ export default function App() {
             <Route path="distribucion"     element={<PathGuard path="/distribucion"><Distribucion /></PathGuard>} />
 
             {/* Rutas exclusivas de ADMINISTRADOR */}
-            <Route path="carga"         element={<AdminRoute><CargaExcel /></AdminRoute>} />
-            <Route path="importaciones" element={<AdminRoute><Importaciones /></AdminRoute>} />
-            <Route path="usuarios"      element={<AdminRoute><Usuarios /></AdminRoute>} />
-            <Route path="permisos"      element={<AdminRoute><Permisos /></AdminRoute>} />
-            <Route path="servicios"     element={<AdminRoute><Servicios /></AdminRoute>} />
-            <Route path="auditoria"     element={<AdminRoute><Auditoria /></AdminRoute>} />
+            <Route path="carga"          element={<AdminRoute><CargaExcel /></AdminRoute>} />
+            <Route path="importaciones"  element={<AdminRoute><Importaciones /></AdminRoute>} />
+            <Route path="usuarios"       element={<AdminRoute><Usuarios /></AdminRoute>} />
+            <Route path="permisos"       element={<AdminRoute><Permisos /></AdminRoute>} />
+            <Route path="servicios"      element={<AdminRoute><Servicios /></AdminRoute>} />
+            <Route path="auditoria"      element={<AdminRoute><Auditoria /></AdminRoute>} />
+            <Route path="configuracion"  element={<AdminRoute><Configuracion /></AdminRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

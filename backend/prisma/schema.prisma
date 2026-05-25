@@ -538,3 +538,11 @@ model Auditoria {
 
   @@map("auditorias")
 }
+
+model ConfiguracionRolPath {
+  id    Int    @id @default(autoincrement())
+  rol   String @unique
+  paths Json   // string[]
+
+  @@map("configuracion_rol_paths")
+}

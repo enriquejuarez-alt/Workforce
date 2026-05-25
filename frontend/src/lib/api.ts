@@ -238,6 +238,15 @@ export const programacionApi = {
     api.get<import('../types').CronogramaResponse>(`/programacion/${id}/cronograma`),
 }
 
+// Configuración de roles
+export const configuracionApi = {
+  getRolConfig: () => api.get<Record<string, string[]>>('/configuracion/roles'),
+  updateRolConfig: (config: Record<string, string[]>) =>
+    api.put<{ ok: boolean }>('/configuracion/roles', config),
+  resetRol: (rol: string) =>
+    api.delete<{ ok: boolean; defaults: string[] }>(`/configuracion/roles/${rol}`),
+}
+
 // Vacaciones WF
 export const vacacionesApi = {
   list: (params?: Record<string, any>) => api.get<Vacacion[]>('/vacaciones', { params }),

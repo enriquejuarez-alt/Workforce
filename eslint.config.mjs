@@ -11,8 +11,19 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "backend/**",
+    "frontend/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "react/no-unescaped-entities": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/static-components": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

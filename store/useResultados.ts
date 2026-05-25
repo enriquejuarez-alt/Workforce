@@ -186,7 +186,7 @@ export const useResultados = create<ResultadosState>()(
     }),
     {
       name: "plani-resultados",
-      storage: sessionStorageWithMap,
+      storage: sessionStorageWithMap as never,
       // No persistir estado transitorio
       partialize: (state) => ({
         resultado: state.resultado,

@@ -8,15 +8,17 @@ import {
   Sliders,
   CalendarOff,
   Settings2,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Carga de archivos", icon: UploadCloud },
-  { href: "/dashboard", label: "Resumen", icon: LayoutDashboard },
-  { href: "/simulador", label: "Simulador", icon: Sliders },
-  { href: "/franco", label: "Franco", icon: CalendarOff },
-  { href: "/configuracion", label: "Configuración", icon: Settings2 },
+  { href: "/planificacion", label: "Carga de archivos", icon: UploadCloud },
+  { href: "/planificacion/resumen", label: "Resumen", icon: LayoutDashboard },
+  { href: "/planificacion/curvas", label: "Curvas", icon: TrendingUp },
+  { href: "/planificacion/simulador", label: "Simulador", icon: Sliders },
+  { href: "/planificacion/franco", label: "Franco", icon: CalendarOff },
+  { href: "/planificacion/configuracion", label: "Configuración", icon: Settings2 },
 ];
 
 export function Sidebar() {
@@ -43,7 +45,7 @@ export function Sidebar() {
           Módulos
         </p>
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href !== '/planificacion' && pathname.startsWith(href));
           return (
             <Link
               key={href}

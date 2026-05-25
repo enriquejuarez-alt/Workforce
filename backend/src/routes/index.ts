@@ -23,6 +23,7 @@ import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
 import { getReporteAusentismo, exportReporteAusentismo } from '../controllers/reportes'
+import { getRolConfig, updateRolConfig, resetRolConfig } from '../controllers/configuracion'
 import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, previewRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, exportConversor, getCronograma, setNomina } from '../controllers/programacion'
 import { analizarNomina, procesarDistribucion, descargarDistribucion, cruzarNominas } from '../controllers/distribucion'
 
@@ -153,5 +154,9 @@ router.post('/distribucion/analizar', authenticate, uploadExcel.single('file'), 
 router.post('/distribucion/procesar', authenticate, procesarDistribucion)
 router.post('/distribucion/descargar', authenticate, descargarDistribucion)
 router.post('/distribucion/cruzar', authenticate, uploadExcel.array('files', 2), cruzarNominas)
+
+router.get('/configuracion/roles', authenticate, getRolConfig)
+router.put('/configuracion/roles', authenticate, requireAdmin, updateRolConfig)
+router.delete('/configuracion/roles/:rol', authenticate, requireAdmin, resetRolConfig)
 
 export default router

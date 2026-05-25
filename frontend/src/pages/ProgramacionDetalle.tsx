@@ -289,7 +289,7 @@ function CoverageGrid({ sim, intervalos, fechas }: {
           <div className="flex gap-4 mb-2 text-[11px]">
             <span>Asig: <strong className="text-white">{tooltip.data.asignados}</strong></span>
             <span>Req: <strong className="text-white">{tooltip.data.requeridos}</strong></span>
-            <span>L.Inf: <strong className="text-white">{(tooltip.data as any).limite_inferior ?? '—'}</strong></span>
+            <span>L.Inf: <strong className="text-white">{tooltip.data.limite_inferior ?? '—'}</strong></span>
           </div>
           {tooltip.data.agentes?.length > 0 && (
             <div className="border-t border-gray-700 pt-2 max-h-36 overflow-y-auto">
@@ -827,36 +827,40 @@ export default function ProgramacionDetalle() {
             )}
             {cronograma && (
               <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-2.5 text-center">
-                      <p className="text-xl font-black text-gray-900">{cronograma.total}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">agentes</p>
-                    </div>
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-2.5 text-center">
-                      <p className="text-xl font-black text-gray-900">{cronograma.dates.length}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">días</p>
-                    </div>
-                  </div>
-                  <button className="btn-secondary text-xs py-1.5 px-3" onClick={handleExportConversor}>
-                    <Download size={12} /> Exportar Excel
-                  </button>
-                </div>
-
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 270px)' }}>
-                    <table className="text-xs border-collapse" style={{ minWidth: 'max-content' }}>
+                  {/* Card header */}
+                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <Users size={13} className="text-gray-400" />
+                        <span className="text-sm font-black text-gray-900">{cronograma.total}</span>
+                        <span className="text-xs text-gray-400">agentes</span>
+                      </div>
+                      <div className="w-px h-4 bg-gray-200" />
+                      <div className="flex items-center gap-1.5">
+                        <CalendarDays size={13} className="text-gray-400" />
+                        <span className="text-sm font-black text-gray-900">{cronograma.dates.length}</span>
+                        <span className="text-xs text-gray-400">días</span>
+                      </div>
+                    </div>
+                    <button className="btn-secondary text-xs py-1.5 px-3" onClick={handleExportConversor}>
+                      <Download size={12} /> Exportar Excel
+                    </button>
+                  </div>
+
+                  <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 310px)' }}>
+                    <table className="w-full text-xs border-collapse" style={{ minWidth: 'max-content' }}>
                       <thead>
                         <tr>
-                          <th className="sticky left-0 top-0 z-30 bg-gray-900 text-white px-4 py-3 text-left border-r border-gray-700 whitespace-nowrap font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 200 }}>Agente</th>
-                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-3 py-3 text-center border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 62 }}>Cto.</th>
-                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-3 py-3 text-center border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 62 }}>Ingreso</th>
-                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-3 py-3 text-center border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 62 }}>Break</th>
-                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-4 py-3 text-left border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 120 }}>Francos</th>
+                          <th className="sticky left-0 top-0 z-30 bg-gray-900 text-white px-4 py-3 text-left border-r border-gray-700 whitespace-nowrap font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 220 }}>Agente</th>
+                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-3 py-3 text-center border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 68 }}>Cto.</th>
+                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-3 py-3 text-center border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 68 }}>Ingreso</th>
+                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-3 py-3 text-center border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 68 }}>Break</th>
+                          <th className="sticky top-0 z-20 bg-gray-900 text-white px-4 py-3 text-left border-r border-gray-700 font-semibold text-[11px] uppercase tracking-wide" style={{ minWidth: 130 }}>Francos</th>
                           {cronograma.dates.map(d => (
                             <th key={d.fecha}
-                              className={`sticky top-0 z-20 text-white px-1 py-3 text-center border-r border-gray-700 ${d.dow === 0 || d.dow === 6 ? 'bg-gray-700' : 'bg-gray-800'}`}
-                              style={{ minWidth: 44 }}
+                              className={`sticky top-0 z-20 text-white px-2 py-3 text-center border-r border-gray-700 ${d.dow === 0 || d.dow === 6 ? 'bg-gray-700' : 'bg-gray-800'}`}
+                              style={{ minWidth: 56 }}
                             >
                               <div className="text-[9px] font-normal opacity-60">{d.dia_semana}</div>
                               <div className="font-bold text-[12px]">{d.dia_num}</div>

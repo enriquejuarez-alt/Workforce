@@ -279,6 +279,15 @@ export const vacacionesApi = {
   deleteImportacion: (id: number) => api.delete(`/vacaciones/importaciones/${id}`),
 }
 
+// Configuración de roles
+export const configuracionApi = {
+  getRolConfig: () => api.get<Record<string, string[]>>('/configuracion/roles'),
+  updateRolConfig: (config: Record<string, string[]>) =>
+    api.put<{ ok: boolean }>('/configuracion/roles', config),
+  resetRol: (rol: string) =>
+    api.delete<{ ok: boolean; defaults: string[] }>(`/configuracion/roles/${rol}`),
+}
+
 // Plani / Walt integration
 export interface PlaniServicioConfig {
   key: string

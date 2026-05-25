@@ -33,11 +33,12 @@ const PROGRAMACION_ITEMS = [
 ]
 
 const ADMIN_ITEMS = [
-  { to: '/carga',         icon: Upload,    label: 'Carga de Nómina' },
-  { to: '/importaciones', icon: History,   label: 'Historial Importaciones' },
-  { to: '/usuarios',      icon: Users,     label: 'Usuarios' },
-  { to: '/servicios',     icon: Building2, label: 'Servicios' },
-  { to: '/auditoria',     icon: Activity,  label: 'Auditoría' },
+  { to: '/carga',          icon: Upload,    label: 'Carga de Nómina' },
+  { to: '/importaciones',  icon: History,   label: 'Historial Importaciones' },
+  { to: '/usuarios',       icon: Users,     label: 'Usuarios' },
+  { to: '/servicios',      icon: Building2, label: 'Servicios' },
+  { to: '/auditoria',      icon: Activity,  label: 'Auditoría' },
+  { to: '/configuracion',  icon: Sliders,   label: 'Configuración' },
 ]
 
 const WALT_ITEMS = [

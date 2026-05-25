@@ -32,6 +32,7 @@ const SECTION_MAP: Record<string, string> = {
   '/usuarios':         'Administración · Usuarios',
   '/servicios':        'Administración · Servicios',
   '/auditoria':        'Administración · Auditoría',
+  '/configuracion':    'Administración · Configuración',
   '/soporte':          'Soporte',
   '/planificacion':    'Walt · Planificación',
   '/programacion':     'Programación',

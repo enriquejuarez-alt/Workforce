@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   RotateCcw, Download, TrendingUp, TrendingDown, Minus,
-  AlertTriangle, Clock, GitCompare, X, Save, ChevronDown, CalendarRange,
+  AlertTriangle, Clock, GitCompare, X, Save, ChevronDown, CalendarRange, FilePen,
 } from "lucide-react";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { useResultados } from "@/store/useResultados";
@@ -494,6 +495,13 @@ export default function SimuladorPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/planificacion/contratos"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-[#0054A6]/30 hover:text-[#0054A6]"
+            >
+              <FilePen className="h-3.5 w-3.5" />
+              Contratos
+            </Link>
             <GuardarEscenario />
             <Button variant="secondary" size="sm" onClick={resetAjustes} className="gap-1.5">
               <RotateCcw className="h-3.5 w-3.5" />

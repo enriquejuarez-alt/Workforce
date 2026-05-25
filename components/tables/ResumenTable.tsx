@@ -10,12 +10,13 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface Props {
   resultados: ResultadoServicio[];
+  francoMap?: Map<string, number>;
 }
 
 type SortKey = "servicio" | "hcActivos" | "cumplimiento" | "deltaHC103" | "teoricoFacturable";
 type SortDir = "asc" | "desc";
 
-export function ResumenTable({ resultados }: Props) {
+export function ResumenTable({ resultados, francoMap }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("servicio");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [expandidoEq, setExpandidoEq] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export function ResumenTable({ resultados }: Props) {
             const eq = r.agentesEquivalentes;
             const tieneDeficit = r.deltaHC103 > 0;
             const fa = r.francoAjuste;
+            const hcConFrancoReactivo = francoMap?.get(r.servicio);
 
             return (
               <React.Fragment key={r.servicio}>
@@ -133,7 +135,12 @@ export function ResumenTable({ resultados }: Props) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {fa ? (
+                    {hcConFrancoReactivo != null ? (
+                      <div className="text-xs tabular-nums">
+                        <span className="font-semibold text-orange-600">{Math.ceil(hcConFrancoReactivo)}</span>
+                        <span className="text-gray-400 ml-1">(+{Math.ceil(Math.max(0, hcConFrancoReactivo - r.hcActivos))})</span>
+                      </div>
+                    ) : fa ? (
                       <div className="text-xs tabular-nums">
                         <span className="font-semibold text-orange-600">{Math.ceil(fa.hcConFranco)}</span>
                         <span className="text-gray-400 ml-1">(+{Math.ceil(fa.extra)})</span>
@@ -164,13 +171,17 @@ export function ResumenTable({ resultados }: Props) {
                           <span className="text-gray-400">Mix actual:</span>{" "}
                           <strong className="text-amber-600">{Math.ceil(eq.mix)} personas</strong>
                         </span>
-                        {fa && (
+                        {(hcConFrancoReactivo != null || fa) && (
                           <>
                             <span className="text-gray-300">|</span>
-                            <span className="text-gray-500">Plantel total c/franco (jue–dom):</span>
+                            <span className="text-gray-500">Plantel total c/franco:</span>
                             <span className="text-gray-700">
-                              <strong className="text-orange-600">{Math.ceil(fa.hcConFranco)}</strong>
-                              <span className="text-gray-400 ml-1">({((1 - fa.factorDisponible) * 100).toFixed(0)}% en franco)</span>
+                              <strong className="text-orange-600">
+                                {Math.ceil(hcConFrancoReactivo ?? fa!.hcConFranco)}
+                              </strong>
+                              {fa && hcConFrancoReactivo == null && (
+                                <span className="text-gray-400 ml-1">({((1 - fa.factorDisponible) * 100).toFixed(0)}% en franco)</span>
+                              )}
                             </span>
                           </>
                         )}

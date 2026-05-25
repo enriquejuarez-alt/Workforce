@@ -39,6 +39,14 @@ export interface ReglaFrancoContrato {
 
 export const FRANCO_DEFAULTS: ReglaFrancoContrato[] = [
   {
+    hsSemanal: 24,
+    label: "24 hs",
+    francos: [
+      { dias: ["lunes", "martes", "miercoles", "jueves", "viernes"] },
+      { dias: ["sabado", "domingo"] },
+    ],
+  },
+  {
     hsSemanal: 30,
     label: "30 hs",
     francos: [

@@ -9,6 +9,7 @@ import {
   CalendarOff,
   Settings2,
   TrendingUp,
+  FilePen,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/planificacion/resumen", label: "Resumen", icon: LayoutDashboard },
   { href: "/planificacion/curvas", label: "Curvas", icon: TrendingUp },
   { href: "/planificacion/simulador", label: "Simulador", icon: Sliders },
+  { href: "/planificacion/contratos", label: "Contratos", icon: FilePen },
   { href: "/planificacion/franco", label: "Franco", icon: CalendarOff },
   { href: "/planificacion/configuracion", label: "Configuración", icon: Settings2 },
 ];

@@ -7,7 +7,7 @@ import {
   ClipboardList, ArrowLeftRight, Shield, GitCompare,
   LogOut, Activity, History, UserMinus, GraduationCap, Palmtree,
   CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
-  PanelLeftClose, PanelLeftOpen, TrendingDown, GitCommitVertical,
+  PanelLeftClose, PanelLeftOpen, TrendingDown, GitCommitVertical, FilePen,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { useSidebarStore } from '@/store/sidebar'
@@ -48,6 +48,7 @@ const WALT_ITEMS = [
   { to: '/planificacion/resumen',     icon: LayoutDashboard, label: 'Resumen' },
   { to: '/planificacion/curvas',      icon: TrendingUp,      label: 'Curvas' },
   { to: '/planificacion/simulador',   icon: Sliders,         label: 'Simulador' },
+  { to: '/planificacion/contratos',    icon: FilePen,         label: 'Contratos' },
 ]
 
 const navItemBase = (collapsed: boolean) =>

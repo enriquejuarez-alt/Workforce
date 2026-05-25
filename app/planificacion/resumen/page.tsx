@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useResultados } from "@/store/useResultados";
 import { useUploads } from "@/store/useUploads";
+import { useFrancoConfig } from "@/store/useFrancoConfig";
 import { KpiCard } from "@/components/KpiCard";
 import { ResumenTable } from "@/components/tables/ResumenTable";
 import { CumplimientoBarChart } from "@/components/charts/CumplimientoBarChart";
@@ -13,6 +14,8 @@ import { nivelCumplimiento } from "@/lib/domain/types";
 import { fmtNumero, fmtPct, fmtHoras } from "@/lib/utils/formato";
 import { filtrarAgentes, hayFiltrosActivos } from "@/lib/domain/filterEngine";
 import { calcularResultados } from "@/lib/domain/calculos";
+import { calcularFrancoPorServicio } from "@/lib/domain/francoEngine";
+import { getServiciosKeys } from "@/lib/config/servicesRuntime";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +32,13 @@ export default function DashboardPage() {
     activeFilters,
   } = useResultados();
   const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
+  const { reglas } = useFrancoConfig();
+
+  const francoMap = useMemo(() => {
+    if (agentes.length === 0) return new Map<string, number>();
+    const resultados = calcularFrancoPorServicio(agentes, matrices, reglas, getServiciosKeys());
+    return new Map(resultados.map((r) => [r.servicio, r.hcNecesarioTotal]));
+  }, [agentes, matrices, reglas]);
 
   const resultadoMostrado = useMemo(() => {
     if (!resultado || agentes.length === 0) return resultado;
@@ -181,7 +191,7 @@ export default function DashboardPage() {
           <h3 className="text-sm font-semibold text-gray-700 mb-3">
             Detalle por servicio
           </h3>
-          <ResumenTable resultados={resultadoMostrado.resultados} />
+          <ResumenTable resultados={resultadoMostrado.resultados} francoMap={francoMap} />
         </div>
 
         {/* Todas las alertas */}

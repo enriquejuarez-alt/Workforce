@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
@@ -43,11 +43,11 @@ export default function FrancoPage() {
           )}
         </div>
         <Link
-          href="/configuracion"
+          href="/planificacion/contratos"
           className="flex items-center gap-1.5 text-xs text-[#0054A6] hover:underline underline-offset-2"
         >
           <Info className="h-3.5 w-3.5" />
-          Editar reglas de franco
+          Editar contratos y francos
         </Link>
       </div>
 

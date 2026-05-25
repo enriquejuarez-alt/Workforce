@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { AlertCircle, ArrowRight, ChevronDown, AlertTriangle, Loader2, CheckCircle2, X } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronDown, AlertTriangle, Loader2, CheckCircle2, X, FilePen } from "lucide-react";
 import { DropZone } from "@/components/upload/DropZone";
 import { FilePreview } from "@/components/upload/FilePreview";
 import { Button } from "@/components/ui/button";
@@ -294,6 +295,13 @@ export default function UploadPage() {
             <h2 className="text-lg font-bold text-gray-900 leading-tight">Carga de archivos</h2>
             <p className="text-xs text-gray-400 mt-0.5">Procesamiento local · los datos no salen del navegador</p>
           </div>
+          <Link
+            href="/planificacion/contratos"
+            className="hidden md:flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-[#0054A6]/30 hover:text-[#0054A6]"
+          >
+            <FilePen className="h-3.5 w-3.5" />
+            Contratos y francos
+          </Link>
           {/* Mini stepper */}
           <div className="hidden sm:flex items-center gap-1.5 shrink-0">
             {stepDot(!!archivoCP, "bg-blue-500", 1)}

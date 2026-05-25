@@ -8,6 +8,7 @@ import {
 import type { ResultadoServicio } from "@/lib/domain/types";
 import { type ServicioKey } from "@/lib/domain/types";
 import { useSimulador } from "@/store/useSimulador";
+import { useFrancoConfig } from "@/store/useFrancoConfig";
 import { fmtPct } from "@/lib/utils/formato";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -312,6 +313,7 @@ function ReductoresCell({
 
 function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: ServicioKey[]; resultadosSimulados: ResultadoServicio[] }) {
   const { modificaciones, escenarios, addModificacion, bulkAddModificaciones, removeModificacion, clearModificaciones, saveEscenario, loadEscenario, deleteEscenario } = useSimulador();
+  const contratos = useFrancoConfig((s) => s.reglas);
 
   const [tipoActivo, setTipoActivo] = useState<TipoOp>("add_agents");
   const [servicio, setServicio]     = useState<ServicioKey>(servicios[0]);
@@ -499,9 +501,11 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Contrato</label>
               <select value={hsSemanal} onChange={(e) => setHsSemanal(parseInt(e.target.value))} className={selectCls}>
-                <option value={30}>30 hs/sem</option>
-                <option value={35}>35 hs/sem</option>
-                <option value={36}>36 hs/sem</option>
+                {contratos.map((contrato) => (
+                  <option key={contrato.hsSemanal} value={contrato.hsSemanal}>
+                    {contrato.label || `${contrato.hsSemanal} hs`} / sem
+                  </option>
+                ))}
               </select>
             </div>
           )}

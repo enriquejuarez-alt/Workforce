@@ -205,6 +205,7 @@ export interface ResultadoServicio {
   // Unidades facturables
   tope: number;
   teoricoFacturable: number;
+  hsFacturable100: number;
   recorte: number;
   faltante: number;
   // Franco dimensionamiento

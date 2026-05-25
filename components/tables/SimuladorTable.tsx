@@ -127,7 +127,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
   const { ajustes, setAjuste } = useSimulador();
   const [open, setOpen] = useState(false);
 
-  const inputCls = "w-16 h-7 bg-white border border-gray-300 rounded-lg px-2 text-xs tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
+  const editorInputCls = "w-16 h-7 bg-white border border-gray-300 rounded-lg px-2 text-xs tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
 
   const tieneOverrides = resultadosBase.some((r) => {
     const aj = ajustes[r.servicio];
@@ -215,7 +215,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
                             const v = e.target.value === "" ? null : parseFloat(e.target.value) / 100;
                             setAjuste(r.servicio as ServicioKey, { deslogueoOverride: v });
                           }}
-                          className={cn(inputCls, aj.deslogueoOverride !== null && "border-violet-400 bg-violet-50")}
+                          className={cn(editorInputCls, aj.deslogueoOverride !== null && "border-violet-400 bg-violet-50")}
                         />
                       </td>
                       <td className="py-2 px-2 text-center">
@@ -230,7 +230,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
                             const v = e.target.value === "" ? null : parseFloat(e.target.value) / 100;
                             setAjuste(r.servicio as ServicioKey, { ausentismoOverride: v });
                           }}
-                          className={cn(inputCls, aj.ausentismoOverride !== null && "border-violet-400 bg-violet-50")}
+                          className={cn(editorInputCls, aj.ausentismoOverride !== null && "border-violet-400 bg-violet-50")}
                         />
                       </td>
                       <td className="py-2 px-2 text-center">
@@ -245,7 +245,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
                             const v = e.target.value === "" ? null : parseFloat(e.target.value) / 100;
                             setAjuste(r.servicio as ServicioKey, { rotacionOverride: v });
                           }}
-                          className={cn(inputCls, aj.rotacionOverride !== null && "border-violet-400 bg-violet-50")}
+                          className={cn(editorInputCls, aj.rotacionOverride !== null && "border-violet-400 bg-violet-50")}
                         />
                       </td>
                       <td className="py-2 px-2">
@@ -271,6 +271,43 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
   );
 }
 
+// ── ReductoresCell ────────────────────────────────────────────────────────────
+
+function ReductoresCell({
+  base,
+  sim,
+}: {
+  base: ResultadoServicio;
+  sim: ResultadoServicio;
+}) {
+  const rows = [
+    { label: "Desl.", base: base.reductoRes.deslogueo, sim: sim.reductoRes.deslogueo },
+    { label: "Aus.",  base: base.reductoRes.ausentismo, sim: sim.reductoRes.ausentismo },
+    { label: "Rot.",  base: base.reductoRes.rotacion,   sim: sim.reductoRes.rotacion  },
+  ];
+
+  return (
+    <div className="space-y-0.5">
+      {rows.map(({ label, base: bv, sim: sv }) => {
+        const changed = Math.abs(sv - bv) > 0.0005;
+        return (
+          <div key={label} className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-400 w-7 shrink-0">{label}</span>
+            <span className={cn("text-[10px] tabular-nums font-medium", changed ? "text-violet-600" : "text-gray-600")}>
+              {(sv * 100).toFixed(1)}%
+            </span>
+            {changed && (
+              <span className="text-[9px] text-gray-400 tabular-nums">
+                ({(bv * 100).toFixed(1)})
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── EscenarioBuilder ─────────────────────────────────────────────────────────
 
 function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: ServicioKey[]; resultadosSimulados: ResultadoServicio[] }) {
@@ -284,8 +321,6 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
   const [saveNombre, setSaveNombre]     = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [showEscenarios, setShowEscenarios] = useState(false);
-
-  const opCfg = OPERACIONES.find((o) => o.tipo === tipoActivo)!;
 
   const agregar = () => {
     const params: Record<string, unknown> = { cantidad };
@@ -506,43 +541,6 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ── ReductoresCell ────────────────────────────────────────────────────────────
-
-function ReductoresCell({
-  base,
-  sim,
-}: {
-  base: ResultadoServicio;
-  sim: ResultadoServicio;
-}) {
-  const rows = [
-    { label: "Desl.", base: base.reductoRes.deslogueo, sim: sim.reductoRes.deslogueo },
-    { label: "Aus.",  base: base.reductoRes.ausentismo, sim: sim.reductoRes.ausentismo },
-    { label: "Rot.",  base: base.reductoRes.rotacion,   sim: sim.reductoRes.rotacion  },
-  ];
-
-  return (
-    <div className="space-y-0.5">
-      {rows.map(({ label, base: bv, sim: sv }) => {
-        const changed = Math.abs(sv - bv) > 0.0005;
-        return (
-          <div key={label} className="flex items-center gap-1">
-            <span className="text-[10px] text-gray-400 w-7 shrink-0">{label}</span>
-            <span className={cn("text-[10px] tabular-nums font-medium", changed ? "text-violet-600" : "text-gray-600")}>
-              {(sv * 100).toFixed(1)}%
-            </span>
-            {changed && (
-              <span className="text-[9px] text-gray-400 tabular-nums">
-                ({(bv * 100).toFixed(1)})
-              </span>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }

@@ -34,6 +34,7 @@ export default function FrancoPage() {
       transition={{ duration: 0.2 }}
       className="p-6 space-y-6"
     >
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Planificación de francos</h1>
@@ -50,6 +51,7 @@ export default function FrancoPage() {
         </Link>
       </div>
 
+      {/* Info banner */}
       <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 flex gap-2">
         <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <span>
@@ -58,6 +60,7 @@ export default function FrancoPage() {
         </span>
       </div>
 
+      {/* Grid */}
       <FrancoGrid resultados={resultadosFranco} />
     </motion.div>
   );

@@ -5,6 +5,16 @@ import { DIAS_SEMANA, DIA_LABELS, type DiaSemana } from "@/lib/config/francoRule
 import { cn } from "@/lib/utils/cn";
 import { Plus, Trash2, RotateCcw } from "lucide-react";
 
+const GRUPO_LABELS: Record<string, string> = {
+  lunes: "Semana",
+  martes: "Semana",
+  miercoles: "Semana",
+  jueves: "Jue–Dom",
+  viernes: "Jue–Dom",
+  sabado: "Finde",
+  domingo: "Finde",
+};
+
 export function FrancoRulesEditor() {
   const { reglas, setVentana, addFranco, removeFranco, resetToDefaults } = useFrancoConfig();
 
@@ -43,6 +53,7 @@ export function FrancoRulesEditor() {
             key={regla.hsSemanal}
             className="rounded-xl border border-gray-200 bg-white overflow-hidden"
           >
+            {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-gray-800">{regla.label}</span>
@@ -59,6 +70,7 @@ export function FrancoRulesEditor() {
               </button>
             </div>
 
+            {/* Franco windows */}
             <div className="divide-y divide-gray-100">
               {regla.francos.map((ventana, fi) => (
                 <div key={fi} className="flex items-center gap-4 px-5 py-3">
@@ -66,6 +78,7 @@ export function FrancoRulesEditor() {
                     Franco {fi + 1}
                   </span>
 
+                  {/* Day toggles */}
                   <div className="flex items-center gap-1.5 flex-1">
                     {DIAS_SEMANA.map((dia) => {
                       const activo = ventana.dias.includes(dia);
@@ -109,6 +122,7 @@ export function FrancoRulesEditor() {
         ))}
       </div>
 
+      {/* Legend */}
       <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-700">
         <strong>Cómo funciona:</strong> si un contrato tiene franco en una ventana de N días,
         cada día dentro de esa ventana tiene probabilidad 1/N de ser el día de franco del agente.

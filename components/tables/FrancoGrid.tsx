@@ -33,6 +33,7 @@ export function FrancoGrid({ resultados }: Props) {
 
   return (
     <div className="space-y-3">
+      {/* Header row */}
       <div className="overflow-auto rounded-xl border border-gray-200">
         <table className="w-full text-sm">
           <thead>
@@ -68,14 +69,17 @@ export function FrancoGrid({ resultados }: Props) {
                   i % 2 === 0 ? "bg-white" : "bg-gray-50/40"
                 )}
               >
+                {/* Service name */}
                 <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">
                   {r.servicio}
                 </td>
 
+                {/* Active HC */}
                 <td className="px-3 py-3 tabular-nums text-gray-600 text-center">
                   {Math.round(r.hcActivos)}
                 </td>
 
+                {/* Composition */}
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap gap-1">
                     {r.composicion.map(({ hsSemanal, cantidad }) => (
@@ -92,6 +96,7 @@ export function FrancoGrid({ resultados }: Props) {
                   </div>
                 </td>
 
+                {/* Day cells */}
                 {r.dias.map((d) => (
                   <td key={d.dia} className="px-2 py-2 text-center">
                     <div
@@ -112,6 +117,7 @@ export function FrancoGrid({ resultados }: Props) {
                   </td>
                 ))}
 
+                {/* HC necesario total */}
                 <td className="px-4 py-3 text-right tabular-nums">
                   <span className="font-semibold text-orange-600">
                     {Math.ceil(r.hcNecesarioTotal)}
@@ -128,6 +134,7 @@ export function FrancoGrid({ resultados }: Props) {
         </table>
       </div>
 
+      {/* Legend */}
       <div className="flex items-center gap-4 text-xs text-gray-500 px-1">
         <span className="font-medium text-gray-600">Estado:</span>
         {(["surplus", "ok", "justo", "deficit"] as EstadoFranco[]).map((e) => (

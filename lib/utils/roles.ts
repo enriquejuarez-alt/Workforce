@@ -1,4 +1,5 @@
 import type { Rol } from '@/types'
+import { useConfigStore } from '@/store/config'
 
 // Etiquetas para mostrar en UI
 export const ROL_LABELS: Record<Rol, string> = {
@@ -17,73 +18,16 @@ export const ROL_BADGE_VARIANT: Record<Rol, string> = {
   USUARIO:       'purple',
 }
 
-// Paths de navegación a los que cada rol tiene acceso.
-// El path se compara con startsWith, así que '/nomina' cubre '/nomina/agente/:id'.
-// ADMINISTRADOR usa '*' → acceso total.
-const ROL_PATHS: Record<Rol, string[] | '*'> = {
-  ADMINISTRADOR: '*',
-
-  WORKFORCE: [
-    '/dashboard',
-    '/nomina',
-    '/licencias',
-    '/calendario',
-    '/cambios',
-    '/bajas',
-    '/capacitaciones',
-    '/vacaciones',
-    '/comparacion',
-    '/ausentismo',
-    '/historial-agente',
-    '/planificacion',
-    '/programacion',
-    '/distribucion',
-    '/soporte',
-  ],
-
-  LIDER: [
-    '/dashboard',
-    '/nomina',
-    '/licencias',
-    '/calendario',
-    '/bajas',
-    '/ausentismo',
-    '/soporte',
-  ],
-
-  CAPACITADOR: [
-    '/capacitaciones',
-    '/soporte',
-  ],
-
-  // USUARIO es el rol legacy — mismo acceso que WORKFORCE
-  USUARIO: [
-    '/dashboard',
-    '/nomina',
-    '/licencias',
-    '/calendario',
-    '/cambios',
-    '/bajas',
-    '/capacitaciones',
-    '/vacaciones',
-    '/comparacion',
-    '/ausentismo',
-    '/historial-agente',
-    '/planificacion',
-    '/programacion',
-    '/distribucion',
-    '/soporte',
-  ],
-}
-
 /**
- * Retorna true si el rol puede acceder al path dado.
- * Usá este helper en RoleRoute y en el Sidebar.
+ * canAccess lee del store dinámico (configurado por el admin).
+ * ADMINISTRADOR siempre tiene acceso total.
+ * Rutas admin-only (/carga, /usuarios, etc.) se controlan por separado.
  */
 export function canAccess(rol: Rol | undefined, path: string): boolean {
   if (!rol) return false
-  const allowed = ROL_PATHS[rol]
-  if (allowed === '*') return true
+  if (rol === 'ADMINISTRADOR') return true
+  const { rolPaths } = useConfigStore.getState()
+  const allowed = rolPaths[rol] ?? []
   return allowed.some((p) => path === p || path.startsWith(p + '/'))
 }
 

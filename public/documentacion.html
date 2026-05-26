@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Documentación Técnica — Sistema Konecta HC</title>
+<style>
+  /* ─── Variables ─────────────────────────────────────────────────── */
+  :root {
+    --blue:    #0054A6;
+    --blue-lt: #E8F0FB;
+    --navy:    #001E50;
+    --gray:    #6B7280;
+    --gray-lt: #F3F4F6;
+    --border:  #E5E7EB;
+    --text:    #111827;
+    --green:   #059669;
+    --red:     #DC2626;
+    --amber:   #D97706;
+    --purple:  #7C3AED;
+  }
+
+  /* ─── Reset & base ──────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 13px; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    line-height: 1.65;
+    background: #fff;
+  }
+  a { color: var(--blue); }
+
+  /* ─── Print setup ───────────────────────────────────────────────── */
+  @page {
+    size: A4;
+    margin: 18mm 15mm 18mm 20mm;
+  }
+  @media print {
+    .no-print { display: none !important; }
+    .page-break { page-break-before: always; break-before: page; }
+    .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+    body { font-size: 11.5px; }
+    h1, h2, h3 { page-break-after: avoid; break-after: avoid; }
+  }
+
+  /* ─── Typography ────────────────────────────────────────────────── */
+  h1 { font-size: 2.2em; font-weight: 800; color: var(--navy); }
+  h2 { font-size: 1.35em; font-weight: 700; color: var(--navy); margin-top: 2.2em; margin-bottom: .6em; border-bottom: 2px solid var(--blue); padding-bottom: .3em; }
+  h3 { font-size: 1.08em; font-weight: 700; color: var(--blue); margin-top: 1.6em; margin-bottom: .4em; }
+  h4 { font-size: .98em; font-weight: 600; color: #374151; margin-top: 1.2em; margin-bottom: .3em; }
+  p  { margin-bottom: .8em; }
+  ul, ol { padding-left: 1.4em; margin-bottom: .8em; }
+  li { margin-bottom: .25em; }
+  strong { font-weight: 700; }
+  em { font-style: italic; color: var(--gray); }
+  code {
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: .88em;
+    background: var(--gray-lt);
+    padding: .1em .35em;
+    border-radius: 3px;
+    color: #1e40af;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 1em 1.2em;
+    overflow-x: auto;
+    font-size: .82em;
+    line-height: 1.7;
+    margin: .8em 0 1.2em;
+    border-left: 3px solid var(--blue);
+  }
+  pre code { background: none; padding: 0; color: inherit; font-size: 1em; }
+
+  /* ─── Layout containers ─────────────────────────────────────────── */
+  .wrapper { max-width: 860px; margin: 0 auto; padding: 2rem 2.5rem; }
+  .section  { margin-bottom: 2.5em; }
+
+  /* ─── Cover page ────────────────────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: var(--navy);
+    color: #fff;
+    padding: 3rem 3.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: rgba(0,84,166,.35);
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; left: -60px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: rgba(0,84,166,.2);
+  }
+  .cover-logo {
+    width: 52px; height: 52px; border-radius: 12px;
+    background: var(--blue);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8em; font-weight: 900; color: #fff;
+    margin-bottom: 2.5rem;
+    position: relative; z-index: 1;
+  }
+  .cover h1 { color: #fff; font-size: 2.8em; line-height: 1.15; margin-bottom: .5em; position: relative; z-index: 1; }
+  .cover .subtitle { font-size: 1.1em; color: rgba(255,255,255,.65); margin-bottom: 2.5em; z-index: 1; position: relative; }
+  .cover-badges { display: flex; gap: .6em; flex-wrap: wrap; position: relative; z-index: 1; }
+  .badge {
+    padding: .3em .9em; border-radius: 999px; font-size: .78em; font-weight: 600;
+    background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.2);
+  }
+  .cover-meta { margin-top: auto; padding-top: 3rem; position: relative; z-index: 1; }
+  .cover-meta p { color: rgba(255,255,255,.45); font-size: .82em; }
+
+  /* ─── TOC ───────────────────────────────────────────────────────── */
+  .toc { background: var(--gray-lt); border-radius: 8px; padding: 1.4em 1.8em; margin-bottom: 2em; }
+  .toc h2 { border: none; margin-top: 0; font-size: 1em; text-transform: uppercase; letter-spacing: .08em; color: var(--gray); }
+  .toc ol { padding-left: 1.2em; }
+  .toc li { margin-bottom: .2em; font-size: .9em; }
+  .toc a { text-decoration: none; color: var(--blue); }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ─── Info boxes ────────────────────────────────────────────────── */
+  .info  { background: var(--blue-lt); border-left: 3px solid var(--blue); border-radius: 0 6px 6px 0; padding: .8em 1.1em; margin-bottom: 1em; font-size: .92em; }
+  .warn  { background: #FEF3C7; border-left: 3px solid var(--amber); border-radius: 0 6px 6px 0; padding: .8em 1.1em; margin-bottom: 1em; font-size: .92em; }
+  .tip   { background: #D1FAE5; border-left: 3px solid var(--green); border-radius: 0 6px 6px 0; padding: .8em 1.1em; margin-bottom: 1em; font-size: .92em; }
+
+  /* ─── Tables ────────────────────────────────────────────────────── */
+  .tbl-wrap { overflow-x: auto; margin-bottom: 1.2em; }
+  table { width: 100%; border-collapse: collapse; font-size: .87em; }
+  th {
+    background: var(--navy); color: #fff;
+    padding: .55em .9em; text-align: left;
+    font-weight: 600; font-size: .82em; text-transform: uppercase; letter-spacing: .06em;
+    white-space: nowrap;
+  }
+  td { padding: .5em .9em; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: var(--gray-lt); }
+  tr:hover td { background: var(--blue-lt); }
+
+  /* ─── Formula box ───────────────────────────────────────────────── */
+  .formula {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 6px;
+    padding: .9em 1.2em;
+    margin: .8em 0 1.2em;
+    font-family: 'Consolas', monospace;
+    font-size: .88em;
+    line-height: 1.9;
+    color: #0c4a6e;
+  }
+  .formula .comment { color: #64748b; font-style: italic; }
+
+  /* ─── Flow steps ────────────────────────────────────────────────── */
+  .flow-steps { counter-reset: step; padding: 0; list-style: none; }
+  .flow-steps li {
+    counter-increment: step;
+    padding: .6em 0 .6em 2.8em;
+    position: relative;
+    border-left: 2px solid var(--border);
+    margin-left: 1em;
+    padding-left: 1.8em;
+  }
+  .flow-steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: -1.05em;
+    top: .55em;
+    width: 2em; height: 2em;
+    background: var(--blue); color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75em; font-weight: 700;
+    line-height: 1;
+  }
+  .flow-steps li:last-child { border-color: transparent; }
+
+  /* ─── Grid cards ────────────────────────────────────────────────── */
+  .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .8em; margin-bottom: 1em; }
+  .card {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 1em 1.1em; background: #fff;
+  }
+  .card-title { font-weight: 700; font-size: .9em; color: var(--navy); margin-bottom: .3em; }
+  .card p { font-size: .85em; color: var(--gray); margin: 0; }
+
+  /* ─── Role badge colors ─────────────────────────────────────────── */
+  .role-admin  { background: #FEE2E2; color: #991B1B; padding: .15em .5em; border-radius: 4px; font-size: .8em; font-weight: 700; }
+  .role-wf     { background: #DBEAFE; color: #1E3A8A; padding: .15em .5em; border-radius: 4px; font-size: .8em; font-weight: 700; }
+  .role-user   { background: #F3E8FF; color: #5B21B6; padding: .15em .5em; border-radius: 4px; font-size: .8em; font-weight: 700; }
+  .role-cap    { background: #D1FAE5; color: #065F46; padding: .15em .5em; border-radius: 4px; font-size: .8em; font-weight: 700; }
+  .role-lider  { background: #FEF3C7; color: #92400E; padding: .15em .5em; border-radius: 4px; font-size: .8em; font-weight: 700; }
+
+  /* ─── Misc ──────────────────────────────────────────────────────── */
+  .tag { display: inline-block; padding: .1em .4em; border-radius: 3px; font-size: .75em; font-weight: 700; }
+  .tag-get    { background: #D1FAE5; color: #065F46; }
+  .tag-post   { background: #DBEAFE; color: #1E3A8A; }
+  .tag-put    { background: #FEF3C7; color: #92400E; }
+  .tag-patch  { background: #FEF9C3; color: #713F12; }
+  .tag-delete { background: #FEE2E2; color: #991B1B; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+  .print-btn {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+    background: var(--blue); color: #fff;
+    border: none; border-radius: 999px; padding: .7em 1.5em;
+    font-size: .9em; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(0,84,166,.4);
+    transition: background .15s;
+  }
+  .print-btn:hover { background: #004090; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">⬇ Guardar como PDF</button>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PORTADA
+════════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">K</div>
+  <h1>Documentación Técnica<br/>Sistema Konecta HC</h1>
+  <p class="subtitle">Gestión de Nómina de Personal · Módulo WALT de Planificación de Dotación</p>
+  <div class="cover-badges">
+    <span class="badge">Next.js 16</span>
+    <span class="badge">Express + Prisma</span>
+    <span class="badge">PostgreSQL</span>
+    <span class="badge">TypeScript 5</span>
+    <span class="badge">React Query 5</span>
+    <span class="badge">Zustand 5</span>
+  </div>
+  <div class="cover-meta">
+    <p>Versión del sistema: 2.0 · 2026</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     CONTENIDO
+════════════════════════════════════════════════════════════════════ -->
+<div class="wrapper">
+
+<!-- Índice -->
+<div class="toc page-break">
+  <h2>Tabla de Contenidos</h2>
+  <ol>
+    <li><a href="#sec-overview">Visión General del Sistema</a></li>
+    <li><a href="#sec-arch">Arquitectura Técnica</a></li>
+    <li><a href="#sec-auth">Autenticación y Seguridad</a></li>
+    <li><a href="#sec-roles">Roles y Permisos</a></li>
+    <li><a href="#sec-data">Modelos de Datos</a></li>
+    <li><a href="#sec-backend">Backend: API REST</a></li>
+    <li><a href="#sec-hr">Módulo HR — Gestión de Nómina</a></li>
+    <li><a href="#sec-walt">Módulo WALT — Planificación de Dotación</a></li>
+    <li><a href="#sec-parsers">Parsers de Archivos Excel</a></li>
+    <li><a href="#sec-calculos">Motor de Cálculo</a></li>
+    <li><a href="#sec-franco">Motor de Franco</a></li>
+    <li><a href="#sec-simulador">Simulador de Escenarios</a></li>
+    <li><a href="#sec-stores">Gestión de Estado</a></li>
+    <li><a href="#sec-planibridge">Integración Embebida (postMessage)</a></li>
+    <li><a href="#sec-servicios">Servicios Configurados</a></li>
+    <li><a href="#sec-glossary">Glosario</a></li>
+  </ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     1. VISIÓN GENERAL
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-overview">
+<h2>1. Visión General del Sistema</h2>
+
+<p>
+  <strong>Konecta HC</strong> es una plataforma interna de gestión de recursos humanos y planificación de
+  dotación para los equipos de soporte de Konecta Argentina. El sistema está compuesto por dos módulos
+  independientes que coexisten en una misma aplicación:
+</p>
+
+<div class="card-grid">
+  <div class="card">
+    <div class="card-title">🏢 Módulo HR — Nómina</div>
+    <p>Gestión completa del ciclo de vida de los agentes: nómina, licencias, cambios, bajas, capacitaciones, vacaciones, programación y auditoría. Conectado a base de datos PostgreSQL vía API REST.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">📊 Módulo WALT — Planificación</div>
+    <p>Herramienta de análisis client-side para planificación de dotación (HC). Procesa archivos Excel del cliente (CP), reductores operativos y nómina para calcular cumplimiento, francos y dimensionamiento.</p>
+  </div>
+</div>
+
+<h3>Tecnologías Principales</h3>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Capa</th><th>Tecnología</th><th>Versión</th><th>Rol</th></tr>
+  <tr><td>Frontend</td><td>Next.js (App Router)</td><td>16.2.4</td><td>Framework React full-stack</td></tr>
+  <tr><td>Frontend</td><td>React</td><td>19</td><td>UI components</td></tr>
+  <tr><td>Frontend</td><td>TypeScript</td><td>5</td><td>Tipado estático</td></tr>
+  <tr><td>Frontend</td><td>Tailwind CSS</td><td>4</td><td>Estilos utilitarios</td></tr>
+  <tr><td>Estado</td><td>Zustand</td><td>5</td><td>State management global</td></tr>
+  <tr><td>Data fetching</td><td>TanStack React Query</td><td>5</td><td>Cache y sincronización con API</td></tr>
+  <tr><td>Tablas</td><td>TanStack Table</td><td>8</td><td>Tablas complejas con sorting/filtros</td></tr>
+  <tr><td>Validación</td><td>Zod + React Hook Form</td><td>4 / 7</td><td>Validación de formularios</td></tr>
+  <tr><td>Gráficos</td><td>Recharts</td><td>2</td><td>Charts y visualizaciones</td></tr>
+  <tr><td>Animaciones</td><td>Framer Motion</td><td>12</td><td>Transiciones de página</td></tr>
+  <tr><td>Excel</td><td>xlsx / exceljs</td><td>—</td><td>Parsing y generación de Excel</td></tr>
+  <tr><td>Backend</td><td>Express</td><td>4</td><td>API REST</td></tr>
+  <tr><td>ORM</td><td>Prisma</td><td>6</td><td>Acceso a base de datos</td></tr>
+  <tr><td>Base de datos</td><td>PostgreSQL</td><td>—</td><td>Persistencia</td></tr>
+  <tr><td>Testing</td><td>Vitest</td><td>3</td><td>Tests unitarios</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     2. ARQUITECTURA TÉCNICA
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-arch">
+<h2>2. Arquitectura Técnica</h2>
+
+<h3>Estructura de la Aplicación</h3>
+
+<pre><code>nominav2/Nomina/
+├── app/                          ← Rutas Next.js (App Router)
+│   ├── layout.tsx                ← Root layout (QueryClientProvider + Toaster)
+│   ├── page.tsx                  ← Redirige / → /dashboard
+│   ├── providers.tsx             ← QueryClient (staleTime 30s, 1 retry)
+│   ├── login/                    ← Página pública de login
+│   ├── acceso-denegado/          ← Página pública de acceso denegado
+│   ├── (hr)/                     ← Grupo de rutas HR
+│   │   ├── layout.tsx            ← HrSidebar + RouteGuard
+│   │   ├── dashboard/
+│   │   ├── nomina/
+│   │   ├── licencias/
+│   │   └── ... (22 rutas HR)
+│   └── planificacion/            ← Módulo WALT
+│       ├── layout.tsx            ← AppShell (sidebar WALT + postMessage bridge)
+│       ├── page.tsx              ← Carga de archivos
+│       ├── resumen/
+│       ├── curvas/
+│       ├── simulador/
+│       ├── contratos/
+│       ├── franco/
+│       ├── analisis/
+│       └── configuracion/
+├── backend/                      ← API Express
+│   ├── src/
+│   │   ├── index.ts              ← Entry point (puerto 3001)
+│   │   ├── routes/index.ts       ← Mapa completo de endpoints
+│   │   ├── controllers/          ← 25 controladores
+│   │   └── middleware/           ← Auth JWT, roles, multipart
+│   └── prisma/
+│       └── schema.prisma         ← Schema de la DB
+├── components/                   ← Componentes compartidos
+│   ├── hr/                       ← Componentes exclusivos del módulo HR
+│   ├── charts/                   ← Gráficos Recharts
+│   ├── tables/                   ← Tablas (ResumenTable, FrancoGrid, etc.)
+│   └── ...
+├── lib/
+│   ├── api.ts                    ← Clientes Axios para todos los endpoints HR
+│   ├── domain/                   ← Motor de cálculo WALT (puro, sin I/O)
+│   ├── parsers/                  ← Parsers de Excel (CP, nómina, reductores)
+│   ├── config/                   ← Definición de servicios y reglas de franco
+│   └── utils/                    ← Utilidades (formato, exportación, roles)
+├── store/                        ← Stores Zustand
+├── types/                        ← Tipos TypeScript globales
+├── hooks/                        ← React hooks compartidos
+├── next.config.ts                ← Proxy /api/* → localhost:3001
+└── middleware.ts                 ← Pass-through (auth es client-side)</code></pre>
+
+<h3>Proxy de Desarrollo</h3>
+<p>
+  En desarrollo, Next.js reescribe automáticamente las rutas para evitar CORS y tener una sola URL de origen:
+</p>
+<div class="formula">
+<span class="comment"># next.config.ts</span>
+/api/*      →  http://localhost:3001/api/*
+/uploads/*  →  http://localhost:3001/uploads/*
+</div>
+
+<h3>Separación de Layouts</h3>
+<p>Los dos módulos tienen layouts completamente independientes:</p>
+<ul>
+  <li><strong>Módulo HR</strong>: rutas bajo <code>app/(hr)/</code> → HrSidebar colapsable con secciones por rol</li>
+  <li><strong>Módulo WALT</strong>: rutas bajo <code>app/planificacion/</code> → AppShell con sidebar de planning</li>
+  <li><strong>Páginas públicas</strong>: <code>/login</code>, <code>/acceso-denegado</code> → sin sidebar</li>
+</ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     3. AUTENTICACIÓN
+════════════════════════════════════════════════════════════════════ -->
+<div class="section" id="sec-auth">
+<h2>3. Autenticación y Seguridad</h2>
+
+<h3>Flujo de Autenticación</h3>
+<ol class="flow-steps">
+  <li>El usuario ingresa email y contraseña en <code>/login</code></li>
+  <li>El frontend llama a <code>POST /api/auth/login</code></li>
+  <li>El backend valida credenciales contra <code>usuarios.password_hash</code> (bcrypt)</li>
+  <li>Si válido, devuelve <code>{ token: &lt;JWT&gt;, user: &lt;Usuario&gt; }</code></li>
+  <li>El store <code>useAuthStore</code> guarda <code>token</code> y <code>user</code> en <code>localStorage</code></li>
+  <li>El interceptor Axios agrega <code>Authorization: Bearer &lt;token&gt;</code> a todas las requests</li>
+  <li>Si el backend responde 401, el interceptor borra <code>localStorage</code> y redirige a <code>/login</code></li>
+</ol>
+
+<div class="info">
+  <strong>Nota:</strong> El middleware de Next.js (<code>middleware.ts</code>) es un pass-through — no verifica JWT.
+  La verificación de acceso real ocurre en el componente <code>RouteGuard</code> (client-side) que carga con el layout HR.
+</div>
+
+<h3>Guard de Rutas (RouteGuard)</h3>
+<p>
+  El componente <code>RouteGuard</code> en <code>app/(hr)/layout.tsx</code> hace las siguientes validaciones al montar:
+</p>
+<ol>
+  <li>Si no hay <code>token</code> en <code>localStorage</code> → redirige a <code>/login</code></li>
+  <li>Llama a <code>GET /api/configuracion/roles</code> para obtener las rutas permitidas por rol</li>
+  <li>Usa <code>canAccess(rol, pathname)</code> para verificar que el usuario puede acceder a la ruta actual</li>
+  <li>Si el rol no tiene acceso → redirige a <code>/acceso-denegado</code></li>
+</ol>
+
+<h3>Seguridad del Backend</h3>
+<ul>
+  <li>CORS restringido a <code>localhost:*</code> en desarrollo</li>
+  <li>Body limit: <strong>50 MB</strong> (para importaciones de Excel)</li>
+  <li>Middleware <code>requireAdmin</code>: verifica <code>rol === ADMINISTRADOR</code></li>
+  <li>Middleware <code>requireRole(...roles)</code>: acepta cualquiera de los roles indicados</li>
+  <li>Middleware <code>blockRole(...roles)</code>: bloquea los roles indicados</li>
+  <li>Log de auditoría automático en operaciones críticas (create, update, delete)</li>
+</ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     4. ROLES Y PERMISOS
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-roles">
+<h2>4. Roles y Permisos</h2>
+
+<h3>Roles del Sistema</h3>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Rol</th><th>Descripción</th><th>Acceso base</th></tr>
+  <tr>
+    <td><span class="role-admin">ADMINISTRADOR</span></td>
+    <td>Acceso total al sistema sin restricciones</td>
+    <td>Todos los módulos, todas las operaciones, configuración del sistema</td>
+  </tr>
+  <tr>
+    <td><span class="role-wf">WORKFORCE</span></td>
+    <td>Gestión operativa de personal</td>
+    <td>Dashboard, nómina, licencias, cambios, bajas, capacitaciones, remociones, vacaciones, ausentismo, historial</td>
+  </tr>
+  <tr>
+    <td><span class="role-user">USUARIO (Supervisor)</span></td>
+    <td>Vista limitada configurable por admin</td>
+    <td>Rutas configuradas en <code>ConfiguracionRolPath</code></td>
+  </tr>
+  <tr>
+    <td><span class="role-cap">CAPACITADOR</span></td>
+    <td>Acceso exclusivo al módulo de formación</td>
+    <td>Solo <code>/capacitaciones</code></td>
+  </tr>
+  <tr>
+    <td><span class="role-lider">LIDER</span></td>
+    <td>Vista de su servicio</td>
+    <td>Configurable, filtrado automático a su servicio asignado</td>
+  </tr>
+</table>
+</div>
+
+<div class="warn">
+  Las rutas accesibles por cada rol (excepto ADMINISTRADOR) son <strong>configurables en tiempo de ejecución</strong>
+  desde la pantalla de Configuración → Roles (<code>PUT /api/configuracion/roles</code>). Los cambios se aplican
+  sin reiniciar el servidor y se almacenan en la tabla <code>configuracion_rol_paths</code>.
+</div>
+
+<h3>Permisos Granulares por Servicio</h3>
+<p>
+  Cada usuario no-administrador puede tener permisos distintos para cada servicio, configurados en
+  <code>UsuarioServicioPermiso</code>:
+</p>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Permiso</th><th>Descripción</th></tr>
+  <tr><td><code>puede_ver</code></td><td>Ver agentes y nómina del servicio</td></tr>
+  <tr><td><code>puede_editar_nomina_mes_corriente</code></td><td>Editar datos del mes en curso</td></tr>
+  <tr><td><code>puede_ver_nominas_historicas</code></td><td>Ver nóminas de meses anteriores</td></tr>
+  <tr><td><code>puede_editar_nominas_historicas</code></td><td>Editar nóminas de meses anteriores</td></tr>
+  <tr><td><code>puede_cargar_excel</code></td><td>Importar nómina desde Excel</td></tr>
+  <tr><td><code>puede_exportar</code></td><td>Descargar exportaciones</td></tr>
+  <tr><td><code>puede_registrar_licencia</code></td><td>Crear y editar licencias</td></tr>
+  <tr><td><code>puede_registrar_cambio_servicio</code></td><td>Registrar cambios temporales de servicio</td></tr>
+  <tr><td><code>puede_crear_agente</code></td><td>Agregar nuevos agentes al sistema</td></tr>
+  <tr><td><code>puede_desactivar_agente</code></td><td>Desactivar agentes (baja)</td></tr>
+  <tr><td><code>puede_comparar_nominas_mensuales</code></td><td>Acceder a la pantalla de comparación</td></tr>
+  <tr><td><code>campos_editables[]</code></td><td>Lista de campos que puede modificar en el snapshot</td></tr>
+  <tr><td><code>segmentos_permitidos[]</code></td><td>Segmentos/sub-equipos visibles para este usuario</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     5. MODELOS DE DATOS
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-data">
+<h2>5. Modelos de Datos</h2>
+
+<h3>Enumeraciones</h3>
+<pre><code>enum Rol {
+  ADMINISTRADOR | USUARIO | WORKFORCE | CAPACITADOR | LIDER
+}
+
+enum EstadoNomina {
+  BORRADOR | ACTIVA | CERRADA | ARCHIVADA
+}</code></pre>
+
+<h3>Entidades Principales</h3>
+
+<h4>Usuario</h4>
+<pre><code>model Usuario {
+  id                 Int
+  nombre             String
+  email              String    (unique)
+  password_hash      String
+  rol                Rol
+  servicio_id        Int?      (servicio asignado para LIDER)
+  activo             Boolean   (default true)
+  fecha_creacion     DateTime
+  ultimo_acceso      DateTime?
+}</code></pre>
+
+<h4>Servicio</h4>
+<pre><code>model Servicio {
+  id          Int
+  nombre      String    (unique)
+  descripcion String?
+  color       String    (default "#6366f1", hex color para UI)
+  activo      Boolean
+  plani_config Json?   ← Config para módulo WALT:
+                         { key, label?, hojaCP: string[],
+                           segmentos: string[], reductores: string[] }
+}</code></pre>
+
+<h4>Agente</h4>
+<pre><code>model Agente {
+  id                    Int
+  dni                   String    (unique)
+  usuario               String    (unique, login del agente)
+  nombre                String
+  superior              String?
+  segmento              String?   (ej: "SOPORTE-CBS")
+  horarios              String?   (ej: "09:00-15:00")
+  estado                String?   (ej: "ACTIVO", "LP")
+  contrato              String?   (ej: "36hs", "30hs - PART TIME")
+  sitio                 String?
+  modalidad             String?   (PRESENCIAL, HOME OFFICE, HÍBRIDO)
+  jefe                  String?
+  servicio_id           Int?
+  activo                Boolean
+  presente_ultima_carga Boolean   (detectado en la última importación Excel)
+}</code></pre>
+
+<h4>NominaMensual</h4>
+<pre><code>model NominaMensual {
+  id                   Int
+  servicio_id          Int
+  mes                  Int       (1-12)
+  anio                 Int
+  tipo                 String    (default "OPERACION")
+  estado               EstadoNomina
+  archivo_nombre       String?
+  cargado_por          Int?      (usuario_id)
+  fecha_carga          DateTime?
+  total_agentes        Int
+  agentes_creados      Int
+  agentes_actualizados Int
+  agentes_no_presentes Int
+  errores              Int
+  ← Unique: [servicio_id, mes, anio, tipo]
+}</code></pre>
+
+<h4>AgenteNominaMensual (Snapshot)</h4>
+<p>
+  Copia inmutable del estado del agente en el momento de la importación. Permite consultar
+  cómo estaba la nómina en cualquier mes histórico.
+</p>
+<pre><code>model AgenteNominaMensual {
+  id                  Int
+  nomina_mensual_id   Int
+  agente_id           Int
+  ← (más todos los campos del Agente copiados al momento de la importación)
+  presente_en_nomina  Boolean
+}</code></pre>
+
+<h4>Licencia</h4>
+<pre><code>model Licencia {
+  id             Int
+  agente_id      Int
+  fecha_desde    DateTime
+  fecha_hasta    DateTime
+  motivo         String?
+  observacion    String?
+  creado_por     Int       (usuario_id)
+  importacion_id Int?      (si vino de importación masiva WF)
+}</code></pre>
+
+<h4>CambioServicioTemporal</h4>
+<pre><code>model CambioServicioTemporal {
+  agente_id         Int
+  servicio_origen_id Int
+  servicio_destino_id Int
+  fecha_desde       DateTime
+  fecha_hasta       DateTime
+  motivo            String?
+}</code></pre>
+
+<h4>CambioContrato</h4>
+<pre><code>model CambioContrato {
+  agente_id        Int
+  tipo             String    (TEMPORAL | DEFINITIVO)
+  contrato_anterior String?  (ej: "36hs")
+  contrato_nuevo   String    (ej: "30hs")
+  fecha_desde      DateTime
+  fecha_hasta      DateTime? (null si es definitivo)
+}</code></pre>
+
+<h4>Capacitacion</h4>
+<pre><code>model Capacitacion {
+  agente_id        Int
+  tipo_formacion   String    (OJT | TRAINING)
+  fecha_inicio     DateTime
+  fecha_fin        DateTime
+  dado_de_alta     Boolean   (default false)
+  pendiente_alta   Boolean   (default true)
+  fecha_alta       DateTime?
+}</code></pre>
+
+<div class="info">
+  Al replicar una nómina al mes siguiente, los agentes con <code>pendiente_alta = true</code> cuya
+  <code>fecha_fin</code> cayó en el mes anterior son automáticamente incorporados con estado ACTIVO.
+</div>
+
+<h4>ProgramacionMensual</h4>
+<pre><code>model ProgramacionMensual {
+  id         Int
+  servicio_id Int
+  mes        Int
+  anio       Int
+  semana     Int   (0 = mes completo, 1-4 = semana específica)
+  nomina_base_id Int?
+  ← Unique: [servicio_id, mes, anio, semana]
+}</code></pre>
+
+<h4>Auditoria</h4>
+<pre><code>model Auditoria {
+  id               Int
+  usuario_id       Int
+  accion           String    (ej: "CREATE", "UPDATE", "DELETE")
+  entidad          String    (ej: "Agente", "Licencia")
+  entidad_id       String
+  campo_modificado String?
+  valor_anterior   String?
+  valor_nuevo      String?
+  ip               String?
+  user_agent       String?
+  created_at       DateTime
+}</code></pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     6. BACKEND: API REST
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-backend">
+<h2>6. Backend: API REST</h2>
+
+<p>El backend corre en <code>http://localhost:3001</code>. Todas las rutas están prefijadas con <code>/api</code>.</p>
+<p>Leyenda de autenticación: <strong>Sí</strong> = JWT requerido · <strong>No</strong> = pública.</p>
+
+<h3>Autenticación</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/auth/login</code></td><td>No</td><td>Login; devuelve JWT + usuario</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/auth/me</code></td><td>Sí</td><td>Usuario autenticado actual</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/auth/logout</code></td><td>Sí</td><td>Cierra sesión</td></tr>
+</table></div>
+
+<h3>Usuarios y Permisos</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/usuarios</code></td><td>Admin</td><td>Listar todos los usuarios</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/usuarios</code></td><td>Admin</td><td>Crear usuario</td></tr>
+  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/usuarios/:id</code></td><td>Admin</td><td>Actualizar usuario (incluye password opcional)</td></tr>
+  <tr><td><span class="tag tag-patch">PATCH</span></td><td><code>/api/usuarios/:id/estado</code></td><td>Admin</td><td>Activar / desactivar usuario</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/usuarios/:id/permisos</code></td><td>Admin</td><td>Permisos del usuario por servicio</td></tr>
+  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/usuarios/:id/permisos/:servicioId</code></td><td>Admin</td><td>Asignar/actualizar permisos</td></tr>
+  <tr><td><span class="tag tag-delete">DELETE</span></td><td><code>/api/usuarios/:id/permisos/:servicioId</code></td><td>Admin</td><td>Revocar permisos</td></tr>
+</table></div>
+
+<h3>Servicios</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/servicios</code></td><td>Sí</td><td>Listar servicios activos</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/servicios</code></td><td>Admin</td><td>Crear servicio</td></tr>
+  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/servicios/:id</code></td><td>Admin</td><td>Actualizar servicio</td></tr>
+  <tr><td><span class="tag tag-patch">PATCH</span></td><td><code>/api/servicios/:id/estado</code></td><td>Admin</td><td>Activar / desactivar</td></tr>
+  <tr><td><span class="tag tag-delete">DELETE</span></td><td><code>/api/servicios/:id</code></td><td>Admin</td><td>Eliminar servicio</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/servicios/:id/metricas</code></td><td>Sí</td><td>KPIs del servicio</td></tr>
+  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/servicios/:id/plani-config</code></td><td>Admin</td><td>Actualizar config módulo WALT</td></tr>
+</table></div>
+
+<h3>Agentes y Nóminas</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes</code></td><td>Sí</td><td>Listar agentes (máx. 500, excluye Capacitador)</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/agentes</code></td><td>Sí</td><td>Crear agente</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id</code></td><td>Sí</td><td>Detalle del agente</td></tr>
+  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/agentes/:id</code></td><td>Sí</td><td>Actualizar agente</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id/timeline</code></td><td>Sí</td><td>Timeline de eventos (licencias, cambios, bajas, etc.)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/nominas</code></td><td>Sí</td><td>Listar nóminas mensuales</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/nominas/comparar</code></td><td>Sí</td><td>Comparar dos nóminas (diferencias)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/nominas/:id</code></td><td>Sí</td><td>Detalle de una nómina</td></tr>
+  <tr><td><span class="tag tag-patch">PATCH</span></td><td><code>/api/nominas/:id/estado</code></td><td>Admin</td><td>Cambiar estado (BORRADOR → ACTIVA → CERRADA → ARCHIVADA)</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/nominas/:id/replicar</code></td><td>Admin</td><td>Replicar nómina al mes siguiente</td></tr>
+  <tr><td><span class="tag tag-patch">PATCH</span></td><td><code>/api/nominas/agentes/:snapshotId</code></td><td>Sí</td><td>Editar snapshot de agente en nómina</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/excel/validar</code></td><td>Admin</td><td>Preview de importación Excel (multipart)</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/excel/confirmar</code></td><td>Admin</td><td>Confirmar y persistir importación</td></tr>
+</table></div>
+
+<h3>Novedades Operativas</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Módulo</th><th>Endpoints</th></tr>
+  <tr><td>Licencias</td><td>CRUD + <code>import-wf</code> (Excel masivo) + calendario + export calendario</td></tr>
+  <tr><td>Cambios temporales</td><td>CRUD de cambios de servicio (temporal)</td></tr>
+  <tr><td>Cambios de contrato</td><td>CRUD + bulk create + tipo TEMPORAL|DEFINITIVO</td></tr>
+  <tr><td>Cambios de horario</td><td>CRUD + tipo TEMPORAL|DEFINITIVO</td></tr>
+  <tr><td>Bajas</td><td>CRUD + import masivo Excel + tipos de baja</td></tr>
+  <tr><td>Capacitaciones</td><td>CRUD + <code>dar-de-alta</code> (activa al agente)</td></tr>
+  <tr><td>Remociones</td><td>CRUD</td></tr>
+  <tr><td>Vacaciones</td><td>Import masivo Excel + historial + delete</td></tr>
+</table></div>
+
+<h3>Reportes y Exportaciones</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/dashboard</code></td><td>KPIs globales: agentes activos, licencias, vacaciones del mes, etc.</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/export/nomina/:nominaId</code></td><td>Exportar nómina como Excel (blob)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/reportes/ausentismo</code></td><td>Reporte de ausentismo con filtros</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/auditoria</code></td><td>Log de auditoría (solo Admin)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/notificaciones</code></td><td>Notificaciones del usuario autenticado</td></tr>
+</table></div>
+
+<h3>Programación</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/programacion</code></td><td>Listar programaciones mensuales</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/programacion</code></td><td>Crear nueva programación</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/programacion/:id/simular</code></td><td>Simular distribución HC</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/programacion/:id/cronograma</code></td><td>Cronograma mensual de distribución</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/programacion/:id/export</code></td><td>Exportar programación (Excel)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/programacion/:id/francos</code></td><td>Exportar francos asignados (Excel)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/programacion/:id/conversor</code></td><td>Exportar conversor de horarios</td></tr>
+</table></div>
+
+<h3>Módulo WALT (integración con HR)</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Método</th><th>Ruta</th><th>Descripción</th></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/plani/config</code></td><td>Devuelve servicios con su <code>plani_config</code> para el módulo WALT</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/plani/nomina</code></td><td>Nómina activa de un servicio para mes/año dado; usada por WALT embebido</td></tr>
+</table></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     7. MÓDULO HR
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-hr">
+<h2>7. Módulo HR — Gestión de Nómina</h2>
+
+<h3>Pantallas del Sistema</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Ruta</th><th>Pantalla</th><th>Descripción</th></tr>
+  <tr><td><code>/dashboard</code></td><td>Dashboard</td><td>KPIs del mes: agentes activos, en licencia, en vacaciones, cambios activos, última importación, distribución por servicio, ausentes hoy</td></tr>
+  <tr><td><code>/nomina</code></td><td>Nómina</td><td>Tabla con todos los agentes del mes activo. Filtros por estado, servicio, sitio, horario, modalidad. Edición inline de campos. Exportación Excel.</td></tr>
+  <tr><td><code>/nomina/agente/:id</code></td><td>Detalle de Agente</td><td>Timeline completo del agente: licencias, cambios temporales, cambios de contrato, capacitaciones, remociones, bajas y vacaciones</td></tr>
+  <tr><td><code>/licencias</code></td><td>Licencias</td><td>CRUD de licencias individuales e importación masiva WF. Vista de calendario mensual.</td></tr>
+  <tr><td><code>/calendario</code></td><td>Calendario</td><td>Vista de calendario de licencias, vacaciones y ausencias del mes</td></tr>
+  <tr><td><code>/cambios</code></td><td>Cambios Temporales</td><td>Cambios de asignación de servicio con período de validez</td></tr>
+  <tr><td><code>/cambios-contrato</code></td><td>Cambios de Contrato</td><td>Cambios de tipo de contrato (TEMPORAL o DEFINITIVO)</td></tr>
+  <tr><td><code>/bajas</code></td><td>Bajas y Remociones</td><td>Historial de bajas con snapshot del agente al momento de la baja. Importación masiva.</td></tr>
+  <tr><td><code>/capacitaciones</code></td><td>Formador</td><td>Gestión del ciclo OJT/Training. Marcado de alta al finalizar capacitación.</td></tr>
+  <tr><td><code>/vacaciones</code></td><td>Vacaciones</td><td>Importación masiva de vacaciones WF con historial</td></tr>
+  <tr><td><code>/comparacion</code></td><td>Comparar Nóminas</td><td>Diferencias entre dos nóminas (altas, bajas, modificaciones)</td></tr>
+  <tr><td><code>/ausentismo</code></td><td>Ausentismo</td><td>Reporte de ausentismo con filtros por servicio, período, motivo</td></tr>
+  <tr><td><code>/historial-agente</code></td><td>Historial Agente</td><td>Búsqueda de agente por DNI/nombre y visualización de su historial completo</td></tr>
+  <tr><td><code>/programacion</code></td><td>Programación</td><td>Lista de programaciones mensuales por servicio/semana</td></tr>
+  <tr><td><code>/programacion/:id</code></td><td>Detalle Programación</td><td>Grilla de requeridos por horario, factor de reducción, simulación HC, exportaciones</td></tr>
+  <tr><td><code>/distribucion</code></td><td>Distribución</td><td>Herramienta para cruzar y distribuir nóminas entre servicios</td></tr>
+  <tr><td><code>/carga</code></td><td>Carga de Nómina</td><td>Importación de nómina Excel con validación y preview antes de confirmar</td></tr>
+  <tr><td><code>/importaciones</code></td><td>Historial Importaciones</td><td>Historial de todas las importaciones con estado y detalle de errores</td></tr>
+  <tr><td><code>/usuarios</code></td><td>Usuarios</td><td>CRUD de usuarios con asignación de roles y permisos granulares</td></tr>
+  <tr><td><code>/servicios</code></td><td>Servicios</td><td>CRUD de servicios con configuración de color y config WALT</td></tr>
+  <tr><td><code>/auditoria</code></td><td>Auditoría</td><td>Log inmutable de todas las operaciones del sistema</td></tr>
+  <tr><td><code>/configuracion</code></td><td>Configuración</td><td>Rutas accesibles por rol (configurable), parámetros del sistema</td></tr>
+</table></div>
+
+<h3>Flujo de Importación de Nómina Excel</h3>
+<ol class="flow-steps">
+  <li>Admin sube un archivo <code>.xlsx</code> en <code>/carga</code></li>
+  <li><code>POST /api/excel/validar</code> — analiza el archivo y devuelve preview: agentes nuevos, actualizados, no presentes y errores</li>
+  <li>El usuario revisa el preview y confirma</li>
+  <li><code>POST /api/excel/confirmar</code> — persiste los cambios:
+    <ul>
+      <li>Crea <code>NominaMensual</code> si no existe para ese servicio/mes/año</li>
+      <li>Para cada fila: crea o actualiza <code>Agente</code> + guarda snapshot en <code>AgenteNominaMensual</code></li>
+      <li>Registra en <code>ImportacionNomina</code> con contadores</li>
+    </ul>
+  </li>
+  <li>El sistema marca <code>presente_ultima_carga = false</code> en agentes no encontrados</li>
+</ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     8. MÓDULO WALT
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-walt">
+<h2>8. Módulo WALT — Planificación de Dotación</h2>
+
+<div class="info">
+  <strong>Principio fundamental:</strong> Todo el procesamiento ocurre <strong>en el navegador del cliente</strong>.
+  Los archivos Excel no se envían al servidor. Los resultados se guardan en <code>sessionStorage</code>
+  y se pierden al cerrar la pestaña.
+</div>
+
+<h3>Pantallas del Módulo</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Ruta</th><th>Nombre</th><th>Descripción</th></tr>
+  <tr><td><code>/planificacion</code></td><td>Carga de archivos</td><td>Upload de los 3 archivos fuente + selección de hoja + botón "Procesar"</td></tr>
+  <tr><td><code>/planificacion/resumen</code></td><td>Resumen</td><td>KPIs globales + tabla detallada por servicio + gráfico de cumplimiento + alertas</td></tr>
+  <tr><td><code>/planificacion/curvas</code></td><td>Curvas</td><td>Curva temporal diaria e intradiaria de Hs requeridas vs. disponibles por servicio</td></tr>
+  <tr><td><code>/planificacion/simulador</code></td><td>Simulador</td><td>Escenarios what-if: agregar/quitar/mover agentes, cambiar contratos o reductores</td></tr>
+  <tr><td><code>/planificacion/contratos</code></td><td>Contratos y Francos</td><td>Editor de reglas de franco por tipo de contrato (qué días pueden tomar franco)</td></tr>
+  <tr><td><code>/planificacion/franco</code></td><td>Planificación de Francos</td><td>Disponibilidad esperada de HC por día de semana para cada servicio</td></tr>
+  <tr><td><code>/planificacion/analisis</code></td><td>Análisis</td><td>Distribución de contratos (30/35/36 hs) y ranking de impacto de reductores</td></tr>
+  <tr><td><code>/planificacion/configuracion</code></td><td>Configuración</td><td>Parámetros adicionales del módulo</td></tr>
+</table></div>
+
+<h3>Archivos de Entrada</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Archivo</th><th>Contenido</th><th>Obligatorio</th></tr>
+  <tr><td><code>CP_Soporte_MM-AAAA.xlsx</code></td><td>Requerido del cliente: grilla de HC (o Hs) por franja horaria de 30 min por día del mes. Una hoja por servicio.</td><td>Sí</td></tr>
+  <tr><td><code>reductores.xlsx</code></td><td>Hoja "RESUMEN PONDERADO": deslogueo, ausentismo y rotación (%) por servicio para el mes</td><td>Sí</td></tr>
+  <tr><td><code>Nomina_Soporte.xlsx</code></td><td>Nómina de agentes: DNI, nombre, segmento, estado, contrato, horarios, sitio, modalidad, jefe, superior</td><td>Sí (o vía sistema)</td></tr>
+</table></div>
+
+<div class="tip">
+  <strong>Alternativa para la nómina:</strong> Si el módulo WALT está integrado como iframe dentro de Nómina HR,
+  la nómina se puede cargar directamente desde la base de datos del sistema sin necesidad de subir un archivo Excel.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     9. PARSERS
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-parsers">
+<h2>9. Parsers de Archivos Excel</h2>
+
+<h3>Parser CP (<code>lib/parsers/parseCP.ts</code>)</h3>
+<p>Procesa el archivo de requerido del cliente (Capacity Planning).</p>
+
+<h4>Detección automática de formato HC vs. Hs</h4>
+<ul>
+  <li>Si los valores de la grilla son enteros ≥ 1 → asume <strong>HC directo</strong> (headcount)</li>
+  <li>Si hay decimales o valores &lt; 1 → asume <strong>horas</strong> → convierte: <code>hcMatrix[f][d] = valor / 0.5</code> (intervalos de 30 min)</li>
+</ul>
+
+<h4>Estructura del archivo CP esperada</h4>
+<pre><code>Fila 0: días de la semana (LUN, MAR, MIÉ...)
+Fila 1: fechas (seriales Excel → Date)
+Filas 2+: valores por franja horaria de 30 minutos
+  ej: 08:00, 08:30, 09:00... 23:00, 23:30</code></pre>
+
+<h4>Cálculo de totalMes</h4>
+<div class="formula">
+<span class="comment">/* Formato HC */</span>
+totalMes_hs = Σ(hcReq × 0.5) para cada [franja, día]
+<span class="comment">/* Cada celda HC × 0.5 hs = horas necesarias en ese intervalo */</span>
+
+<span class="comment">/* Formato Hs */</span>
+totalMes_hs = Σ(valor_celda) directamente
+</div>
+
+<h3>Parser Reductores (<code>lib/parsers/parseReductores.ts</code>)</h3>
+<p>Lee la hoja <strong>"RESUMEN PONDERADO"</strong> del archivo de reductores.</p>
+<ul>
+  <li>Detecta columnas por nombre normalizado (sin acento, lowercase, trim)</li>
+  <li>Columna <code>servicio</code>: nombre del servicio</li>
+  <li>Columna <code>deslog*</code> o <code>login*</code>: % de tiempo de deslogueo (ej: 0.05 = 5%)</li>
+  <li>Columna <code>ausent*</code>: % de ausentismo</li>
+  <li>Columna <code>rotac*</code>: % de rotación</li>
+  <li>El nombre del servicio se normaliza y se resuelve contra alias de reductores de cada <code>ServiceDefinition</code></li>
+</ul>
+
+<h3>Parser Nómina (<code>lib/parsers/parseNomina.ts</code>)</h3>
+<p>Lee la hoja seleccionada del archivo de nómina.</p>
+
+<h4>Columnas detectadas automáticamente</h4>
+<div class="tbl-wrap"><table>
+  <tr><th>Columna</th><th>Alias aceptados</th><th>Campo resultante</th></tr>
+  <tr><td>Segmento</td><td>segmento, sector, área</td><td><code>segmento</code> → normalizado a <code>servicioKey</code></td></tr>
+  <tr><td>Estado</td><td>estado, status</td><td><code>estado</code> (ACTIVO, LP, etc.)</td></tr>
+  <tr><td>Contrato</td><td>contrato, tipo contrato</td><td><code>hsSemanal</code> (30, 35, 36)</td></tr>
+  <tr><td>Horarios</td><td>horario, horarios, ingreso/egreso</td><td><code>entryTime</code>, <code>exitTime</code></td></tr>
+  <tr><td>DNI</td><td>dni, documento</td><td><code>dni</code></td></tr>
+  <tr><td>Nombre</td><td>nombre, apellido, apellido y nombre</td><td><code>nombre</code></td></tr>
+  <tr><td>Fecha inicio atención</td><td>fecha inicio atencion, capa, inicio</td><td><code>fechaInicioAtencion</code> (→ <code>esCapa = true</code>)</td></tr>
+</table></div>
+
+<h4>Parser de horario (<code>parsearHorario</code>)</h4>
+<p>Acepta múltiples formatos de horario:</p>
+<div class="formula">
+"09:00-15:00"     → entry: "09:00", exit: "15:00"
+"09:00 / 15:00"   → entry: "09:00", exit: "15:00"
+"9 a 15"          → entry: "09:00", exit: "15:00"
+"09:00"           → entry: "09:00", exit: null
+</div>
+
+<h4>Extracción de horas de contrato (<code>extraerHorasContrato</code>)</h4>
+<div class="formula">
+"36hs"            → 36
+"30 HORAS"        → 30
+"35hs - PART TIME" → 35
+"FULL TIME"       → 36 (default)
+sin valor         → 36 (default)
+</div>
+
+<h4>Resolución de segmento a servicio</h4>
+<ol>
+  <li>Primero busca en <code>mappingOverrides</code> (sobreescrituras manuales del usuario)</li>
+  <li>Si no, normaliza el segmento (lowercase, sin acentos, trim) y busca en <code>segmentosNomina</code> de cada servicio definido</li>
+  <li>Si no resuelve → el agente es excluido del cálculo y contado en <code>agentesExcluidos</code></li>
+</ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     10. MOTOR DE CÁLCULO
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-calculos">
+<h2>10. Motor de Cálculo</h2>
+
+<p>
+  El motor de cálculo (<code>lib/domain/calculos.ts</code>) es una función pura sin efectos secundarios.
+  Toma agentes, matrices CP, reductores, días del mes y parámetros de configuración; devuelve un
+  <code>ResultadoGeneral</code> con resultados por servicio.
+</p>
+
+<h3>Preparación — Días al mes (<code>aplicarDiasAlMes</code>)</h3>
+<p>Antes del cálculo principal, se ajustan las horas brutas de cada agente:</p>
+
+<div class="formula">
+<span class="comment">── Agente normal ──</span>
+hsMensualBrutas = hsSemanal × (diasDelMes / 7)
+
+<span class="comment">── Agente en CAPA (tiene fechaInicioAtencion) ──</span>
+diaInicio          = fechaInicioAtencion.getDate()
+diasDisponibles    = max(0, diasDelMes − diaInicio + 1)
+proporcion         = diasDisponibles / diasDelMes
+hsMensualBrutas    = hsSemanal × (diasDelMes / 7) × proporcion
+
+<span class="comment">── Pases entre servicios ──</span>
+Si el DNI del agente está en el mapa de pases configurados,
+su segmentoNorm se reemplaza por el servicio destino antes del cálculo.
+</div>
+
+<h3>Agrupación por Servicio</h3>
+<div class="formula">
+Para cada agente ACTIVO en el servicio:
+  hcActivos          += 1
+  hsBrutas           += hsMensualBrutas
+  hsSemanalSuma      += hsSemanal
+  hsSemanalConteo    += 1
+  si esCapa → hcCapa += 1
+
+Para cada agente no ACTIVO:
+  hcLP               += 1   (licencia / baja)
+
+hsSemanalPromedio = hsSemanalSuma / hsSemanalConteo
+                    (default 36 si no hay activos)
+</div>
+
+<h3>Factor Productivo</h3>
+<div class="formula">
+<span class="comment">── Modo MULTIPLICATIVO (recomendado) ──</span>
+factorProductivo = (1 − deslogueo) × (1 − ausentismo) × (1 − rotacion)
+
+<span class="comment">── Modo ADITIVO (alternativo) ──</span>
+factorProductivo = max(0, 1 − deslogueo − ausentismo − rotacion)
+
+<span class="comment">Ejemplo: deslogueo=5%, ausentismo=4%, rotacion=2%</span>
+Multiplicativo: 0.95 × 0.96 × 0.98 ≈ 0.8933  →  89.33%
+Aditivo:        1 − 0.11 = 0.89               →  89.00%
+</div>
+
+<h3>Horas Netas y Cumplimiento</h3>
+<div class="formula">
+hsNetas       = hsBrutas × factorProductivo
+hsRequeridas  = matrizCP.totalMes   (Hs requeridas por el cliente en el mes)
+cumplimiento  = (hsNetas / hsRequeridas) × 100   [%]
+</div>
+
+<h3>Delta HC al 103% (<code>deltaHC103</code>)</h3>
+<p>
+  Cuántos agentes equivalentes faltan (positivo) o sobran (negativo)
+  para alcanzar exactamente el 103% del requerido:
+</p>
+<div class="formula">
+hsNetasPor103       = hsRequeridas × 1.03
+hsBrutasNecesarias  = hsNetasPor103 / factorProductivo
+hsBrutasActuales    = hcActivos × hsSemanalPromedio × (diasDelMes / 7)
+diffHsBrutas        = hsBrutasNecesarias − hsBrutasActuales
+hsPorAgente         = hsSemanalPromedio × (diasDelMes / 7)
+deltaHC103          = diffHsBrutas / hsPorAgente
+
+<span class="comment">deltaHC103 > 0 → faltan agentes para llegar al 103%</span>
+<span class="comment">deltaHC103 < 0 → sobran agentes (exceso sobre 103%)</span>
+</div>
+
+<h3>Agentes Equivalentes por Tipo de Contrato</h3>
+<p>Cuando hay déficit (<code>deltaHC103 > 0</code>), cuántos agentes de cada tipo de contrato
+se necesitarían para cerrarlo:</p>
+<div class="formula">
+hsGap       = deltaHC103 × hsSemanalPromedio × (diasDelMes / 7)
+
+hs30        = hsGap / (30 × (diasDelMes/7) × factorProductivo)
+hs35        = hsGap / (35 × (diasDelMes/7) × factorProductivo)
+hs36        = hsGap / (36 × (diasDelMes/7) × factorProductivo)
+mix         = deltaHC103   <span class="comment">(en HC con el promedio actual del pool)</span>
+</div>
+
+<h3>Facturación</h3>
+<div class="formula">
+tope              = hsRequeridas × (topeFacturacion / 100)  <span class="comment">[default: 103%]</span>
+teoricoFacturable = min(hsNetas, tope)
+hsFacturable100   = min(hsNetas, hsRequeridas)
+recorte           = max(0, hsNetas − tope)    <span class="comment">← horas que exceden el tope (no facturables)</span>
+faltante          = max(0, hsRequeridas − hsNetas)  <span class="comment">← horas que faltan</span>
+</div>
+
+<h3>Ajuste por Franco (<code>francoAjuste</code>)</h3>
+<p>Cuántos agentes adicionales en plantel se necesitan para garantizar cobertura incluso
+en el peor día de franco (aplicado cuando el servicio tiene <code>francoConfig</code>):</p>
+<div class="formula">
+<span class="comment">── Datos del servicio (estático) ──</span>
+francoConfig = { diasVentana: 4, fraccionAfectada: 1.0 }
+<span class="comment">diasVentana = N días en la ventana de franco (ej: Jue-Dom = 4)</span>
+<span class="comment">fraccionAfectada = fracción del plantel que rota en esa ventana (1.0 = todos)</span>
+
+factorDisponible  = 1 − (fraccionAfectada / diasVentana)
+                  = 1 − (1.0 / 4) = 0.75   <span class="comment">← en el peor día, 75% del plantel disponible</span>
+hcNecesarioBruto  = hcActivos + deltaHC103  <span class="comment">← plantel óptimo sin franco</span>
+hcConFranco       = hcNecesarioBruto / factorDisponible
+extra             = hcConFranco − hcNecesarioBruto
+</div>
+
+<div class="info">
+  El valor <strong>HC c/Franco</strong> en la tabla de resumen se calcula reactivamente usando las reglas
+  de franco editadas por el usuario en <code>/planificacion/contratos</code>. El método reactivo usa
+  <code>calcularFrancoPorServicio()</code> que considera la composición real de contratos (30/35/36 hs)
+  de cada servicio.
+</div>
+
+<h3>Sistema de Alertas</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Condición</th><th>Severidad</th><th>Alcance</th></tr>
+  <tr><td><code>cumplimientoTotal &lt; 90%</code></td><td>🔴 Crítico</td><td>Global</td></tr>
+  <tr><td><code>cumplimientoTotal &lt; 100%</code></td><td>🟡 Advertencia</td><td>Global</td></tr>
+  <tr><td><code>cumplimientoTotal &gt; 115%</code></td><td>🔵 Información</td><td>Global</td></tr>
+  <tr><td><code>servicio.cumplimiento &lt; 80%</code></td><td>🔴 Crítico</td><td>Por servicio</td></tr>
+  <tr><td><code>servicio.cumplimiento &lt; 100%</code></td><td>🟡 Advertencia</td><td>Por servicio</td></tr>
+  <tr><td><code>servicio.cumplimiento &gt; 115%</code></td><td>🔵 Información</td><td>Por servicio</td></tr>
+  <tr><td>Servicio sin activos pero con hs requeridas</td><td>🔴 Crítico</td><td>Por servicio</td></tr>
+  <tr><td>Suma reductores (deslogueo+ausentismo+rotación) &gt; 8%</td><td>🟡 Advertencia</td><td>Por servicio</td></tr>
+</table></div>
+
+<h3>Tabla de Resumen — Columnas</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Columna</th><th>Origen</th></tr>
+  <tr><td>Servicio</td><td>ServicioKey del agrupamiento</td></tr>
+  <tr><td>Personas activas</td><td><code>hcActivos</code></td></tr>
+  <tr><td>En licencia</td><td><code>hcLP</code></td></tr>
+  <tr><td>Hs Brutas</td><td><code>hsBrutas</code> = Σ hsMensualBrutas de activos</td></tr>
+  <tr><td>Reductor</td><td><code>-(1 - factorProductivo) × 100</code> %</td></tr>
+  <tr><td>Hs Netas</td><td><code>hsNetas = hsBrutas × factorProductivo</code></td></tr>
+  <tr><td>Hs Req. 100%</td><td><code>hsRequeridas</code> del archivo CP</td></tr>
+  <tr><td>Hs Req. 103%</td><td><code>hsRequeridas × 1.03</code></td></tr>
+  <tr><td>Cumplimiento</td><td><code>(hsNetas / hsRequeridas) × 100</code> %</td></tr>
+  <tr><td>Desvíos al 103%</td><td><code>deltaHC103</code> en agentes equivalentes</td></tr>
+  <tr><td>Hs Fact. 100%</td><td><code>min(hsNetas, hsRequeridas)</code></td></tr>
+  <tr><td>Hs Fact. 103%</td><td><code>min(hsNetas, tope)</code></td></tr>
+  <tr><td>Recorte</td><td><code>max(0, hsNetas - tope)</code></td></tr>
+  <tr><td>Capa</td><td><code>hcCapa</code> (agentes en capacitación)</td></tr>
+  <tr><td>Ag. Eq.</td><td>Agentes necesarios en 30/35/36 hs para cerrar el gap</td></tr>
+  <tr><td>HC c/Franco</td><td><code>hcNecesarioTotal</code> reactivo via <code>calcularFrancoPorServicio()</code></td></tr>
+</table></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     11. MOTOR DE FRANCO
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-franco">
+<h2>11. Motor de Franco</h2>
+
+<p>
+  El motor de franco (<code>lib/domain/francoEngine.ts</code>) calcula la disponibilidad esperada
+  de HC por día de semana, considerando el tipo de contrato de cada agente y sus ventanas de franco.
+</p>
+
+<h3>Reglas de Franco por Defecto</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Contrato</th><th>Francos</th><th>Ventana 1</th><th>Ventana 2</th></tr>
+  <tr><td>24 hs</td><td>2</td><td>Lun-Vie (1 de cada 5 días)</td><td>Sáb-Dom (1 de cada 2 días)</td></tr>
+  <tr><td>30 hs</td><td>2</td><td>Lun-Vie (1 de cada 5 días)</td><td>Sáb-Dom (1 de cada 2 días)</td></tr>
+  <tr><td>35 hs</td><td>2</td><td>Lun-Vie (1 de cada 5 días)</td><td>Sáb-Dom (1 de cada 2 días)</td></tr>
+  <tr><td>36 hs</td><td>1</td><td>Jue-Dom (1 de cada 4 días)</td><td>—</td></tr>
+</table></div>
+
+<div class="info">
+  <strong>Configuración personalizada:</strong> Estas reglas son editables en <code>/planificacion/contratos</code>
+  (pantalla "Contratos y Francos"). Los cambios persisten en <code>localStorage</code> y afectan inmediatamente
+  al cálculo de la pantalla Franco y a la columna "HC c/Franco" del Resumen.
+</div>
+
+<h3>Fórmula de Probabilidad de Franco</h3>
+
+<div class="formula">
+<span class="comment">── probabilidadFrancoDia(regla, dia) ──</span>
+Para cada ventana de franco de la regla:
+  Si el día está incluido en esa ventana:
+    p += 1 / |dias en la ventana|
+
+<span class="comment">Ejemplo: contrato 36hs, ventana = [Jue, Vie, Sáb, Dom]</span>
+  p(Jue) = 1/4 = 0.25    (25% de los agentes 36hs están de franco el jueves)
+  p(Lun) = 0.00           (ninguno franco el lunes)
+
+<span class="comment">Ejemplo: contrato 30hs, ventanas = [Lun-Vie], [Sáb-Dom]</span>
+  p(Lun) = 1/5 = 0.20
+  p(Sáb) = 1/2 = 0.50
+</div>
+
+<h3>HC Disponible por Día</h3>
+<div class="formula">
+ausentes_dia = Σ (cantidad_contrato_i × p_franco_dia(contrato_i, dia))
+
+hcDisponible_dia = hcActivos − ausentes_dia
+
+Estado del día:
+  ratio = hcDisponible_dia / hcRequerido_dia (del CP)
+  ratio ≥ 1.03  →  "surplus"   (verde)
+  ratio ≥ 1.00  →  "ok"        (esmeralda)
+  ratio ≥ 0.95  →  "justo"     (ámbar)
+  ratio  < 0.95  →  "deficit"  (rojo)
+</div>
+
+<h3>HC Necesario Total</h3>
+<p>Para garantizar cobertura incluso en el peor día:</p>
+<div class="formula">
+Para cada día con hcRequerido > 0:
+  pAusente           = ausentes_dia / hcActivos
+  disponibleFraction = 1 − pAusente
+  needed             = hcRequerido_dia / disponibleFraction
+
+hcNecesarioTotal = max(needed para todos los días)
+</div>
+
+<h3>Pantalla Franco — Lectura de la Tabla</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Columna</th><th>Descripción</th></tr>
+  <tr><td>Servicio</td><td>Nombre del servicio</td></tr>
+  <tr><td>Activos</td><td>HC activos totales en ese servicio</td></tr>
+  <tr><td>Contratos</td><td>Composición: "20×36hs, 5×30hs"</td></tr>
+  <tr><td>Lun / Mar / Mié / Jue / Vie / Sáb / Dom</td><td>HC disponible esperado por día con código de color (surplus/ok/justo/deficit)</td></tr>
+  <tr><td>HC Necesario</td><td><code>hcNecesarioTotal</code>: agentes mínimos en plantel para cubrir el peor día</td></tr>
+</table></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     12. SIMULADOR
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-simulador">
+<h2>12. Simulador de Escenarios</h2>
+
+<p>
+  El simulador permite analizar el impacto de cambios hipotéticos en la dotación
+  <strong>sin modificar datos reales</strong>. Los resultados se calculan en tiempo real en el navegador.
+</p>
+
+<h3>Tipos de Modificaciones</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Tipo</th><th>Descripción</th><th>Parámetros</th></tr>
+  <tr><td><code>add_agents</code></td><td>Agregar agentes a un servicio</td><td>servicio, cantidad, hsSemanal</td></tr>
+  <tr><td><code>remove_agents</code></td><td>Quitar agentes de un servicio</td><td>servicio, cantidad</td></tr>
+  <tr><td><code>move_agents</code></td><td>Mover agentes entre servicios</td><td>servicioOrigen, servicioDestino, cantidad</td></tr>
+  <tr><td><code>change_contract</code></td><td>Cambiar tipo de contrato a N agentes</td><td>servicio, cantidad, hsSemanal nuevo, contratoDesde</td></tr>
+  <tr><td><code>change_reducer</code></td><td>Ajustar reductores de un servicio</td><td>servicio, deslogueoOverride, ausentismoOverride, rotacionOverride</td></tr>
+</table></div>
+
+<h3>Lógica de Simulación</h3>
+<ol class="flow-steps">
+  <li>El usuario agrega modificaciones desde la UI; cada una genera un objeto <code>SimModificacion</code> con un ID único</li>
+  <li>Al recalcular, el simulador parte de los agentes y reductores originales del store</li>
+  <li>Aplica cada modificación en orden: agrega agentes ficticios, elimina los reales, mueve segmentoNorm, ajusta hsSemanal o reductores</li>
+  <li>Llama a <code>calcularResultados()</code> con el conjunto modificado</li>
+  <li>Muestra los resultados del escenario junto a los originales para comparar</li>
+</ol>
+
+<h3>Filtros de Agentes</h3>
+<p>
+  El módulo WALT permite filtrar la nómina antes del cálculo para analizar sub-grupos:
+</p>
+<div class="tbl-wrap"><table>
+  <tr><th>Filtro</th><th>Descripción</th></tr>
+  <tr><td>Sitio</td><td>Filtrar por ubicación física del agente</td></tr>
+  <tr><td>Modalidad</td><td>PRESENCIAL, HOME OFFICE, HÍBRIDO</td></tr>
+  <tr><td>Jefe</td><td>Filtrar por jefe directo</td></tr>
+  <tr><td>Contrato</td><td>"30" | "35" | "36" horas</td></tr>
+  <tr><td>Estado</td><td>"ACTIVO" | "LP" (licencia)</td></tr>
+</table></div>
+
+<p>Los filtros se aplican reactivamente en el <code>DashboardPage</code>: recalcula <code>calcularResultados()</code>
+con los agentes filtrados y muestra los resultados parciales junto a los alertas originales.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     13. STORES ZUSTAND
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-stores">
+<h2>13. Gestión de Estado (Stores Zustand)</h2>
+
+<div class="tbl-wrap"><table>
+  <tr><th>Store</th><th>Persistencia</th><th>Contenido Principal</th></tr>
+  <tr>
+    <td><code>useAuthStore</code></td>
+    <td>localStorage</td>
+    <td><code>user</code>, <code>token</code>, <code>isAuthenticated</code>. SSR-safe: inicializado con <code>typeof window !== 'undefined'</code>.</td>
+  </tr>
+  <tr>
+    <td><code>useResultados</code></td>
+    <td>sessionStorage<br/>(serialización custom del Map)</td>
+    <td>Toda la sesión WALT: <code>resultado</code>, <code>matrices</code> (Map), <code>agentes[]</code>, <code>reductores[]</code>, <code>diasDelMes</code>, <code>alertas[]</code>, <code>activeFilters</code>, <code>mappingOverrides[]</code>, <code>pases[]</code>, <code>agentesDesdeApi</code></td>
+  </tr>
+  <tr>
+    <td><code>useUploads</code></td>
+    <td>IndexedDB (binarios)</td>
+    <td>Los 3 archivos Excel (<code>archivoCP</code>, <code>archivoReductores</code>, <code>archivoNomina</code>), <code>hojaNomina</code>, <code>modoReductor</code> ("multiplicativo" | "aditivo"), <code>topeFacturacion</code> (default 103)</td>
+  </tr>
+  <tr>
+    <td><code>useFrancoConfig</code></td>
+    <td>localStorage</td>
+    <td><code>reglas[]</code>: configuración de francos por tipo de contrato. Editable desde <code>/planificacion/contratos</code>.</td>
+  </tr>
+  <tr>
+    <td><code>useSimulador</code></td>
+    <td>localStorage (parcial)</td>
+    <td>Modificaciones del simulador, escenario actual, período de vigencia</td>
+  </tr>
+  <tr>
+    <td><code>usePlaniConfig</code></td>
+    <td>En memoria</td>
+    <td><code>serviciosNomina[]</code> recibido por postMessage desde Nómina HR (modo embebido)</td>
+  </tr>
+  <tr>
+    <td><code>useConfigStore</code></td>
+    <td>En memoria</td>
+    <td><code>rolPaths</code>: rutas accesibles por cada rol (cargado desde API)</td>
+  </tr>
+  <tr>
+    <td><code>useSidebarStore</code></td>
+    <td>En memoria</td>
+    <td><code>collapsed</code>: estado colapsado/expandido del sidebar HR</td>
+  </tr>
+</table></div>
+
+<div class="warn">
+  <strong>Importante:</strong> Los datos de cálculo WALT (<code>useResultados</code>) se almacenan en
+  <code>sessionStorage</code>, lo que significa que <strong>se pierden al cerrar la pestaña o el navegador</strong>.
+  No hay sincronización con el servidor. Es necesario re-procesar los archivos para recuperar la sesión.
+</div>
+
+<div class="warn">
+  <strong>SSR:</strong> Los stores que acceden a <code>localStorage</code> tienen guardas
+  <code>typeof window !== 'undefined'</code> para evitar errores en el servidor (Next.js renderiza
+  en Node.js donde <code>window</code> no existe). Todos los componentes que usan estos stores
+  están marcados con <code>"use client"</code>.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     14. INTEGRACIÓN EMBEBIDA
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-planibridge">
+<h2>14. Integración Embebida — postMessage Bridge</h2>
+
+<p>
+  El módulo WALT puede operar de forma embebida dentro del sistema HR a través de un iframe.
+  La comunicación entre la ventana padre (Nómina HR) y el iframe (WALT) se realiza mediante
+  la API <code>window.postMessage</code>.
+</p>
+
+<h3>Detección del Modo Embebido</h3>
+<p>El componente <code>AppShell</code> detecta que está en modo embebido si cualquiera de estas
+condiciones es verdadera:</p>
+<ul>
+  <li>El parámetro de URL <code>?embedded=1</code> está presente</li>
+  <li><code>sessionStorage</code> tiene <code>plani_embedded = "1"</code></li>
+  <li><code>window.self !== window.top</code> (está dentro de un iframe)</li>
+</ul>
+<p>En modo embebido, <code>AppShell</code> <strong>omite el sidebar y el header</strong> de WALT y
+renderiza solo el contenido de la página.</p>
+
+<h3>Mensajes Entrantes (Padre → WALT)</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Tipo</th><th>Datos adicionales</th><th>Acción en WALT</th></tr>
+  <tr><td><code>PLANI_INIT</code></td><td><code>servicios[]</code></td><td>Sobreescribe la lista de servicios activos en <code>usePlaniConfig</code>. Permite que los servicios de la DB reemplacen los servicios estáticos definidos en <code>services.ts</code>.</td></tr>
+  <tr><td><code>PLANI_NOMINA</code></td><td><code>agentes[]</code>, <code>mes</code>, <code>anio</code></td><td>Carga la nómina de agentes directamente desde el sistema, sin necesidad de archivo Excel.</td></tr>
+  <tr><td><code>PLANI_NAVIGATE</code></td><td><code>path</code> (string)</td><td>Navega programáticamente a la ruta indicada dentro del módulo WALT.</td></tr>
+  <tr><td><code>PLANI_REQUEST_CONFIG</code></td><td>—</td><td>Respuesta al evento de solicitud de configuración (ver abajo).</td></tr>
+</table></div>
+
+<h3>Mensajes Salientes (WALT → Padre)</h3>
+<div class="tbl-wrap"><table>
+  <tr><th>Tipo</th><th>Datos adicionales</th><th>Cuándo se envía</th></tr>
+  <tr><td><code>PLANI_READY</code></td><td>—</td><td>Al montar <code>AppShell</code>, para notificar que WALT está listo</td></tr>
+  <tr><td><code>PLANI_PAGE_CHANGE</code></td><td><code>page</code> (string)</td><td>Al finalizar el procesamiento y navegar a resumen</td></tr>
+  <tr><td><code>PLANI_REQUEST_CONFIG</code></td><td>—</td><td>Si <code>serviciosNomina</code> está vacío al cargar la página de upload</td></tr>
+  <tr><td><code>PLANI_REQUEST_NOMINA</code></td><td><code>servicioId</code>, <code>mes</code>, <code>anio</code></td><td>Cuando el usuario solicita cargar la nómina desde el sistema</td></tr>
+</table></div>
+
+<h3>Configuración Dinámica de Servicios</h3>
+<p>
+  Cuando WALT recibe <code>PLANI_INIT</code> con la lista de servicios del sistema, cada servicio
+  puede tener un campo <code>plani_config</code> (JSON almacenado en la tabla <code>servicios</code>):
+</p>
+<pre><code>plani_config: {
+  key: "SOPORTE-CBS",        // ServicioKey único
+  label: "CBS",              // Etiqueta en la UI
+  hojaCP: ["PTF", "CBS"],    // Nombres de hojas aceptados en el CP
+  segmentos: ["SOPORTE-CBS", "CBS"],  // Alias en la nómina
+  reductores: ["SOPORTE-CBS"]         // Alias en los reductores
+}</code></pre>
+<p>
+  Si un servicio no tiene <code>plani_config</code>, WALT intenta mapearlo por nombre contra la
+  lista estática en <code>lib/config/services.ts</code>.
+</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     15. SERVICIOS CONFIGURADOS
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-servicios">
+<h2>15. Servicios Configurados (Estáticos)</h2>
+
+<p>
+  La configuración estática de servicios en <code>lib/config/services.ts</code> define
+  los alias de nombres que el sistema acepta para cada servicio en los 3 archivos de entrada.
+  Esta configuración es sobreescrita por la configuración dinámica recibida por postMessage
+  cuando WALT opera en modo embebido.
+</p>
+
+<div class="tbl-wrap"><table>
+  <tr><th>ServicioKey</th><th>Hojas CP aceptadas</th><th>Segmentos en Nómina</th><th>Franco</th></tr>
+  <tr>
+    <td><code>SOPORTE-CBS</code></td>
+    <td>PTF, CBS, Soporte CBS</td>
+    <td>SOPORTE-CBS, SOPORTE CBS, CBS</td>
+    <td>Ventana 4 días, 100% agentes</td>
+  </tr>
+  <tr>
+    <td><code>SOPORTE-CONECTIVIDAD</code></td>
+    <td>Sop_Conectividad, Conectividad, SOPORTE-CONECTIVIDAD</td>
+    <td>SOPORTE-CONECTIVIDAD, SOPORTE CONECTIVIDAD</td>
+    <td>Ventana 4 días, 100% agentes</td>
+  </tr>
+  <tr>
+    <td><code>SOPORTE-ENTRETENIMIENTO</code></td>
+    <td>Entretenimiento, SOPORTE-ENTRETENIMIENTO</td>
+    <td>SOPORTE-ENTRETENIMIENTO, SOPORTE ENTRETENIMIENTO</td>
+    <td>Ventana 4 días, 100% agentes</td>
+  </tr>
+  <tr>
+    <td><code>SOPORTE-MOVIL</code></td>
+    <td>Esp_Movil, Esp.Movil, Esp Movil, SOPORTE-MOVIL</td>
+    <td>SOPORTE-MOVIL, SOPORTE MOVIL, ESP MOVIL</td>
+    <td>Ventana 4 días, 100% agentes</td>
+  </tr>
+  <tr>
+    <td><code>SOPORTE-RRSS</code></td>
+    <td>Digital, SOPORTE-RRSS, RRSS</td>
+    <td>SOPORTE-RRSS, SOPORTE RRSS, RRSS</td>
+    <td>Ventana 4 días, 100% agentes</td>
+  </tr>
+</table></div>
+
+<div class="info">
+  <strong>Normalización:</strong> Todos los nombres de hojas y segmentos se normalizan antes de la comparación:
+  <code>trim() → lowercase → replace(/\s+/g, " ")</code>. Esto permite mayor tolerancia a variaciones
+  de formato en los archivos fuente.
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     16. GLOSARIO
+════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-glossary">
+<h2>16. Glosario</h2>
+
+<div class="tbl-wrap"><table>
+  <tr><th>Término</th><th>Definición</th></tr>
+  <tr><td><strong>HC</strong></td><td>Headcount — número de personas/agentes</td></tr>
+  <tr><td><strong>Hs Brutas</strong></td><td>Horas totales que aportaría cada agente en el mes según su contrato, sin descontar reductores</td></tr>
+  <tr><td><strong>Hs Netas</strong></td><td>Horas efectivas luego de aplicar el factor productivo (deslogueo + ausentismo + rotación)</td></tr>
+  <tr><td><strong>CP</strong></td><td>Capacity Planning — archivo del cliente con el requerimiento de HC por franja horaria</td></tr>
+  <tr><td><strong>Reductor</strong></td><td>Porcentaje de horas perdidas por una causa (deslogueo, ausentismo, rotación)</td></tr>
+  <tr><td><strong>Factor Productivo</strong></td><td>Fracción de horas brutas que se convierten en horas efectivas. Calculado a partir de los reductores.</td></tr>
+  <tr><td><strong>Cumplimiento</strong></td><td>Porcentaje de cobertura del requerido: Hs Netas / Hs Requeridas × 100</td></tr>
+  <tr><td><strong>deltaHC103</strong></td><td>Desvío en agentes equivalentes para alcanzar exactamente el 103% del requerido. Positivo = falta; negativo = sobra.</td></tr>
+  <tr><td><strong>Tope Facturable</strong></td><td>Máximo de horas que se pueden facturar, definido como porcentaje del requerido (default 103%)</td></tr>
+  <tr><td><strong>Recorte</strong></td><td>Horas que exceden el tope facturable y por lo tanto no generan facturación</td></tr>
+  <tr><td><strong>Franco</strong></td><td>Día libre obligatorio según el contrato del agente. Los contratos de 36 hs tienen franco rotativo Jue-Dom.</td></tr>
+  <tr><td><strong>Ventana de Franco</strong></td><td>Conjunto de días entre los cuales el agente puede tomar su franco. El franco se distribuye uniformemente dentro de la ventana.</td></tr>
+  <tr><td><strong>HC c/Franco</strong></td><td>Headcount mínimo en plantel para garantizar cobertura incluso en el peor día de franco de la semana</td></tr>
+  <tr><td><strong>CAPA</strong></td><td>Agente en capacitación (OJT o Training). Ingresa parcialmente al mes según su fecha de inicio de atención.</td></tr>
+  <tr><td><strong>LP</strong></td><td>Licencia por Salud — agente con licencia médica, no disponible para operar</td></tr>
+  <tr><td><strong>Pase</strong></td><td>Asignación temporal o definitiva de un agente a un servicio distinto al de su nómina original</td></tr>
+  <tr><td><strong>Mapping Override</strong></td><td>Corrección manual del mapeo de un segmento de nómina a un servicio (para segmentos no reconocidos automáticamente)</td></tr>
+  <tr><td><strong>Modo Embebido</strong></td><td>Estado del módulo WALT cuando opera dentro de un iframe en la plataforma HR</td></tr>
+  <tr><td><strong>WALT</strong></td><td>Nombre interno del módulo de Planificación de Dotación</td></tr>
+  <tr><td><strong>WF / Workforce</strong></td><td>Equipo de gestión de personal (Workforce Management)</td></tr>
+  <tr><td><strong>OJT</strong></td><td>On the Job Training — capacitación en puesto de trabajo</td></tr>
+  <tr><td><strong>Snapshot</strong></td><td>Copia del estado de un agente en un momento determinado (nómina mensual), para auditoría histórica</td></tr>
+  <tr><td><strong>sessionStorage</strong></td><td>Almacenamiento de navegador que se pierde al cerrar la pestaña (usado para datos de sesión WALT)</td></tr>
+  <tr><td><strong>localStorage</strong></td><td>Almacenamiento persistente del navegador (usado para auth, configuración de franco)</td></tr>
+</table></div>
+</div>
+
+<!-- Footer -->
+<hr />
+<p style="text-align:center; color:#9CA3AF; font-size:.8em; padding: 1em 0 2em;">
+  Konecta Argentina · Sistema HC · Documentación Técnica v2.0 · 2026<br/>
+  Generado automáticamente a partir del código fuente del sistema.
+</p>
+
+</div><!-- /wrapper -->
+</body>
+</html>

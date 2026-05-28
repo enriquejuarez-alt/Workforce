@@ -43,7 +43,7 @@ const ADMIN_ITEMS = [
 
 const WALT_ITEMS = [
   { page: 'carga',     icon: UploadCloud,     label: 'Carga de archivos' },
-  { page: 'dashboard', icon: LayoutDashboard, label: 'Resumen' },
+  { page: 'resumen',   icon: LayoutDashboard, label: 'Resumen' },
   { page: 'curvas',    icon: TrendingUp,      label: 'Curvas' },
   { page: 'simulador', icon: Sliders,         label: 'Simulador' },
 ]

@@ -31,7 +31,7 @@ const ALL_COMMANDS: Command[] = [
   { to: '/programacion',     label: 'Programación',        section: 'Programación',        icon: CalendarClock },
   { to: '/distribucion',     label: 'Distribución',        section: 'Programación',        icon: Shuffle },
   { to: '/planificacion?page=carga',     label: 'Planif. · Carga de archivos', section: 'Walt', icon: UploadCloud },
-  { to: '/planificacion?page=dashboard', label: 'Planif. · Resumen',           section: 'Walt', icon: BarChart3 },
+  { to: '/planificacion?page=resumen',   label: 'Planif. · Resumen',           section: 'Walt', icon: BarChart3 },
   { to: '/planificacion?page=analisis',  label: 'Planif. · Análisis',          section: 'Walt', icon: TrendingUp },
   { to: '/planificacion?page=curvas',    label: 'Planif. · Curvas',            section: 'Walt', icon: TrendingUp },
   { to: '/planificacion?page=simulador', label: 'Planif. · Simulador',         section: 'Walt', icon: Sliders },

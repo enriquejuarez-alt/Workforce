@@ -17,15 +17,16 @@ const MESES = [
 ]
 
 const PAGE_MAP: Record<string, string> = {
-  carga:     '/',
-  dashboard: '/dashboard',
-  analisis:  '/analisis',
-  curvas:    '/curvas',
-  simulador: '/simulador',
+  carga:     '/planificacion',
+  dashboard: '/planificacion/resumen',
+  resumen:   '/planificacion/resumen',
+  analisis:  '/planificacion/analisis',
+  curvas:    '/planificacion/curvas',
+  simulador: '/planificacion/simulador',
 }
 
 function buildSrc(page: string) {
-  return `${PLANI_BASE}${PAGE_MAP[page] ?? '/'}?embedded=1`
+  return `${PLANI_BASE}${PAGE_MAP[page] ?? '/planificacion'}?embedded=1`
 }
 
 export default function Planificacion() {
@@ -50,8 +51,8 @@ export default function Planificacion() {
   const searchParams = new URLSearchParams(location.search)
   const page = searchParams.get('page') ?? 'carga'
 
-  // El iframe siempre carga en la base — la navegación interna es via postMessage
-  const initialSrc = useRef(`${PLANI_BASE}/?embedded=1`)
+  // El iframe entra directo a /planificacion para activar el layout embebido de Walt.
+  const initialSrc = useRef(`${PLANI_BASE}/planificacion?embedded=1`)
 
   // Send service config and listen for PLANI_READY / PLANI_PAGE_CHANGE
   useEffect(() => {
@@ -109,7 +110,7 @@ export default function Planificacion() {
   useEffect(() => {
     if (!planiReady) return
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'PLANI_NAVIGATE', path: PAGE_MAP[page] ?? '/' },
+      { type: 'PLANI_NAVIGATE', path: PAGE_MAP[page] ?? '/planificacion' },
       PLANI_BASE
     )
   }, [page, planiReady])
@@ -131,7 +132,7 @@ export default function Planificacion() {
         PLANI_BASE
       )
       iframeRef.current?.contentWindow?.postMessage(
-        { type: 'PLANI_NAVIGATE', path: '/' },
+        { type: 'PLANI_NAVIGATE', path: '/planificacion' },
         PLANI_BASE
       )
       toast.success(`${data.agentes.length} agentes cargados en Walt`)
@@ -216,7 +217,7 @@ export default function Planificacion() {
             className="btn-ghost py-1 px-2.5 text-xs"
             onClick={() => {
               setError(false)
-              iframeRef.current?.contentWindow?.postMessage({ type: 'PLANI_NAVIGATE', path: PAGE_MAP[page] ?? '/' }, PLANI_BASE)
+              iframeRef.current?.contentWindow?.postMessage({ type: 'PLANI_NAVIGATE', path: PAGE_MAP[page] ?? '/planificacion' }, PLANI_BASE)
             }}
             title="Recargar"
           >

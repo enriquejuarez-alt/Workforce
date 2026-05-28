@@ -3,6 +3,7 @@ import { authenticate, requireAdmin, blockRole, requireRole } from '../middlewar
 import { uploadExcel, uploadImagen } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
+import { googleAuth, googleCallback } from '../controllers/authGoogle'
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission } from '../controllers/users'
 import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent, getAgenteTimeline } from '../controllers/agents'
@@ -32,6 +33,8 @@ const router = Router()
 router.post('/auth/login', login)
 router.get('/auth/me', authenticate, getMe)
 router.post('/auth/logout', authenticate, logout)
+router.get('/auth/google', googleAuth)
+router.get('/auth/google/callback', googleCallback)
 
 router.get('/usuarios', authenticate, requireAdmin, listUsers)
 router.post('/usuarios', authenticate, requireAdmin, createUser)

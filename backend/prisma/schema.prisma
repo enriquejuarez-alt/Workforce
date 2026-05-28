@@ -546,3 +546,11 @@ model ConfiguracionRolPath {
 
   @@map("configuracion_rol_paths")
 }
+
+model UsuarioSeccion {
+  id         Int @id @default(autoincrement())
+  usuario_id Int @unique
+  paths      Json // string[] — secciones permitidas para este usuario específico
+
+  @@map("usuario_secciones")
+}

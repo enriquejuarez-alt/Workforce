@@ -53,6 +53,11 @@ export const usersApi = {
     api.put<UsuarioServicioPermiso>(`/usuarios/${id}/permisos/${servicioId}`, data),
   deletePermission: (id: number, servicioId: number) =>
     api.delete(`/usuarios/${id}/permisos/${servicioId}`),
+  getSecciones: (id: number) => api.get<string[] | null>(`/usuarios/${id}/secciones`),
+  setSecciones: (id: number, paths: string[]) =>
+    api.put<{ ok: boolean }>(`/usuarios/${id}/secciones`, { paths }),
+  deleteSecciones: (id: number) =>
+    api.delete<{ ok: boolean }>(`/usuarios/${id}/secciones`),
 }
 
 // Servicios

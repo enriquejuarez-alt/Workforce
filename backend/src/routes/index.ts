@@ -4,7 +4,7 @@ import { uploadExcel, uploadImagen } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
 import { googleAuth, googleCallback } from '../controllers/authGoogle'
-import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission } from '../controllers/users'
+import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission, getUserSecciones, setUserSecciones, deleteUserSecciones } from '../controllers/users'
 import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent, getAgenteTimeline } from '../controllers/agents'
 import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
@@ -43,6 +43,9 @@ router.patch('/usuarios/:id/estado', authenticate, requireAdmin, toggleUser)
 router.get('/usuarios/:id/permisos', authenticate, requireAdmin, getUserPermissions)
 router.put('/usuarios/:id/permisos/:servicioId', authenticate, requireAdmin, setUserPermission)
 router.delete('/usuarios/:id/permisos/:servicioId', authenticate, requireAdmin, deleteUserPermission)
+router.get('/usuarios/:id/secciones', authenticate, requireAdmin, getUserSecciones)
+router.put('/usuarios/:id/secciones', authenticate, requireAdmin, setUserSecciones)
+router.delete('/usuarios/:id/secciones', authenticate, requireAdmin, deleteUserSecciones)
 
 router.get('/servicios', authenticate, listServices)
 router.post('/servicios', authenticate, requireAdmin, createService)

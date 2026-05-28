@@ -19,15 +19,15 @@ export const ROL_BADGE_VARIANT: Record<Rol, string> = {
 }
 
 /**
- * canAccess lee del store dinámico (configurado por el admin).
+ * canAccess lee del store dinámico.
  * ADMINISTRADOR siempre tiene acceso total.
- * Rutas admin-only (/carga, /usuarios, etc.) se controlan por separado.
+ * Si el usuario tiene override personal (currentUserOverride), tiene prioridad sobre el rol.
  */
 export function canAccess(rol: Rol | undefined, path: string): boolean {
   if (!rol) return false
   if (rol === 'ADMINISTRADOR') return true
-  const { rolPaths } = useConfigStore.getState()
-  const allowed = rolPaths[rol] ?? []
+  const { currentUserOverride, rolPaths } = useConfigStore.getState()
+  const allowed = currentUserOverride ?? rolPaths[rol] ?? []
   return allowed.some((p) => path === p || path.startsWith(p + '/'))
 }
 

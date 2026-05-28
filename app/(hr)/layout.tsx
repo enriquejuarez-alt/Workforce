@@ -6,19 +6,26 @@ import RouteGuard from "@/components/hr/RouteGuard";
 import { useSidebarStore } from "@/store/sidebar";
 import { useAuthStore } from "@/store/auth";
 import { useConfigStore } from "@/store/config";
-import { configuracionApi } from "@/lib/api";
+import { configuracionApi, usersApi } from "@/lib/api";
 
 function ConfigLoader() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
   const setRolPaths = useConfigStore((s) => s.setRolPaths);
+  const setCurrentUserOverride = useConfigStore((s) => s.setCurrentUserOverride);
   const reset = useConfigStore((s) => s.reset);
 
   useEffect(() => {
-    if (!isAuthenticated) { reset(); return; }
+    if (!isAuthenticated || !user) { reset(); return; }
     configuracionApi.getRolConfig()
       .then((r) => setRolPaths(r.data))
       .catch(() => {});
-  }, [isAuthenticated]);
+    if (user.rol !== 'ADMINISTRADOR') {
+      usersApi.getSecciones(user.id)
+        .then((r) => setCurrentUserOverride(r.data))
+        .catch(() => {});
+    }
+  }, [isAuthenticated, user?.id]);
 
   return null;
 }

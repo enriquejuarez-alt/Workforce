@@ -149,6 +149,42 @@ export const setUserPermission = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const getUserSecciones = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const record = await prisma.usuarioSeccion.findUnique({ where: { usuario_id: id } })
+    return res.json(record ? record.paths : null)
+  } catch {
+    return res.status(500).json({ error: 'Error al obtener secciones' })
+  }
+}
+
+export const setUserSecciones = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const { paths } = req.body
+    if (!Array.isArray(paths)) return res.status(400).json({ error: 'paths debe ser un array' })
+    await prisma.usuarioSeccion.upsert({
+      where: { usuario_id: id },
+      update: { paths },
+      create: { usuario_id: id, paths },
+    })
+    return res.json({ ok: true })
+  } catch {
+    return res.status(500).json({ error: 'Error al guardar secciones' })
+  }
+}
+
+export const deleteUserSecciones = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    await prisma.usuarioSeccion.deleteMany({ where: { usuario_id: id } })
+    return res.json({ ok: true })
+  } catch {
+    return res.status(500).json({ error: 'Error al restablecer secciones' })
+  }
+}
+
 export const deleteUserPermission = async (req: AuthRequest, res: Response) => {
   try {
     const userId = parseInt(req.params.id)

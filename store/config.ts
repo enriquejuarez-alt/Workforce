@@ -22,14 +22,18 @@ export const DEFAULT_ROL_PATHS: Record<string, string[]> = {
 
 interface ConfigStore {
   rolPaths: Record<string, string[]>
+  currentUserOverride: string[] | null // null = usar config de rol; array = restricción personal
   loaded: boolean
   setRolPaths: (paths: Record<string, string[]>) => void
+  setCurrentUserOverride: (paths: string[] | null) => void
   reset: () => void
 }
 
 export const useConfigStore = create<ConfigStore>((set) => ({
   rolPaths: DEFAULT_ROL_PATHS,
+  currentUserOverride: null,
   loaded: false,
   setRolPaths: (rolPaths) => set({ rolPaths, loaded: true }),
-  reset: () => set({ rolPaths: DEFAULT_ROL_PATHS, loaded: false }),
+  setCurrentUserOverride: (currentUserOverride) => set({ currentUserOverride }),
+  reset: () => set({ rolPaths: DEFAULT_ROL_PATHS, currentUserOverride: null, loaded: false }),
 }))

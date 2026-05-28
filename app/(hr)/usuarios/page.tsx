@@ -2,7 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UserPlus, Edit2, Shield, CheckCircle2, MoreHorizontal, PowerOff, Power } from 'lucide-react'
+import {
+  UserPlus, Edit2, Shield, CheckCircle2, MoreHorizontal, PowerOff, Power,
+  LayoutDashboard, FileSpreadsheet, ClipboardList, CalendarDays, ArrowLeftRight,
+  UserMinus, GraduationCap, Palmtree, GitCompare, TrendingDown, GitCommitVertical,
+  UploadCloud, CalendarClock, Shuffle, HelpCircle, Settings, RotateCcw,
+} from 'lucide-react'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import Header from '@/components/hr/layout/Header'
@@ -15,10 +21,29 @@ import { PageLoading } from '@/components/hr/ui/LoadingSpinner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-function ActionMenu({ user, onEdit, onPermisos, onToggle, isPending }: {
+const ALL_SECTIONS = [
+  { path: '/dashboard',        label: 'Dashboard',            icon: LayoutDashboard },
+  { path: '/nomina',           label: 'Nómina',               icon: FileSpreadsheet },
+  { path: '/licencias',        label: 'Licencias',            icon: ClipboardList },
+  { path: '/calendario',       label: 'Calendario',           icon: CalendarDays },
+  { path: '/cambios',          label: 'Cambios',              icon: ArrowLeftRight },
+  { path: '/bajas',            label: 'Bajas y Remociones',   icon: UserMinus },
+  { path: '/capacitaciones',   label: 'Formador',             icon: GraduationCap },
+  { path: '/vacaciones',       label: 'Vacaciones',           icon: Palmtree },
+  { path: '/comparacion',      label: 'Comparar Nóminas',     icon: GitCompare },
+  { path: '/ausentismo',       label: 'Ausentismo',           icon: TrendingDown },
+  { path: '/historial-agente', label: 'Historial Agente',     icon: GitCommitVertical },
+  { path: '/planificacion',    label: 'Planificación (Walt)', icon: UploadCloud },
+  { path: '/programacion',     label: 'Programación',         icon: CalendarClock },
+  { path: '/distribucion',     label: 'Distribución',         icon: Shuffle },
+  { path: '/soporte',          label: 'Soporte',              icon: HelpCircle },
+]
+
+function ActionMenu({ user, onEdit, onPermisos, onSecciones, onToggle, isPending }: {
   user: Usuario
   onEdit: () => void
   onPermisos: () => void
+  onSecciones: () => void
   onToggle: () => void
   isPending: boolean
 }) {
@@ -42,7 +67,7 @@ function ActionMenu({ user, onEdit, onPermisos, onToggle, isPending }: {
         <MoreHorizontal size={16} />
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-50 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+        <div className="absolute right-0 top-8 z-50 w-52 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
             onClick={() => { setOpen(false); onEdit() }}
@@ -55,6 +80,14 @@ function ActionMenu({ user, onEdit, onPermisos, onToggle, isPending }: {
           >
             <Shield size={13} /> Gestionar permisos
           </button>
+          {user.rol !== 'ADMINISTRADOR' && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              onClick={() => { setOpen(false); onSecciones() }}
+            >
+              <Settings size={13} /> Secciones visibles
+            </button>
+          )}
           <div className="border-t border-gray-100 my-1" />
           <button
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${user.activo ? 'text-red-500 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
@@ -75,6 +108,7 @@ export default function Usuarios() {
   const [showCreate, setShowCreate] = useState(false)
   const [editUser, setEditUser] = useState<Usuario | null>(null)
   const [permisoUser, setPermisoUser] = useState<Usuario | null>(null)
+  const [seccionesUser, setSeccionesUser] = useState<Usuario | null>(null)
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -100,7 +134,22 @@ export default function Usuarios() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+
+        {/* Banner: link a configuración de roles */}
+        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-100">
+          <div className="flex items-center gap-3">
+            <Settings size={15} className="text-blue-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-blue-900">Configuración de roles</p>
+              <p className="text-xs text-blue-600">Definí qué secciones puede ver cada rol globalmente.</p>
+            </div>
+          </div>
+          <Link href="/configuracion" className="btn-secondary text-xs py-1.5 px-3">
+            Ir a Configuración →
+          </Link>
+        </div>
+
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -176,6 +225,7 @@ export default function Usuarios() {
                       user={user}
                       onEdit={() => setEditUser(user)}
                       onPermisos={() => setPermisoUser(user)}
+                      onSecciones={() => setSeccionesUser(user)}
                       onToggle={() => toggleMutation.mutate(user.id)}
                       isPending={toggleMutation.isPending}
                     />
@@ -206,6 +256,13 @@ export default function Usuarios() {
         <PermisosModal
           user={permisoUser}
           onClose={() => setPermisoUser(null)}
+        />
+      )}
+
+      {seccionesUser && (
+        <SeccionesModal
+          user={seccionesUser}
+          onClose={() => setSeccionesUser(null)}
         />
       )}
     </div>
@@ -581,6 +638,105 @@ function PermisosModal({ user, onClose }: { user: Usuario; onClose: () => void }
           )}
         </div>
       </div>
+    </Modal>
+  )
+}
+
+function SeccionesModal({ user, onClose }: { user: Usuario; onClose: () => void }) {
+  const { data: current, isLoading } = useQuery({
+    queryKey: ['user-secciones', user.id],
+    queryFn: () => usersApi.getSecciones(user.id).then((r) => r.data),
+  })
+
+  const [selected, setSelected] = useState<Set<string> | null>(null)
+
+  useEffect(() => {
+    if (current !== undefined) {
+      setSelected(current ? new Set(current) : null)
+    }
+  }, [current])
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      if (selected === null) return usersApi.deleteSecciones(user.id)
+      return usersApi.setSecciones(user.id, [...selected])
+    },
+    onSuccess: () => { toast.success('Secciones guardadas'); onClose() },
+    onError: () => toast.error('Error al guardar'),
+  })
+
+  const resetMut = useMutation({
+    mutationFn: () => usersApi.deleteSecciones(user.id),
+    onSuccess: () => { setSelected(null); toast.success('Secciones restablecidas al rol') },
+    onError: () => toast.error('Error al restablecer'),
+  })
+
+  function toggle(path: string) {
+    setSelected(prev => {
+      const next = new Set(prev ?? ALL_SECTIONS.map(s => s.path))
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const hasOverride = selected !== null
+  const displaySet = selected ?? new Set(ALL_SECTIONS.map(s => s.path))
+
+  return (
+    <Modal isOpen title={`Secciones visibles — ${user.nombre}`} onClose={onClose} size="md"
+      footer={
+        <div className="flex items-center gap-2 w-full">
+          <button
+            className="btn-secondary flex items-center gap-1.5"
+            onClick={() => resetMut.mutate()}
+            disabled={!hasOverride || resetMut.isPending || saveMut.isPending}
+            title="Quitar restricción personal y usar la del rol"
+          >
+            <RotateCcw size={12} /> Usar config de rol
+          </button>
+          <div className="flex-1" />
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      }
+    >
+      {isLoading ? (
+        <div className="py-8 text-center text-sm text-gray-400">Cargando…</div>
+      ) : (
+        <div className="space-y-3">
+          <div className={`flex items-center gap-2 p-3 rounded-lg text-xs ${hasOverride ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-gray-50 border border-gray-200 text-gray-500'}`}>
+            <Settings size={13} className="shrink-0" />
+            {hasOverride
+              ? `Restricción personal activa — ignora la configuración del rol ${ROL_LABELS[user.rol]}.`
+              : `Sin restricción personal — usa la configuración del rol ${ROL_LABELS[user.rol]}.`}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {ALL_SECTIONS.map(({ path, label, icon: Icon }) => {
+              const on = displaySet.has(path)
+              return (
+                <button
+                  key={path}
+                  onClick={() => toggle(path)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-left transition-all border ${
+                    on
+                      ? 'bg-blue-50 border-blue-200 text-blue-800 font-medium'
+                      : 'bg-gray-50 border-gray-200 text-gray-400 line-through'
+                  }`}
+                >
+                  <Icon size={13} className="shrink-0" />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-400">
+            {[...displaySet].length} de {ALL_SECTIONS.length} secciones habilitadas
+          </p>
+        </div>
+      )}
     </Modal>
   )
 }

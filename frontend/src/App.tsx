@@ -90,6 +90,7 @@ export default function App() {
       <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/auth/callback" element={<Login />} />
           <Route path="/acceso-denegado" element={<AccesoDenegado />} />
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route index element={<RootRedirect />} />

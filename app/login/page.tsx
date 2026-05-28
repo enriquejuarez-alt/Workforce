@@ -1,14 +1,7 @@
 "use client";
 
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Eye, EyeOff, ArrowRight, Loader2, Users, FileSpreadsheet, ArrowLeftRight, Clock, AlertCircle } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { authApi } from '@/lib/api'
-import { useAuthStore } from '@/store/auth'
+import { useSearchParams } from 'next/navigation'
+import { Users, FileSpreadsheet, ArrowLeftRight, Clock, AlertCircle } from 'lucide-react'
 
 function GoogleIcon() {
   return (
@@ -20,17 +13,6 @@ function GoogleIcon() {
     </svg>
   )
 }
-
-const schema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Contraseña requerida'),
-})
-type FormData = z.infer<typeof schema>
-
-const CREDENTIALS = [
-  { label: 'Admin', email: 'admin@konecta.com', pass: 'admin123', color: 'bg-violet-50 border-violet-200 hover:bg-violet-100 text-violet-700' },
-  { label: 'Supervisor', email: 'supervisor.soporte@konecta.com', pass: 'supervisor123', color: 'bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700' },
-]
 
 function AppMockup() {
   const kpis = [
@@ -141,40 +123,8 @@ function AppMockup() {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const { setAuth } = useAuthStore()
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [filledWith, setFilledWith] = useState<string | null>(null)
-
   const oauthError = searchParams.get('oauth_error')
-
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  })
-
-  const fillCredentials = (cred: typeof CREDENTIALS[number]) => {
-    setValue('email', cred.email, { shouldValidate: true })
-    setValue('password', cred.pass, { shouldValidate: true })
-    setFilledWith(cred.label)
-  }
-
-  const onSubmit = async (data: FormData) => {
-    setLoading(true)
-    try {
-      const res = await authApi.login(data.email, data.password)
-      setAuth(res.data.user, res.data.token)
-      const meRes = await authApi.me()
-      setAuth(meRes.data, res.data.token)
-      toast.success(`Bienvenido, ${res.data.user.nombre}`)
-      router.push('/dashboard')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Credenciales inválidas')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -235,17 +185,12 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center px-8 py-12 bg-gray-50">
         <div className="w-full max-w-[340px]">
 
-          {/* Mobile header */}
-          <div className="flex items-center gap-2.5 lg:hidden mb-10">
-            <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-xl object-cover" />
-            <span className="text-sm font-bold text-gray-900">Gestión de Nómina</span>
-          </div>
-
           <div className="mb-8">
+            <img src="/logo.jpg" alt="Logo" className="w-10 h-10 rounded-xl object-cover mb-5" />
             <h2 className="text-[1.65rem] font-extrabold text-gray-900 tracking-tight leading-tight">
               Bienvenido
             </h2>
-            <p className="text-gray-400 text-sm mt-1">Ingresá tus credenciales para continuar</p>
+            <p className="text-gray-400 text-sm mt-1">Iniciá sesión con tu cuenta corporativa</p>
           </div>
 
           {/* OAuth error */}
@@ -256,104 +201,22 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                  Email
-                </label>
-                <input
-                  {...register('email')}
-                  type="email"
-                  placeholder="usuario@konecta.com"
-                  autoFocus
-                  className={`w-full h-10 px-3.5 text-sm rounded-xl border bg-gray-50 text-gray-900 placeholder:text-gray-300 outline-none transition-all
-                    focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/8
-                    ${errors.email ? 'border-red-400' : 'border-gray-200'}`}
-                />
-                {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
-              </div>
+          {/* Google login card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <a
+              href="/api/auth/google"
+              className="w-full h-11 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center gap-2.5 text-sm font-semibold text-gray-700 transition-all active:scale-[.98]"
+              style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
+            >
+              <GoogleIcon />
+              Continuar con Google
+            </a>
 
-              <div>
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <input
-                    {...register('password')}
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    className={`w-full h-10 px-3.5 pr-10 text-sm rounded-xl border bg-gray-50 text-gray-900 placeholder:text-gray-300 outline-none transition-all
-                      focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/8
-                      ${errors.password ? 'border-red-400' : 'border-gray-200'}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-                {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-10 mt-1 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60 active:scale-[.98]"
-                style={{
-                  background: loading ? '#3b82f6' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                  boxShadow: loading ? 'none' : '0 4px 16px rgba(37,99,235,0.30)',
-                }}
-              >
-                {loading ? (
-                  <><Loader2 size={15} className="animate-spin" /> Ingresando...</>
-                ) : (
-                  <>Ingresar <ArrowRight size={15} /></>
-                )}
-              </button>
-
-              <div className="flex items-center gap-3 my-1">
-                <div className="flex-1 h-px bg-gray-100" />
-                <span className="text-xs text-gray-300">o</span>
-                <div className="flex-1 h-px bg-gray-100" />
-              </div>
-
-              <a
-                href="/api/auth/google"
-                className="w-full h-10 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center gap-2.5 text-sm font-medium text-gray-700 transition-all active:scale-[.98]"
-              >
-                <GoogleIcon />
-                Continuar con Google
-              </a>
-            </form>
-          </div>
-
-          {/* Test credentials — click to fill */}
-          <div className="mt-4">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">
-              Credenciales de prueba — click para completar
-            </p>
-            <div className="space-y-2">
-              {CREDENTIALS.map((cred) => (
-                <button
-                  key={cred.email}
-                  type="button"
-                  onClick={() => fillCredentials(cred)}
-                  className={`w-full text-left px-3.5 py-3 rounded-xl border text-xs transition-all active:scale-[.98] ${cred.color}
-                    ${filledWith === cred.label ? 'ring-2 ring-offset-1 ring-current/30' : ''}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">{cred.label}</span>
-                    {filledWith === cred.label && (
-                      <span className="text-[10px] opacity-60 font-medium">✓ cargado</span>
-                    )}
-                  </div>
-                  <div className="font-mono opacity-60 mt-0.5 text-[11px]">{cred.email}</div>
-                </button>
-              ))}
+            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-3">
+              <span className="text-blue-400 text-base leading-none mt-0.5">ℹ</span>
+              <p className="text-xs text-blue-600 leading-relaxed">
+                Usá tu cuenta <span className="font-bold">@konecta.com</span>. Otros dominios no tienen acceso al sistema.
+              </p>
             </div>
           </div>
 

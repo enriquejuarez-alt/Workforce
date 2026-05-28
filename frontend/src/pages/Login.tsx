@@ -116,6 +116,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   google_token_failed: 'No se pudo obtener acceso de Google. Intentá de nuevo.',
   google_no_email:     'Tu cuenta de Google no tiene email verificado.',
   google_server_error: 'Error en el servidor al procesar el login.',
+  user_not_found:      'Tu cuenta no tiene acceso al sistema. Contactá al administrador.',
   user_inactive:       'Tu usuario está desactivado. Contactá al administrador.',
   unknown:             'Ocurrió un error inesperado.',
 }
@@ -249,7 +250,7 @@ export default function Login() {
             <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-3">
               <span className="text-blue-400 text-base leading-none mt-0.5">ℹ</span>
               <p className="text-xs text-blue-600 leading-relaxed">
-                Usá tu cuenta <span className="font-bold">@konecta.com</span>. Otros dominios no tienen acceso al sistema.
+                Usá tu cuenta <span className="font-bold">nombre.apellido@konecta.com</span>. Otros dominios no tienen acceso al sistema.
               </p>
             </div>
           </div>

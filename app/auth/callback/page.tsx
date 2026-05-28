@@ -11,6 +11,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   google_token_failed: "No se pudo obtener acceso de Google. Intentá de nuevo.",
   google_no_email:     "Tu cuenta de Google no tiene email verificado.",
   google_server_error: "Error en el servidor al procesar el login.",
+  user_not_found:      "Tu cuenta no tiene acceso al sistema. Contactá al administrador.",
   user_inactive:       "Tu usuario está desactivado. Contactá al administrador.",
   unknown:             "Ocurrió un error inesperado.",
 };

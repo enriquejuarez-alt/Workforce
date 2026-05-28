@@ -1,6 +1,4 @@
 import { Request, Response } from 'express'
-import bcrypt from 'bcrypt'
-import crypto from 'crypto'
 import prisma from '../prisma'
 import { signToken } from '../utils/jwt'
 import { createAuditLog } from '../utils/audit'
@@ -65,21 +63,14 @@ export async function googleCallback(req: Request, res: Response) {
       return res.redirect(`${FRONTEND_URL}/login?error=google_no_email`)
     }
 
-    // 3 — Buscar o crear usuario
-    let user = await prisma.usuario.findUnique({ where: { email: googleUser.email } })
+    // 3 — Verificar que el usuario fue dado de alta por un admin
+    const user = await prisma.usuario.findUnique({ where: { email: googleUser.email } })
 
     if (!user) {
-      const randomHash = await bcrypt.hash(crypto.randomUUID(), 10)
-      user = await prisma.usuario.create({
-        data: {
-          nombre:        googleUser.name ?? googleUser.email.split('@')[0],
-          email:         googleUser.email,
-          password_hash: randomHash,
-          rol:           'USUARIO',
-          activo:        true,
-        },
-      })
-    } else if (!user.activo) {
+      return res.redirect(`${FRONTEND_URL}/login?error=user_not_found`)
+    }
+
+    if (!user.activo) {
       return res.redirect(`${FRONTEND_URL}/login?error=user_inactive`)
     }
 

@@ -271,7 +271,6 @@ function UserFormModal({ user, onClose, onSaved }: { user?: Usuario; onClose: ()
         <div>
           <label className="label-base">Rol</label>
           <select {...register('rol')} className="input-base">
-            <option value="USUARIO">Supervisor (legacy)</option>
             <option value="WORKFORCE">Workforce</option>
             <option value="CAPACITADOR">Capacitador</option>
             <option value="LIDER">Líder de servicio</option>

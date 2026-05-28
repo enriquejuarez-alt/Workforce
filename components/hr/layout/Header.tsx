@@ -92,7 +92,7 @@ export default function Header({ title, titleAccent, subtitle, actions }: Header
             <div className="text-right hidden sm:block">
               <p className="text-sm font-semibold text-gray-800 leading-tight">{user?.nombre}</p>
               <p className="text-[11px] text-gray-400 mt-0.5">
-                {user?.rol === 'ADMINISTRADOR' ? 'Administrador' : 'Supervisor'}
+                {user?.rol === 'ADMINISTRADOR' ? 'Administrador' : user?.rol === 'WORKFORCE' ? 'Workforce' : user?.rol === 'LIDER' ? 'Líder' : user?.rol === 'CAPACITADOR' ? 'Capacitador' : user?.rol ?? ''}
               </p>
             </div>
             <div

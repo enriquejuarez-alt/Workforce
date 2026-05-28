@@ -7,7 +7,7 @@ export const ROL_LABELS: Record<Rol, string> = {
   WORKFORCE:     'Workforce',
   CAPACITADOR:   'Capacitador',
   LIDER:         'Líder',
-  USUARIO:       'Supervisor',
+  USUARIO:       'Workforce', // legacy — se muestra como Workforce
 }
 
 export const ROL_BADGE_VARIANT: Record<Rol, string> = {

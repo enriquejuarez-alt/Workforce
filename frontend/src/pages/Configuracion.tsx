@@ -32,10 +32,9 @@ const SECTIONS = [
 ]
 
 const ROLES = [
-  { rol: 'WORKFORCE',  label: 'Workforce',   color: '#3B82F6' },
-  { rol: 'USUARIO',    label: 'Supervisor',  color: '#8B5CF6' },
-  { rol: 'LIDER',      label: 'Líder',       color: '#10B981' },
-  { rol: 'CAPACITADOR',label: 'Capacitador', color: '#F59E0B' },
+  { rol: 'WORKFORCE',   label: 'Workforce',   color: '#3B82F6' },
+  { rol: 'LIDER',       label: 'Líder',       color: '#10B981' },
+  { rol: 'CAPACITADOR', label: 'Capacitador', color: '#F59E0B' },
 ] as const
 
 type ConfigState = Record<string, Set<string>>

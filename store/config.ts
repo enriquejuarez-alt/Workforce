@@ -7,6 +7,7 @@ export const DEFAULT_ROL_PATHS: Record<string, string[]> = {
     '/bajas', '/capacitaciones', '/vacaciones', '/comparacion', '/ausentismo',
     '/historial-agente', '/planificacion', '/programacion', '/distribucion', '/soporte',
   ],
+  // USUARIO kept for backwards-compat with existing DB records — same as WORKFORCE
   USUARIO: [
     '/dashboard', '/nomina', '/licencias', '/calendario', '/cambios',
     '/bajas', '/capacitaciones', '/vacaciones', '/comparacion', '/ausentismo',

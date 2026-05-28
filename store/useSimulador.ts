@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { ServicioKey, SimModTipo, SimModificacion } from "@/lib/domain/types";
 import { SERVICIOS_KEYS } from "@/lib/domain/types";
 
@@ -62,7 +63,9 @@ interface SimuladorState {
   deleteEscenario: (id: string) => void;
 }
 
-export const useSimulador = create<SimuladorState>((set, get) => ({
+export const useSimulador = create<SimuladorState>()(
+  persist(
+  (set, get) => ({
   ajustes: ajustesInicial(),
   modificaciones: [],
   escenarios: [],
@@ -119,4 +122,19 @@ export const useSimulador = create<SimuladorState>((set, get) => ({
 
   deleteEscenario: (id) =>
     set((state) => ({ escenarios: state.escenarios.filter((e) => e.id !== id) })),
-}));
+  }),
+  {
+    name: "plani-simulador",
+    storage: createJSONStorage(() =>
+      typeof window !== "undefined" ? sessionStorage : localStorage
+    ),
+    partialize: (state) => ({
+      ajustes: state.ajustes,
+      modificaciones: state.modificaciones,
+      escenarios: state.escenarios,
+      escenarioComparar: state.escenarioComparar,
+      periodoDesde: state.periodoDesde,
+      periodoHasta: state.periodoHasta,
+    }),
+  }
+));

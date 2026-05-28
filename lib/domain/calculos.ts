@@ -30,10 +30,13 @@ export function calcularFactorProductivo(
   rotacion: number,
   modo: ModoReductor
 ): number {
+  const d = Math.min(1, Math.max(0, deslogueo));
+  const a = Math.min(1, Math.max(0, ausentismo));
+  const r = Math.min(1, Math.max(0, rotacion));
   if (modo === "multiplicativo") {
-    return (1 - deslogueo) * (1 - ausentismo) * (1 - rotacion);
+    return (1 - d) * (1 - a) * (1 - r);
   }
-  return Math.max(0, 1 - (deslogueo + ausentismo + rotacion));
+  return Math.max(0, 1 - (d + a + r));
 }
 
 export function calcularCumplimiento(
@@ -266,7 +269,7 @@ export function calcularHCDisponiblePorFranja(
   hcActivos: number,
   hsSemanalPromedio: number
 ): number[] {
-  // Distribución plana (fallback si no hay horarios)
-  const hcPorFranja = (hcActivos * hsSemanalPromedio) / 7 / 24;
+  // Distribución plana (fallback si no hay horarios) — 48 franjas de 30 min
+  const hcPorFranja = (hcActivos * hsSemanalPromedio) / 7 / 48;
   return Array(48).fill(hcPorFranja);
 }

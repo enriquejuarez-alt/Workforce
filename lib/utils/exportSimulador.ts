@@ -81,7 +81,7 @@ export async function exportarSimulacion(
   a.href = url;
   a.download = `planificador_${mes.replace(/ /g, "_")}.xlsx`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 // ── Hoja 1: Detalle con columna Hs Faltantes ──────────────────────────────

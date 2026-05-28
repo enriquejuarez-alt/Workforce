@@ -107,6 +107,8 @@ export function parseNomina(
   const colFechaInicio = encontrarCol("fecha inicio atencion", "fecha inicio", "inicio atencion", "capa fecha", "inicio capa");
 
   const errores: string[] = [];
+  if (!colDNI) errores.push("Columna DNI no encontrada");
+  if (!colNombre) errores.push("Columna NOMBRE no encontrada");
   if (!colSegmento) errores.push("Columna SEGMENTO no encontrada");
   if (!colEstado) errores.push("Columna ESTADO no encontrada");
   if (!colContrato) errores.push("Columna CONTRATO no encontrada");

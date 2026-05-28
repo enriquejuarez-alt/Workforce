@@ -7,20 +7,20 @@ import {
   LayoutDashboard,
   Sliders,
   CalendarOff,
-  Settings2,
   TrendingUp,
   FilePen,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const NAV_ITEMS = [
   { href: "/planificacion", label: "Carga de archivos", icon: UploadCloud },
   { href: "/planificacion/resumen", label: "Resumen", icon: LayoutDashboard },
+  { href: "/planificacion/analisis", label: "Análisis", icon: BarChart2 },
   { href: "/planificacion/curvas", label: "Curvas", icon: TrendingUp },
   { href: "/planificacion/simulador", label: "Simulador", icon: Sliders },
   { href: "/planificacion/contratos", label: "Contratos", icon: FilePen },
   { href: "/planificacion/franco", label: "Franco", icon: CalendarOff },
-  { href: "/planificacion/configuracion", label: "Configuración", icon: Settings2 },
 ];
 
 export function Sidebar() {

@@ -74,6 +74,7 @@ export default function UploadPage() {
     agentesDesdeApi,
     mesDesdeApi,
     anioDesdeApi,
+    clearFilters,
   } = useResultados();
 
   const [loadingCP, setLoadingCP] = useState(false);
@@ -241,6 +242,7 @@ export default function UploadPage() {
       setResultado(resultado);
       setAlertas(alertas);
       setAgentesExcluidos(excl, segs);
+      clearFilters();
 
       router.push("/planificacion/resumen");
       // Notificar a Walt para que sincronice el nav activo

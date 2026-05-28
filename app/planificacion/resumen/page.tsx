@@ -36,9 +36,12 @@ export default function DashboardPage() {
 
   const francoMap = useMemo(() => {
     if (agentes.length === 0) return new Map<string, number>();
-    const resultados = calcularFrancoPorServicio(agentes, matrices, reglas, getServiciosKeys());
+    const agentesParaFranco = hayFiltrosActivos(activeFilters)
+      ? filtrarAgentes(agentes, activeFilters)
+      : agentes;
+    const resultados = calcularFrancoPorServicio(agentesParaFranco, matrices, reglas, getServiciosKeys());
     return new Map(resultados.map((r) => [r.servicio, r.hcNecesarioTotal]));
-  }, [agentes, matrices, reglas]);
+  }, [agentes, matrices, reglas, activeFilters]);
 
   const resultadoMostrado = useMemo(() => {
     if (!resultado || agentes.length === 0) return resultado;

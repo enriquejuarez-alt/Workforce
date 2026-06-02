@@ -7,7 +7,6 @@ frontend/node_modules/
 backend/dist/
 frontend/dist/
 .next/
-plani/.next/
 *.tsbuildinfo
 
 # Environment variables
@@ -16,6 +15,10 @@ backend/.env
 
 # Uploads
 backend/uploads/
+
+# Local notes and Excel workbooks
+*.txt
+*.xlsx
 
 # Prisma generated (regenerated on install)
 backend/node_modules/.prisma/

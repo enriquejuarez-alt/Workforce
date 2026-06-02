@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Plus, Trash2, ArrowRight, Users, UserMinus, Shuffle,
   FileSignature, Wand2, Save, FolderOpen, X, Settings2, RotateCcw,
+  UserRound,
 } from "lucide-react";
 import type { ResultadoServicio } from "@/lib/domain/types";
 import { type ServicioKey } from "@/lib/domain/types";
 import { useSimulador } from "@/store/useSimulador";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
+import { useResultados } from "@/store/useResultados";
 import { fmtPct } from "@/lib/utils/formato";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ const OPERACIONES = [
   { tipo: "add_agents",      label: "Agregar personas",  icon: Users,         color: "text-emerald-600" },
   { tipo: "remove_agents",   label: "Dar de baja",       icon: UserMinus,     color: "text-red-600"     },
   { tipo: "move_agents",     label: "Reasignar",         icon: Shuffle,       color: "text-sky-600"     },
+  { tipo: "move_named_agent", label: "Mover agente",      icon: UserRound,     color: "text-indigo-600"  },
   { tipo: "change_contract", label: "Cambiar contrato",  icon: FileSignature, color: "text-amber-600"   },
 ] as const;
 
@@ -30,11 +33,12 @@ type TipoOp = typeof OPERACIONES[number]["tipo"];
 const selectCls = "h-8 rounded-lg border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6] min-w-[130px]";
 const inputCls  = "w-20 h-8 bg-white border border-gray-300 rounded-lg px-2 text-xs text-gray-700 tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
 
-function descripcionOp(m: { tipo: string; servicio: string; servicioDestino?: string; cantidad: number; hsSemanal?: number; deslogueoOverride?: number | null; ausentismoOverride?: number | null; rotacionOverride?: number | null }): string {
+function descripcionOp(m: { tipo: string; servicio: string; servicioDestino?: string; cantidad: number; hsSemanal?: number; agenteNombre?: string; agenteDni?: string; deslogueoOverride?: number | null; ausentismoOverride?: number | null; rotacionOverride?: number | null }): string {
   switch (m.tipo) {
     case "add_agents":      return `+${m.cantidad} personas a ${m.servicio} (${m.hsSemanal ?? 36}hs/sem)`;
     case "remove_agents":   return `−${m.cantidad} bajas en ${m.servicio}`;
     case "move_agents":     return `${m.cantidad} personas: ${m.servicio} → ${m.servicioDestino ?? "?"}`;
+    case "move_named_agent": return `${m.agenteNombre ?? m.agenteDni ?? "Agente"}: ${m.servicio} -> ${m.servicioDestino ?? "?"}`;
     case "change_contract": return `Cambiar contrato de ${m.cantidad} personas en ${m.servicio} a ${m.hsSemanal ?? 36}hs`;
     default: return m.tipo;
   }
@@ -314,17 +318,52 @@ function ReductoresCell({
 function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: ServicioKey[]; resultadosSimulados: ResultadoServicio[] }) {
   const { modificaciones, escenarios, addModificacion, bulkAddModificaciones, removeModificacion, clearModificaciones, saveEscenario, loadEscenario, deleteEscenario } = useSimulador();
   const contratos = useFrancoConfig((s) => s.reglas);
+  const { agentes } = useResultados();
 
   const [tipoActivo, setTipoActivo] = useState<TipoOp>("add_agents");
   const [servicio, setServicio]     = useState<ServicioKey>(servicios[0]);
   const [destino, setDestino]       = useState<ServicioKey>(servicios[1] ?? servicios[0]);
   const [cantidad, setCantidad]     = useState(1);
   const [hsSemanal, setHsSemanal]   = useState(36);
+  const [agenteDni, setAgenteDni]   = useState("");
+  const [agenteSearch, setAgenteSearch] = useState("");
   const [saveNombre, setSaveNombre]     = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [showEscenarios, setShowEscenarios] = useState(false);
 
+  const agentesOrigen = useMemo(() => {
+    return agentes
+      .filter((a) => a.segmentoNorm === servicio && (a.estado || "").toUpperCase().includes("ACTIVO"))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [agentes, servicio]);
+
+  const agentesFiltrados = useMemo(() => {
+    const q = agenteSearch.trim().toLowerCase();
+    if (!q) return agentesOrigen.slice(0, 80);
+    return agentesOrigen
+      .filter((a) => `${a.nombre} ${a.dni} ${a.usuario}`.toLowerCase().includes(q))
+      .slice(0, 80);
+  }, [agentesOrigen, agenteSearch]);
+
+  const agenteSeleccionado = agentesOrigen.find((a) => a.dni === agenteDni);
+
   const agregar = () => {
+    if (tipoActivo === "move_named_agent") {
+      if (!agenteSeleccionado || !destino || destino === servicio) return;
+      addModificacion("move_named_agent", servicio, {
+        servicioDestino: destino,
+        cantidad: 1,
+        agenteDni: agenteSeleccionado.dni,
+        agenteNombre: agenteSeleccionado.nombre,
+        agenteUsuario: agenteSeleccionado.usuario,
+        hsMensualBrutas: agenteSeleccionado.hsMensualBrutas,
+        hsSemanal: agenteSeleccionado.hsSemanal,
+      });
+      setAgenteDni("");
+      setAgenteSearch("");
+      return;
+    }
+
     const params: Record<string, unknown> = { cantidad };
     if (tipoActivo === "add_agents" || tipoActivo === "change_contract") params.hsSemanal = hsSemanal;
     if (tipoActivo === "move_agents") params.servicioDestino = destino;
@@ -466,14 +505,14 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="text-xs text-gray-500 mb-1 block">
-              {tipoActivo === "move_agents" ? "Origen" : "Servicio"}
+              {tipoActivo === "move_agents" || tipoActivo === "move_named_agent" ? "Origen" : "Servicio"}
             </label>
             <select value={servicio} onChange={(e) => setServicio(e.target.value as ServicioKey)} className={selectCls}>
               {servicios.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {tipoActivo === "move_agents" && (
+          {(tipoActivo === "move_agents" || tipoActivo === "move_named_agent") && (
             <>
               <ArrowRight className="h-4 w-4 text-gray-400 self-end mb-2" />
               <div>
@@ -485,22 +524,50 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
             </>
           )}
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
-            <input
-              type="number"
-              value={cantidad}
-              min={1}
-              max={500}
-              onChange={(e) => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
-              className={inputCls}
-            />
-          </div>
+          {tipoActivo === "move_named_agent" && (
+            <div className="min-w-[260px]">
+              <label className="text-xs text-gray-500 mb-1 block">Agente</label>
+              <div className="flex gap-2">
+                <input
+                  value={agenteSearch}
+                  onChange={(e) => setAgenteSearch(e.target.value)}
+                  placeholder="Buscar nombre, DNI o usuario"
+                  className="h-8 w-44 rounded-lg border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6]"
+                />
+                <select
+                  value={agenteDni}
+                  onChange={(e) => setAgenteDni(e.target.value)}
+                  className="h-8 min-w-[210px] rounded-lg border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#0054A6]"
+                >
+                  <option value="">Seleccionar</option>
+                  {agentesFiltrados.map((a) => (
+                    <option key={a.dni} value={a.dni}>
+                      {a.nombre} · {a.hsSemanal}hs
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {tipoActivo !== "move_named_agent" && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Cantidad</label>
+              <input
+                type="number"
+                value={cantidad}
+                min={1}
+                max={500}
+                onChange={(e) => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
+                className={inputCls}
+              />
+            </div>
+          )}
 
           {(tipoActivo === "add_agents" || tipoActivo === "change_contract") && (
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Contrato</label>
-              <select value={hsSemanal} onChange={(e) => setHsSemanal(parseInt(e.target.value))} className={selectCls}>
+              <select value={hsSemanal} onChange={(e) => setHsSemanal(parseFloat(e.target.value))} className={selectCls}>
                 {contratos.map((contrato) => (
                   <option key={contrato.hsSemanal} value={contrato.hsSemanal}>
                     {contrato.label || `${contrato.hsSemanal} hs`} / sem
@@ -510,7 +577,7 @@ function EscenarioBuilder({ servicios, resultadosSimulados }: { servicios: Servi
             </div>
           )}
 
-          <Button size="sm" onClick={agregar} className="gap-1.5 shrink-0">
+          <Button size="sm" onClick={agregar} disabled={tipoActivo === "move_named_agent" && (!agenteSeleccionado || destino === servicio)} className="gap-1.5 shrink-0">
             <Plus className="h-3.5 w-3.5" />
             Agregar al escenario
           </Button>

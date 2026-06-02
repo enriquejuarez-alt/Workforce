@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
-import { DIAS_SEMANA, DIA_LABELS, type DiaSemana } from "@/lib/config/francoRules";
+import {
+  DIAS_SEMANA,
+  DIA_LABELS,
+  type DiaSemana,
+  type DistribucionJornada,
+  type ReglaFrancoContrato,
+} from "@/lib/config/francoRules";
 import { cn } from "@/lib/utils/cn";
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 
@@ -22,9 +28,22 @@ function describirVentana(dias: DiaSemana[]) {
   return dias.map((d) => DIA_LABELS[d]).join(", ");
 }
 
-export function FrancoRulesEditor() {
+function describirDistribucion(distribucion?: DistribucionJornada) {
+  if (!distribucion || distribucion.tipo === "uniforme") return "Distribucion uniforme";
+  const dias = distribucion.diasLaborables?.map((d) => DIA_LABELS[d]).join(", ") || "sin dias";
+  const extra = distribucion.hsExtraDia && distribucion.hsExtraDia > 0
+    ? ` + ${distribucion.hsExtraDia} hs extra`
+    : "";
+  return `${distribucion.hsBaseDia ?? 0} hs${extra} en ${dias}`;
+}
+
+interface FrancoRulesEditorProps {
+  activeReglas?: ReglaFrancoContrato[];
+}
+
+export function FrancoRulesEditor({ activeReglas }: FrancoRulesEditorProps) {
   const {
-    reglas,
+    reglas: globalReglas,
     addContrato,
     updateContrato,
     removeContrato,
@@ -33,6 +52,8 @@ export function FrancoRulesEditor() {
     removeFranco,
     resetToDefaults,
   } = useFrancoConfig();
+
+  const reglas = activeReglas ?? globalReglas;
   const [nuevoContrato, setNuevoContrato] = useState("");
 
   const contratosExistentes = useMemo(
@@ -55,6 +76,23 @@ export function FrancoRulesEditor() {
       ? ventana.dias.filter((d) => d !== dia)
       : [...ventana.dias, dia];
     setVentana(hsSemanal, francoIndex, { dias });
+  };
+
+  const updateDistribucion = (regla: ReglaFrancoContrato, patch: DistribucionJornada) => {
+    updateContrato(regla.hsSemanal, { distribucion: patch });
+  };
+
+  const toggleDiaDistribucion = (
+    regla: ReglaFrancoContrato,
+    field: "diasLaborables" | "diasExtra",
+    dia: DiaSemana
+  ) => {
+    const distribucion = regla.distribucion?.tipo === "base_extra_diario"
+      ? regla.distribucion
+      : { tipo: "base_extra_diario" as const, diasLaborables: [], hsBaseDia: 0, hsExtraDia: 0, diasExtra: [] };
+    const actual = distribucion[field] ?? [];
+    const next = actual.includes(dia) ? actual.filter((d) => d !== dia) : [...actual, dia];
+    updateDistribucion(regla, { ...distribucion, [field]: next });
   };
 
   return (
@@ -91,13 +129,13 @@ export function FrancoRulesEditor() {
             <input
               type="number"
               min={1}
-              step={1}
+              step={0.5}
               value={nuevoContrato}
               onChange={(e) => setNuevoContrato(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAddContrato();
               }}
-              placeholder="Ej: 32"
+              placeholder="Ej: 32.5"
               className="h-9 w-28 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-[#0054A6]"
             />
             <span className="text-sm text-gray-500">horas semanales</span>
@@ -129,7 +167,7 @@ export function FrancoRulesEditor() {
                     <input
                       type="number"
                       min={1}
-                      step={1}
+                      step={0.5}
                       value={regla.hsSemanal}
                       onChange={(e) => {
                         const hs = Number(e.target.value);
@@ -144,6 +182,9 @@ export function FrancoRulesEditor() {
                 <div className="rounded-md bg-white px-3 py-2 text-xs text-gray-500">
                   {regla.francos.length} franco{regla.francos.length !== 1 ? "s" : ""} semanal
                   {regla.francos.length !== 1 ? "es" : ""}
+                </div>
+                <div className="rounded-md bg-white px-3 py-2 text-xs text-gray-500">
+                  {describirDistribucion(regla.distribucion)}
                 </div>
               </div>
 
@@ -163,6 +204,120 @@ export function FrancoRulesEditor() {
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
+            </div>
+
+            <div className="border-b border-gray-100 px-4 py-3">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Distribucion de jornada</p>
+                  <p className="text-xs text-gray-400">
+                    Usala cuando un contrato no reparte horas de forma pareja. Ej: 32.5 hs con media hora extra L-V.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => updateContrato(regla.hsSemanal, { distribucion: { tipo: "uniforme" } })}
+                    className={cn(
+                      "rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors",
+                      !regla.distribucion || regla.distribucion.tipo === "uniforme"
+                        ? "border-[#0054A6] bg-blue-50 text-[#0054A6]"
+                        : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                    )}
+                  >
+                    Uniforme
+                  </button>
+                  <button
+                    onClick={() => updateDistribucion(regla, {
+                      tipo: "base_extra_diario",
+                      diasLaborables: ["lunes", "martes", "miercoles", "jueves", "viernes"],
+                      hsBaseDia: 6,
+                      hsExtraDia: 0.5,
+                      diasExtra: ["lunes", "martes", "miercoles", "jueves", "viernes"],
+                    })}
+                    className={cn(
+                      "rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors",
+                      regla.distribucion?.tipo === "base_extra_diario"
+                        ? "border-[#0054A6] bg-blue-50 text-[#0054A6]"
+                        : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                    )}
+                  >
+                    Base + extra diario
+                  </button>
+                </div>
+              </div>
+
+              {regla.distribucion?.tipo === "base_extra_diario" && (
+                <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-500">Horas base por dia</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={regla.distribucion.hsBaseDia ?? 0}
+                        onChange={(e) => updateDistribucion(regla, { ...regla.distribucion!, hsBaseDia: Number(e.target.value) })}
+                        className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#0054A6]"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-500">Extra por dia</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={regla.distribucion.hsExtraDia ?? 0}
+                        onChange={(e) => updateDistribucion(regla, { ...regla.distribucion!, hsExtraDia: Number(e.target.value) })}
+                        className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#0054A6]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-gray-500">Dias laborables</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DIAS_SEMANA.map((dia) => {
+                        const activo = regla.distribucion?.diasLaborables?.includes(dia);
+                        return (
+                          <button
+                            key={dia}
+                            onClick={() => toggleDiaDistribucion(regla, "diasLaborables", dia)}
+                            className={cn(
+                              "rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                              activo ? "bg-[#0054A6] text-white shadow-sm" : "bg-white text-gray-400 hover:bg-gray-100"
+                            )}
+                            title={DIA_COMPLETO[dia]}
+                          >
+                            {DIA_LABELS[dia]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-gray-500">Dias con extra</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DIAS_SEMANA.map((dia) => {
+                        const activo = regla.distribucion?.diasExtra?.includes(dia);
+                        return (
+                          <button
+                            key={dia}
+                            onClick={() => toggleDiaDistribucion(regla, "diasExtra", dia)}
+                            className={cn(
+                              "rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                              activo ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-gray-400 hover:bg-gray-100"
+                            )}
+                            title={DIA_COMPLETO[dia]}
+                          >
+                            {DIA_LABELS[dia]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="divide-y divide-gray-100">

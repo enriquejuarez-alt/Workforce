@@ -29,8 +29,20 @@ export function normalizarNombreColumna(nombre: string): string {
 }
 
 export function extraerHorasContrato(contrato: string): number {
-  const match = contrato?.match(/(\d+)/);
-  return match ? parseInt(match[1], 10) : 36;
+  const raw = String(contrato ?? "").trim().toLowerCase();
+  if (!raw) return 36;
+
+  const normalizado = raw
+    .replace(",", ".")
+    .replace("½", " 1/2")
+    .replace(/\by\s+media\b/g, " 1/2")
+    .replace(/\bmedia\b/g, "1/2");
+
+  const mixto = normalizado.match(/(\d+(?:\.\d+)?)\s+(1\/2)/);
+  if (mixto) return Number(mixto[1]) + 0.5;
+
+  const decimal = normalizado.match(/(\d+(?:\.\d+)?)/);
+  return decimal ? Number(decimal[1]) : 36;
 }
 
 export function esFeriado(diaSemana: string): boolean {

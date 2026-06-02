@@ -58,14 +58,14 @@ export function DropZone({
   return (
     <div
       className={cn(
-        "group rounded-xl border-2 border-dashed transition-all cursor-pointer select-none",
+        "group rounded-xl border border-dashed transition-all cursor-pointer select-none shadow-sm",
         dragging
-          ? "border-[#0054A6] bg-blue-50"
+          ? "border-[#0054A6] bg-blue-50 shadow-blue-100"
           : hasFile
-          ? "border-green-300 bg-green-50/60"
+          ? "border-green-300 bg-green-50/70 shadow-green-100/70"
           : error
-          ? "border-red-300 bg-red-50"
-          : "border-gray-200 hover:border-[#0054A6]/40 bg-gray-50/50 hover:bg-blue-50/20"
+          ? "border-red-300 bg-red-50 shadow-red-100/70"
+          : "border-slate-200 bg-slate-50/70 hover:border-[#0054A6]/40 hover:bg-blue-50/30 hover:shadow-blue-100/50"
       )}
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
@@ -74,26 +74,26 @@ export function DropZone({
     >
       <input ref={inputRef} type="file" accept={accepted} className="hidden" onChange={onInputChange} />
 
-      <div className="flex flex-col items-center justify-center gap-2.5 p-5 text-center">
+      <div className="flex min-h-[118px] flex-col items-center justify-center gap-2.5 p-5 text-center">
         {loading ? (
           <div className="h-8 w-8 rounded-full border-2 border-[#0054A6]/30 border-t-[#0054A6] animate-spin" />
         ) : hasFile ? (
-          <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-full bg-green-100 flex items-center justify-center shadow-sm">
             <FileCheck className="h-[18px] w-[18px] text-green-600" />
           </div>
         ) : error ? (
-          <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+          <div className="h-9 w-9 rounded-full bg-red-100 flex items-center justify-center shadow-sm">
             <AlertCircle className="h-[18px] w-[18px] text-red-500" />
           </div>
         ) : (
-          <div className="h-8 w-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center group-hover:border-[#0054A6]/30 group-hover:bg-blue-50 transition-all">
-            <UploadCloud className="h-4 w-4 text-gray-400 group-hover:text-[#0054A6] transition-colors" />
+          <div className="h-9 w-9 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center group-hover:border-[#0054A6]/30 group-hover:bg-blue-50 transition-all">
+            <UploadCloud className="h-4 w-4 text-slate-400 group-hover:text-[#0054A6] transition-colors" />
           </div>
         )}
 
         <div>
-          <p className="text-xs font-semibold text-gray-700">{label}</p>
-          {sublabel && <p className="text-[11px] text-gray-400 mt-0.5 font-mono">{sublabel}</p>}
+          <p className="text-xs font-semibold text-slate-800">{label}</p>
+          {sublabel && <p className="text-[11px] text-slate-400 mt-0.5 font-mono">{sublabel}</p>}
           {fileName && <p className="text-[11px] text-[#0054A6] mt-0.5 font-mono truncate max-w-[160px]">{fileName}</p>}
         </div>
 

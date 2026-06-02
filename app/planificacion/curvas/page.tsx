@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useResultados } from "@/store/useResultados";
+import { useFrancoConfig } from "@/store/useFrancoConfig";
+import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { CurvaTemporalChart } from "@/components/charts/CurvaTemporalChart";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ServicioKey } from "@/lib/domain/types";
@@ -10,15 +12,21 @@ import { cn } from "@/lib/utils/cn";
 import { SinDatos } from "@/components/SinDatos";
 
 export default function CurvasPage() {
-  const { resultado, matrices } = useResultados();
+  const { resultado, matrices, agentes } = useResultados();
+  const { reglas, reglasByServicio } = useFrancoConfig();
+  const serviciosNomina = usePlaniConfig((s) => s.serviciosNomina);
   const serviciosDisponibles = resultado?.resultados.map((r) => r.servicio) ?? [];
   const [servicioActivo, setServicioActivo] = useState<ServicioKey | null>(null);
 
   if (!resultado) return <SinDatos />;
 
   const servicioEfectivo = (servicioActivo ?? serviciosDisponibles[0]) as ServicioKey;
-  const resultadoServicio = resultado.resultados.find((r) => r.servicio === servicioEfectivo);
-  const matriz = matrices.get(servicioEfectivo);
+  const reglasParaServicio = (servicio: ServicioKey) => {
+    const servicioNomina = serviciosNomina?.find(
+      (s) => s.planiConfig?.key === servicio || s.nombre === servicio || String(s.id) === servicio
+    );
+    return servicioNomina ? reglasByServicio[String(servicioNomina.id)] ?? reglas : reglas;
+  };
 
   return (
     <div className="px-6 py-6 max-w-7xl mx-auto">
@@ -46,7 +54,12 @@ export default function CurvasPage() {
             ))}
           </TabsList>
 
-          {serviciosDisponibles.map((k) => (
+          {serviciosDisponibles.map((k) => {
+            const servicioKey = k as ServicioKey;
+            const resultadoServicio = resultado.resultados.find((r) => r.servicio === servicioKey);
+            const matriz = matrices.get(servicioKey);
+
+            return (
             <TabsContent key={k} value={k}>
               {resultadoServicio && matriz ? (
                 <div className="space-y-4">
@@ -86,12 +99,14 @@ export default function CurvasPage() {
                       Curva temporal
                     </h3>
                     <p className="text-xs text-gray-400 mb-4">
-                      Usá los presets de días, los botones ‹ › para navegar, o escribí el rango exacto en los campos
+                      Disponibles considera contratos, reductores y francos esperados por día.
                     </p>
                     <CurvaTemporalChart
                       matriz={matriz}
                       resultado={resultadoServicio}
                       diasDelMes={resultado.diasDelMes}
+                      agentes={agentes}
+                      reglasFranco={reglasParaServicio(servicioKey)}
                     />
                   </div>
                 </div>
@@ -101,7 +116,8 @@ export default function CurvasPage() {
                 </div>
               )}
             </TabsContent>
-          ))}
+            );
+          })}
         </Tabs>
       </motion.div>
     </div>

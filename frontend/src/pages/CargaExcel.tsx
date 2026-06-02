@@ -224,9 +224,10 @@ export default function CargaExcel() {
                     {servicio?.nombre} — {MESES[mes - 1]} {anio}
                   </div>
                 </div>
-                <div className="grid grid-cols-5 gap-3 text-center">
+                <div className="grid grid-cols-6 gap-3 text-center">
                   {[
-                    { label: 'Total filas', value: preview.stats.total, color: 'text-gray-700' },
+                    { label: 'Total archivo', value: preview.stats.total, color: 'text-gray-700' },
+                    { label: 'Agentes reales', value: preview.stats.total_real, color: 'text-gray-900' },
                     { label: 'Nuevos', value: preview.stats.nuevos, color: 'text-green-600' },
                     { label: 'Actualizados', value: preview.stats.actualizados, color: 'text-blue-600' },
                     { label: 'Con errores', value: preview.stats.errores, color: 'text-red-600' },
@@ -239,6 +240,38 @@ export default function CargaExcel() {
                   ))}
                 </div>
               </div>
+
+              {/* Duplicados */}
+              {preview.duplicados?.length > 0 && (
+                <div className="card p-6 border-amber-200 bg-amber-50">
+                  <h3 className="text-sm font-bold text-amber-800 mb-1 flex items-center gap-2">
+                    <AlertTriangle size={14} /> {preview.duplicados.length} nombre{preview.duplicados.length > 1 ? 's' : ''} duplicado{preview.duplicados.length > 1 ? 's' : ''} detectado{preview.duplicados.length > 1 ? 's' : ''}
+                  </h3>
+                  <p className="text-xs text-amber-700 mb-3">
+                    Estos agentes aparecen más de una vez en el archivo. Solo se importará la primera ocurrencia de cada uno.
+                  </p>
+                  <div className="overflow-x-auto max-h-48 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-amber-200">
+                          <th className="table-th text-amber-700">Nombre</th>
+                          <th className="table-th text-amber-700">DNI</th>
+                          <th className="table-th text-amber-700">Usuario</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.duplicados.map((d, i) => (
+                          <tr key={i} className="border-b border-amber-100">
+                            <td className="table-td font-medium text-amber-900">{d.nombre}</td>
+                            <td className="table-td font-mono text-amber-800">{d.dni}</td>
+                            <td className="table-td text-amber-800">{d.usuario}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Errors */}
               {preview.errors.length > 0 && (
@@ -309,7 +342,7 @@ export default function CargaExcel() {
                   disabled={confirmMutation.isPending}
                 >
                   <CheckCircle size={16} />
-                  {confirmMutation.isPending ? 'Importando...' : `Confirmar importación de ${preview.total_rows} agentes`}
+                  {confirmMutation.isPending ? 'Importando...' : `Confirmar importación de ${preview.stats.total_real} agentes${preview.stats.duplicados > 0 ? ` (${preview.stats.duplicados} duplicados omitidos)` : ''}`}
                 </button>
               </div>
             </>

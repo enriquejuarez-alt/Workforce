@@ -513,15 +513,18 @@ export interface ExcelPreview {
   token: string
   stats: {
     total: number
+    total_real: number
     nuevos: number
     actualizados: number
     errores: number
     no_presentes: number
+    duplicados: number
   }
   rows: any[]
   total_rows: number
   errors: any[]
   no_presentes: any[]
+  duplicados: Array<{ nombre: string; dni: string; usuario: string }>
 }
 
 export const MESES = [

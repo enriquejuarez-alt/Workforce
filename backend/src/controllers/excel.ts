@@ -112,6 +112,7 @@ interface PreviewStore {
   formato: string
   rows: any[]
   errors: any[]
+  duplicados: any[]
   stats: any
   filePath: string
   fileName: string
@@ -192,6 +193,24 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Detectar duplicados por nombre completo dentro del mismo archivo
+    const normNombre = (n: string) => n.trim().toLowerCase().replace(/\s+/g, ' ')
+    const seenNames = new Map<string, number>() // nombre normalizado → índice en normalizedRows
+    const duplicados: any[] = []
+    const uniqueRows: any[] = []
+
+    for (let i = 0; i < normalizedRows.length; i++) {
+      const row = normalizedRows[i]
+      const key = normNombre(row.nombre)
+      if (seenNames.has(key)) {
+        duplicados.push({ nombre: row.nombre, dni: row.dni, usuario: row.usuario })
+      } else {
+        seenNames.set(key, i)
+        uniqueRows.push(row)
+      }
+    }
+    normalizedRows = uniqueRows
+
     const dnis = normalizedRows.map((r) => r.dni)
     const users = normalizedRows.map((r) => r.usuario)
 
@@ -237,7 +256,8 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
       formato: formato || 'operacion',
       rows: processedRows,
       errors,
-      stats: { total: data.length, nuevos, actualizados, errores: errors.length, no_presentes: noPresentes.length },
+      duplicados,
+      stats: { total: data.length, total_real: processedRows.length, nuevos, actualizados, errores: errors.length, no_presentes: noPresentes.length, duplicados: duplicados.length },
       filePath: req.file.path,
       fileName: req.file.originalname,
     })
@@ -252,11 +272,12 @@ export const validateExcel = async (req: AuthRequest, res: Response) => {
 
     return res.json({
       token,
-      stats: { total: data.length, nuevos, actualizados, errores: errors.length, no_presentes: noPresentes.length },
+      stats: { total: data.length, total_real: processedRows.length, nuevos, actualizados, errores: errors.length, no_presentes: noPresentes.length, duplicados: duplicados.length },
       rows: processedRows.slice(0, 100),
       total_rows: processedRows.length,
       errors: errors.slice(0, 50),
       no_presentes: noPresentes.slice(0, 50),
+      duplicados: duplicados.slice(0, 100),
     })
   } catch (err) {
     console.error(err)
@@ -271,7 +292,7 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
     const preview = pendingPreviews.get(token)
     if (!preview) return res.status(404).json({ error: 'Preview expirado o no encontrado' })
 
-    const { servicio_id, mes, anio, formato: previewFormato, rows, stats, fileName } = preview
+    const { servicio_id, mes, anio, formato: previewFormato, rows, stats, duplicados: previewDuplicados, fileName } = preview
     const tipo = previewFormato === 'meucci' ? 'MEUCCI' : 'OPERACION'
     pendingPreviews.delete(token)
     if (fs.existsSync(preview.filePath)) fs.unlinkSync(preview.filePath)
@@ -439,10 +460,12 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
       creados++
     }
 
+    const totalReal = rows.length + pendientes.length
+
     await prisma.nominaMensual.update({
       where: { id: nomina.id },
       data: {
-        total_agentes: rows.length + pendientes.length,
+        total_agentes: totalReal,
         agentes_creados: creados,
         agentes_actualizados: actualizados,
         agentes_no_presentes: noPresentes.length,
@@ -455,12 +478,15 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
         nomina_mensual_id: nomina.id,
         archivo_nombre: fileName,
         usuario_id: req.user!.userId,
-        total_filas: rows.length,
+        total_filas: stats.total ?? rows.length,
         agentes_creados: creados,
         agentes_actualizados: actualizados,
         agentes_no_presentes: noPresentes.length,
         errores: stats.errores,
         estado: 'COMPLETADO',
+        ...(previewDuplicados.length > 0 && {
+          detalle_errores: { duplicados: previewDuplicados },
+        }),
       },
     })
 
@@ -474,13 +500,16 @@ export const confirmExcel = async (req: AuthRequest, res: Response) => {
       valor_nuevo: `${rows.length} agentes, ${creados} creados, ${actualizados} actualizados`,
     })
 
+    const dupMsg = previewDuplicados.length > 0 ? ` Se omitieron ${previewDuplicados.length} duplicados.` : ''
     return res.json({
       nomina_id: nomina.id,
-      total: rows.length,
+      total: totalReal,
+      total_archivo: stats.total ?? rows.length,
+      duplicados: previewDuplicados.length,
       creados,
       actualizados,
       no_presentes: noPresentes.length,
-      message: `Se importaron ${rows.length} agentes: ${creados} nuevos, ${actualizados} actualizados.`,
+      message: `Se importaron ${totalReal} agentes: ${creados} nuevos, ${actualizados} actualizados.${dupMsg}`,
     })
   } catch (err) {
     console.error(err)

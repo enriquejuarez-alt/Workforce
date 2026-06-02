@@ -61,6 +61,30 @@ export const SERVICIOS: ServiceDefinition[] = [
     reductorNombres: ["SOPORTE-RRSS", "SOPORTE RRSS"],
     francoConfig: FRANCO_36HS,
   },
+  {
+    key: "SMB-TEC-IN",
+    label: "SMB Tec In",
+    hojaCP: ["SMB TEC IN", "SMB Tec In", "SMB_TEC_IN", "SMB-TEC-IN"],
+    segmentosNomina: ["SMB-TEC-IN", "SMB TEC IN", "SMB TEC IN"],
+    reductorNombres: ["SMB-TEC-IN", "SMB TEC IN"],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-DIGITAL",
+    label: "SMB Digital",
+    hojaCP: ["SMB DIGITAL", "SMB Digital", "SMB_Digital", "SMB-DIGITAL"],
+    segmentosNomina: ["SMB-DIGITAL", "SMB DIGITAL", "SMB Digital"],
+    reductorNombres: ["SMB-DIGITAL", "SMB DIGITAL"],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-PTF",
+    label: "SMB PTF",
+    hojaCP: ["SMB PTF", "SMB-PTF", "SMB_PTF"],
+    segmentosNomina: ["SMB-PTF", "SMB PTF"],
+    reductorNombres: ["SMB-PTF", "SMB PTF"],
+    francoConfig: FRANCO_36HS,
+  },
 ];
 
 export type ServicioKey = string;

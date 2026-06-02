@@ -102,6 +102,7 @@ export interface Alerta {
 // ─── Filtros (Punto 4) ─────────────────────────────────────────────────────────
 
 export interface ActiveFilters {
+  isla: string;
   sitio: string;
   modalidad: string;
   jefe: string;
@@ -110,6 +111,7 @@ export interface ActiveFilters {
 }
 
 export const FILTROS_VACIOS: ActiveFilters = {
+  isla: "",
   sitio: "",
   modalidad: "",
   jefe: "",
@@ -123,6 +125,7 @@ export type SimModTipo =
   | "add_agents"
   | "remove_agents"
   | "move_agents"
+  | "move_named_agent"
   | "change_contract"
   | "change_reducer";
 
@@ -133,6 +136,11 @@ export interface SimModificacion {
   /** Para move_agents: servicio destino */
   servicioDestino?: ServicioKey;
   cantidad: number;
+  /** Para move_named_agent: agente puntual movido */
+  agenteDni?: string;
+  agenteNombre?: string;
+  agenteUsuario?: string;
+  hsMensualBrutas?: number;
   /** Para add_agents / change_contract */
   hsSemanal?: number;
   /** Para change_contract: contrato origen */

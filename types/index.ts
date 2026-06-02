@@ -1,4 +1,4 @@
-export type Rol = 'ADMINISTRADOR' | 'USUARIO' | 'WORKFORCE' | 'CAPACITADOR' | 'LIDER'
+export type Rol = 'ADMINISTRADOR' | 'USUARIO' | 'WORKFORCE' | 'CAPACITADOR' | 'LIDER' | 'VISUALIZADOR'
 export type EstadoNomina = 'BORRADOR' | 'ACTIVA' | 'CERRADA' | 'ARCHIVADA'
 export type EstadoLicencia = 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
 

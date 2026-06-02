@@ -16,6 +16,7 @@ interface UploadsState {
   hojasNomina: string[];
   modoReductor: ModoReductor;
   topeFacturacion: number;
+  porcentajeRotacion: number;
 
   setArchivoCP: (f: File | null) => void;
   setArchivoReductores: (f: File | null) => void;
@@ -23,6 +24,7 @@ interface UploadsState {
   setHojaNomina: (h: string) => void;
   setModoReductor: (m: ModoReductor) => void;
   setTopeFacturacion: (v: number) => void;
+  setPorcentajeRotacion: (v: number) => void;
   reset: () => void;
 
   todosSubidos: () => boolean;
@@ -40,6 +42,7 @@ interface StoredMeta {
   hojasNomina: string[];
   modoReductor: ModoReductor;
   topeFacturacion: number;
+  porcentajeRotacion: number;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -129,12 +132,13 @@ function toFile(stored: StoredFile | null): File | null {
   });
 }
 
-function saveMeta(state: Pick<UploadsState, "hojaNomina" | "hojasNomina" | "modoReductor" | "topeFacturacion">) {
+function saveMeta(state: Pick<UploadsState, "hojaNomina" | "hojasNomina" | "modoReductor" | "topeFacturacion" | "porcentajeRotacion">) {
   void idbSet(META_KEY, {
     hojaNomina: state.hojaNomina,
     hojasNomina: state.hojasNomina,
     modoReductor: state.modoReductor,
     topeFacturacion: state.topeFacturacion,
+    porcentajeRotacion: state.porcentajeRotacion,
   } satisfies StoredMeta);
 }
 
@@ -146,6 +150,7 @@ export const useUploads = create<UploadsState>((set, get) => ({
   hojasNomina: [],
   modoReductor: "multiplicativo",
   topeFacturacion: 103,
+  porcentajeRotacion: 3,
 
   setArchivoCP: (f) => {
     set({ archivoCP: f });
@@ -176,6 +181,10 @@ export const useUploads = create<UploadsState>((set, get) => ({
     set({ topeFacturacion: v });
     saveMeta(get());
   },
+  setPorcentajeRotacion: (v) => {
+    set({ porcentajeRotacion: v });
+    saveMeta(get());
+  },
 
   reset: () => {
     set({
@@ -186,6 +195,7 @@ export const useUploads = create<UploadsState>((set, get) => ({
       hojasNomina: [],
       modoReductor: "multiplicativo",
       topeFacturacion: 103,
+      porcentajeRotacion: 3,
     });
     void idbClear();
   },
@@ -214,6 +224,7 @@ if (typeof window !== "undefined") {
         hojasNomina: meta?.hojasNomina ?? [],
         modoReductor: meta?.modoReductor ?? "multiplicativo",
         topeFacturacion: meta?.topeFacturacion ?? 103,
+        porcentajeRotacion: meta?.porcentajeRotacion ?? 3,
       });
     } catch {
       // Si IndexedDB falla, la app sigue funcionando con estado en memoria.

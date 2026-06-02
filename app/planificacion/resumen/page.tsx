@@ -17,7 +17,7 @@ import { calcularResultados } from "@/lib/domain/calculos";
 import { calcularFrancoPorServicio } from "@/lib/domain/francoEngine";
 import { getServiciosKeys } from "@/lib/config/servicesRuntime";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
-import { Download } from "lucide-react";
+import { Activity, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
 
@@ -31,7 +31,7 @@ export default function DashboardPage() {
     alertas,
     activeFilters,
   } = useResultados();
-  const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
+  const { modoReductor, topeFacturacion, setTopeFacturacion, porcentajeRotacion, setPorcentajeRotacion } = useUploads();
   const { reglas } = useFrancoConfig();
 
   const francoMap = useMemo(() => {
@@ -68,6 +68,7 @@ export default function DashboardPage() {
 
   const filtrado = hayFiltrosActivos(activeFilters);
   const criticas = alertas.filter((a) => a.severidad === "critical");
+  const bajasEstimadas = Math.round(resultadoMostrado.totalHCActivos * (porcentajeRotacion / 100));
 
   return (
     <div className="px-6 py-6 max-w-7xl mx-auto">
@@ -85,6 +86,20 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Rotación mensual */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
+              <span className="text-xs text-gray-500">Rotación</span>
+              <input
+                type="number"
+                min={0}
+                max={30}
+                step={0.5}
+                value={porcentajeRotacion}
+                onChange={(e) => setPorcentajeRotacion(parseFloat(e.target.value) || 0)}
+                className="w-10 bg-transparent text-xs text-gray-700 tabular-nums text-right focus:outline-none"
+              />
+              <span className="text-xs text-gray-500">%</span>
+            </div>
             {/* Tope de facturación */}
             <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
               <span className="text-xs text-gray-500">Tope</span>
@@ -126,7 +141,7 @@ export default function DashboardPage() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
           <KpiCard
             label="Personas activas"
             value={fmtNumero(resultadoMostrado.totalHCActivos)}
@@ -144,6 +159,12 @@ export default function DashboardPage() {
             value={fmtNumero(resultadoMostrado.totalHCCapa)}
             sublabel="Capa — ingreso parcial al mes"
             accent="violet"
+          />
+          <KpiCard
+            label="Bajas est. mensuales"
+            value={fmtNumero(bajasEstimadas)}
+            sublabel={`Rotación ${porcentajeRotacion}% sobre activos`}
+            accent="rose"
           />
           <KpiCard
             label="Cumplimiento Total"
@@ -182,11 +203,31 @@ export default function DashboardPage() {
         </div>
 
         {/* Gráfico de barras */}
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">
-            Cumplimiento % por servicio
-          </h3>
-          <CumplimientoBarChart resultados={resultadoMostrado.resultados} />
+        <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">Cumplimiento por isla</h3>
+                <p className="text-[11px] text-gray-400">Comparativo mensual contra objetivo operativo</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] font-semibold text-gray-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Objetivo 103%
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-slate-300" />
+                Base 100%
+              </span>
+            </div>
+          </div>
+          <div className="px-4 py-4">
+            <CumplimientoBarChart resultados={resultadoMostrado.resultados} />
+          </div>
         </div>
 
         {/* Tabla detallada */}

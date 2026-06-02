@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useResultados } from "@/store/useResultados";
+import { useAuthStore } from "@/store/auth";
 import { parsearHorario } from "@/lib/parsers/parseNomina";
 import { extraerHorasContrato } from "@/lib/utils/excel";
 import { resolverServicioPorSegmentoRuntime } from "@/lib/config/servicesRuntime";
@@ -51,9 +52,11 @@ function rawToAgente(raw: RawAgentePlani): Agente {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [embedded, setEmbedded] = useState(false);
+  const [embeddedChecked, setEmbeddedChecked] = useState(false);
   const setServiciosNomina = usePlaniConfig((s) => s.setServiciosNomina);
   const setAgentesDesdeApi = useResultados((s) => s.setAgentesDesdeApi);
   const router = useRouter();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -63,7 +66,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     let fromIframe = false;
     try { fromIframe = window.self !== window.top; } catch { fromIframe = true; }
     if (fromParam || fromSession || fromIframe) setEmbedded(true);
+    setEmbeddedChecked(true);
   }, []);
+
+  useEffect(() => {
+    if (embeddedChecked && !embedded && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [embeddedChecked, embedded, isAuthenticated, router]);
 
   useEffect(() => {
     if (window.parent !== window) {
@@ -93,9 +103,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("message", handleMessage);
   }, [setServiciosNomina, setAgentesDesdeApi, router]);
 
-  if (embedded) {
+  // Antes de saber si somos embedded, renderizar contenido sin sidebar para evitar flashes
+  if (!embeddedChecked || embedded) {
     return <main className="min-h-screen bg-[#F8F9FA]">{children}</main>;
   }
+
+  // Standalone: esperar auth confirmada
+  if (!isAuthenticated) return null;
 
   return (
     <>

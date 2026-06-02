@@ -19,6 +19,9 @@ export const DEFAULT_ROL_PATHS: Record<string, string[]> = {
   CAPACITADOR: [
     '/capacitaciones', '/soporte',
   ],
+  VISUALIZADOR: [
+    '/planificacion', '/soporte',
+  ],
 }
 
 interface ConfigStore {

@@ -8,6 +8,7 @@ export const ROL_LABELS: Record<Rol, string> = {
   CAPACITADOR:   'Capacitador',
   LIDER:         'Líder',
   USUARIO:       'Workforce', // legacy — se muestra como Workforce
+  VISUALIZADOR:  'Visualizador',
 }
 
 export const ROL_BADGE_VARIANT: Record<Rol, string> = {
@@ -16,6 +17,7 @@ export const ROL_BADGE_VARIANT: Record<Rol, string> = {
   CAPACITADOR:   'green',
   LIDER:         'purple',
   USUARIO:       'purple',
+  VISUALIZADOR:  'gray',
 }
 
 /**
@@ -46,4 +48,12 @@ export function getDefaultPath(rol: Rol | undefined): string {
  */
 export function isAdminRole(rol: Rol | undefined): boolean {
   return rol === 'ADMINISTRADOR'
+}
+
+/**
+ * Retorna true si el rol es solo visualización — puede ver planificación
+ * pero no cargar archivos ni ejecutar cálculos.
+ */
+export function isReadOnly(rol: Rol | undefined): boolean {
+  return rol === 'VISUALIZADOR'
 }

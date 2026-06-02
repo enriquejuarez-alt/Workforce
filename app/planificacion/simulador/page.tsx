@@ -21,7 +21,7 @@ import {
   calcularDeltaHC103,
   calcularAgentesEquivalentes,
 } from "@/lib/domain/calculos";
-import type { ResultadoServicio, ServicioKey } from "@/lib/domain/types";
+import type { Agente, ResultadoServicio, ServicioKey } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
 import { fmtPct } from "@/lib/utils/formato";
 
@@ -65,7 +65,8 @@ function calcularResultadosSimulados(
   modificaciones: ReturnType<typeof useSimulador.getState>["modificaciones"],
   modoReductor: string,
   diasDelMes: number,
-  diasEfectivos: number
+  diasEfectivos: number,
+  agentes: Agente[] = []
 ): ResultadoServicio[] {
   const deltaHC      = new Map<ServicioKey, number>();
   const deltaHsTotal = new Map<ServicioKey, number>();
@@ -94,6 +95,15 @@ function calcularResultadosSimulados(
       deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - mod.cantidad * hsPorAgente);
       deltaHC.set(mod.servicioDestino, (deltaHC.get(mod.servicioDestino) ?? 0) + mod.cantidad);
       deltaHsTotal.set(mod.servicioDestino, (deltaHsTotal.get(mod.servicioDestino) ?? 0) + mod.cantidad * hsPorAgente);
+    }
+    if (mod.tipo === "move_named_agent" && mod.servicioDestino) {
+      const agente = agentes.find((a) => a.dni === mod.agenteDni);
+      const hsMensual = mod.hsMensualBrutas ?? agente?.hsMensualBrutas ?? (base.hsBrutas / Math.max(base.hcActivos, 1));
+      const hsProrrateadas = hsMensual * (diasEfectivos / diasDelMes);
+      deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) - 1);
+      deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - hsProrrateadas);
+      deltaHC.set(mod.servicioDestino, (deltaHC.get(mod.servicioDestino) ?? 0) + 1);
+      deltaHsTotal.set(mod.servicioDestino, (deltaHsTotal.get(mod.servicioDestino) ?? 0) + hsProrrateadas);
     }
     if (mod.tipo === "change_reducer") {
       reducerOvr.set(mod.servicio, {
@@ -451,7 +461,7 @@ function GuardarEscenario() {
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function SimuladorPage() {
-  const { resultado, diasDelMes } = useResultados();
+  const { resultado, diasDelMes, agentes } = useResultados();
   const { ajustes, modificaciones, resetAjustes, periodoDesde, periodoHasta } = useSimulador();
   const { modoReductor } = useUploads();
 
@@ -461,8 +471,8 @@ export default function SimuladorPage() {
 
   const resultadosSimulados: ResultadoServicio[] = useMemo(() => {
     if (!resultado) return [];
-    return calcularResultadosSimulados(resultado, ajustes, modificaciones, modoReductor, diasDelMes, diasEfectivos);
-  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes, diasEfectivos]);
+    return calcularResultadosSimulados(resultado, ajustes, modificaciones, modoReductor, diasDelMes, diasEfectivos, agentes);
+  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes, diasEfectivos, agentes]);
 
   const exportarExcel = () => {
     if (!resultado) return;

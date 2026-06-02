@@ -35,7 +35,7 @@ function calcularDiasEfectivos(
 }
 
 export function useResultadosSimulados(): ResultadoServicio[] {
-  const { resultado, diasDelMes } = useResultados();
+  const { resultado, diasDelMes, agentes } = useResultados();
   const { ajustes, modificaciones, periodoDesde, periodoHasta } = useSimulador();
   const { modoReductor } = useUploads();
 
@@ -83,6 +83,16 @@ export function useResultadosSimulados(): ResultadoServicio[] {
         deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - mod.cantidad * hsPorAgente);
         deltaHC.set(mod.servicioDestino, (deltaHC.get(mod.servicioDestino) ?? 0) + mod.cantidad);
         deltaHsTotal.set(mod.servicioDestino, (deltaHsTotal.get(mod.servicioDestino) ?? 0) + mod.cantidad * hsPorAgente);
+      }
+
+      if (mod.tipo === "move_named_agent" && mod.servicioDestino) {
+        const agente = agentes.find((a) => a.dni === mod.agenteDni);
+        const hsMensual = mod.hsMensualBrutas ?? agente?.hsMensualBrutas ?? (base.hsBrutas / Math.max(base.hcActivos, 1));
+        const hsProrrateadas = hsMensual * (diasEfectivos / diasDelMes);
+        deltaHC.set(mod.servicio, (deltaHC.get(mod.servicio) ?? 0) - 1);
+        deltaHsTotal.set(mod.servicio, (deltaHsTotal.get(mod.servicio) ?? 0) - hsProrrateadas);
+        deltaHC.set(mod.servicioDestino, (deltaHC.get(mod.servicioDestino) ?? 0) + 1);
+        deltaHsTotal.set(mod.servicioDestino, (deltaHsTotal.get(mod.servicioDestino) ?? 0) + hsProrrateadas);
       }
 
       if (mod.tipo === "change_reducer") {
@@ -133,7 +143,7 @@ export function useResultadosSimulados(): ResultadoServicio[] {
 
       return { ...base, hcActivos, hsBrutas, factorProductivo, hsNetas, cumplimiento, deltaHC103, agentesEquivalentes, hsSemanalPromedio: hsSemanalProm, reductoRes: { deslogueo, ausentismo, rotacion }, tope, teoricoFacturable, recorte, faltante };
     });
-  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes, periodoDesde, periodoHasta]);
+  }, [resultado, ajustes, modificaciones, modoReductor, diasDelMes, periodoDesde, periodoHasta, agentes]);
 }
 
 export { calcularDiasEfectivos };

@@ -200,6 +200,14 @@ interface Movement {
   agente_id: number
 }
 
+type RawProgramacionAgent = {
+  id: number
+  nombre: string
+  segmento: string | null
+  horarios: string | null
+  contrato: string | null
+}
+
 // ─── Core simulation ──────────────────────────────────────────────────────────
 
 function runSim(
@@ -426,15 +434,73 @@ function isAvailableForWork(estado: string | null | undefined): boolean {
   return ACTIVE_ESTADOS.has(estado.toLowerCase().trim())
 }
 
+function normalizeProgramacionText(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function isTecnicaService(nombre: string | null | undefined): boolean {
+  const normalized = normalizeProgramacionText(nombre)
+  return normalized.includes('soporte tecnico') || normalized.includes('tecnica')
+}
+
+const SMB_SEGMENT_WHERE = [
+  { segmento: { startsWith: 'SMB', mode: 'insensitive' as const } },
+  { segmento: { contains: 'TECNICA', mode: 'insensitive' as const } },
+  { segmento: { contains: 'TÉCNICA', mode: 'insensitive' as const } },
+]
+
+function dedupeAgentsById(agents: RawProgramacionAgent[]): RawProgramacionAgent[] {
+  const seen = new Set<number>()
+  const unique: RawProgramacionAgent[] = []
+  for (const agent of agents) {
+    if (seen.has(agent.id)) continue
+    seen.add(agent.id)
+    unique.push(agent)
+  }
+  return unique
+}
+
 async function getAgentsForProg(
-  prog: { servicio_id: number; nomina_id: number | null }
-): Promise<{ id: number; nombre: string; segmento: string | null; horarios: string | null; contrato: string | null }[]> {
+  prog: { servicio_id: number; nomina_id: number | null; mes?: number; anio?: number }
+): Promise<RawProgramacionAgent[]> {
+  const servicio = await prisma.servicio.findUnique({
+    where: { id: prog.servicio_id },
+    select: { nombre: true },
+  })
+  const includeSmb = isTecnicaService(servicio?.nombre)
+
   if (prog.nomina_id) {
+    const nomina = await prisma.nominaMensual.findUnique({
+      where: { id: prog.nomina_id },
+      select: { mes: true, anio: true },
+    })
+    const mes = prog.mes ?? nomina?.mes
+    const anio = prog.anio ?? nomina?.anio
+
     const snapshots = await prisma.agenteNominaMensual.findMany({
       where: { nomina_mensual_id: prog.nomina_id, presente_en_nomina: true },
       select: { agente_id: true, nombre: true, segmento: true, horarios: true, contrato: true, estado: true },
     })
-    return snapshots
+
+    const smbSnapshots = includeSmb && mes && anio
+      ? await prisma.agenteNominaMensual.findMany({
+          where: {
+            presente_en_nomina: true,
+            OR: SMB_SEGMENT_WHERE,
+            nomina_mensual: {
+              mes,
+              anio,
+            },
+          },
+          select: { agente_id: true, nombre: true, segmento: true, horarios: true, contrato: true, estado: true },
+        })
+      : []
+
+    const agents = [...snapshots, ...smbSnapshots]
       .filter(s => isAvailableForWork(s.estado))
       .map(s => ({
         id: s.agente_id,
@@ -443,12 +509,23 @@ async function getAgentsForProg(
         horarios: s.horarios,
         contrato: s.contrato,
       }))
+
+    return dedupeAgentsById(agents)
   }
+
   const agents = await prisma.agente.findMany({
-    where: { servicio_id: prog.servicio_id, activo: true },
+    where: {
+      activo: true,
+      OR: includeSmb
+        ? [
+            { servicio_id: prog.servicio_id },
+            ...SMB_SEGMENT_WHERE,
+          ]
+        : [{ servicio_id: prog.servicio_id }],
+    },
     select: { id: true, nombre: true, segmento: true, horarios: true, contrato: true, estado: true },
   })
-  return agents.filter(a => isAvailableForWork(a.estado))
+  return dedupeAgentsById(agents.filter(a => isAvailableForWork(a.estado)))
 }
 
 // ─── Prepare agent infos ──────────────────────────────────────────────────────

@@ -1,0 +1,105 @@
+import type { ServiceDefinition } from "./services";
+
+const FRANCO_36HS = { diasVentana: 4, fraccionAfectada: 1.0 };
+
+export const SERVICIOS_SMB: ServiceDefinition[] = [
+  {
+    key: "SMB-CONVERGENTE",
+    label: "SMB Convergente",
+    hojaCP: "CONVERGENTE SMB",
+    segmentosNomina: ["SMB CONVERGENTE", "SMB ALTO VALOR"],
+    reductorNombres: [
+      "SMB CONVERGENTE",
+      "CONVERGENTE SMB",
+      "SMB ALTO VALOR",
+      "ALTO VALOR",
+      "AV TOP",
+      "DEGRADADOS",
+    ],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-MULTISKILL",
+    label: "SMB Multiskill",
+    hojaCP: "MULTISKILL",
+    segmentosNomina: ["SMB MULTISKILL"],
+    reductorNombres: ["SMB MULTISKILL", "MULTISKILL"],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-CUSTOMER",
+    label: "SMB Customer",
+    hojaCP: "CUSTOMER SMB",
+    segmentosNomina: ["SMB CUSTOMER", "SMB CONECTIVIDAD", "SMB MOVIL"],
+    reductorNombres: [
+      "SMB CUSTOMER",
+      "CUSTOMER SMB",
+      "SMB CONECTIVIDAD",
+      "CONECTIVIDAD",
+      "MIGRA",
+      "ESIM",
+    ],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-RETENCION",
+    label: "SMB Retencion",
+    hojaCP: "RETEN",
+    segmentosNomina: ["SMB RETENCION CRECIMIENTO"],
+    reductorNombres: [
+      "SMB RETENCION",
+      "RETENCION",
+      "RETEN",
+      "SMB RETENCION CRECIMIENTO",
+    ],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-WA-CONVERGENTE",
+    label: "SMB WA Convergente",
+    hojaCP: "WA CONVERGENTE SMB",
+    segmentosNomina: ["SMB DIGITAL CONVERGENTE", "SMB DIGITAL ALTO VALOR"],
+    reductorNombres: [
+      "SMB DIGITAL CONVERGENTE",
+      "SMB DIGITAL ALTO VALOR",
+      "WA CONVERGENTE SMB",
+      "WA ALTO VALOR",
+      "WA AV TOP",
+      "WA DEGRADADOS",
+    ],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-WA-MULTISKILL",
+    label: "SMB WA Multiskill",
+    hojaCP: "WA MULTISKILL",
+    segmentosNomina: ["SMB DIGITAL MULTISKILL"],
+    reductorNombres: ["SMB DIGITAL MULTISKILL", "WA MULTISKILL"],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-WA-CUSTOMER",
+    label: "SMB WA Customer",
+    hojaCP: "WA CUSTOMER SMB",
+    segmentosNomina: ["SMB DIGITAL CONECTIVIDAD"],
+    reductorNombres: [
+      "SMB DIGITAL CONECTIVIDAD",
+      "WA CUSTOMER SMB",
+      "WA CUSTOMER",
+      "WA MIGRA",
+    ],
+    francoConfig: FRANCO_36HS,
+  },
+  {
+    key: "SMB-WA-RETENCION",
+    label: "SMB WA Retencion",
+    hojaCP: "WA RETEN SMB",
+    segmentosNomina: ["SMB DIGITAL RETENCION SOHO"],
+    reductorNombres: [
+      "SMB DIGITAL RETENCION SOHO",
+      "WA RETEN SMB",
+      "WA RETENCION",
+    ],
+    francoConfig: FRANCO_36HS,
+  },
+];

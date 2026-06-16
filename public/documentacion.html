@@ -155,15 +155,52 @@
   .formula {
     background: #f0f9ff;
     border: 1px solid #bae6fd;
+    border-left: 3px solid #0054A6;
     border-radius: 6px;
-    padding: .9em 1.2em;
-    margin: .8em 0 1.2em;
+    padding: 1em 1.4em;
+    margin: .8em 0 1.4em;
     font-family: 'Consolas', monospace;
     font-size: .88em;
-    line-height: 1.9;
+    line-height: 2.1;
     color: #0c4a6e;
+    white-space: pre;
   }
   .formula .comment { color: #64748b; font-style: italic; }
+  .formula .sep {
+    display: block;
+    border: none;
+    border-top: 1px dashed #bae6fd;
+    margin: .6em 0;
+  }
+  .formula .label {
+    display: block;
+    font-style: italic;
+    color: #64748b;
+    font-size: .92em;
+    margin-bottom: .15em;
+  }
+  /* Cajas de paso dentro del motor de cálculo */
+  .calc-step {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 1em 0 1.4em;
+    overflow: hidden;
+  }
+  .calc-step-header {
+    background: var(--blue-lt);
+    border-bottom: 1px solid var(--border);
+    padding: .5em 1em;
+    font-size: .8em;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .calc-step-body {
+    padding: .9em 1.2em;
+  }
+  .calc-step-body p { margin-bottom: .5em; }
+  .calc-step-body .formula { margin: .5em 0 0; }
 
   /* ─── Flow steps ────────────────────────────────────────────────── */
   .flow-steps { counter-reset: step; padding: 0; list-style: none; }
@@ -472,8 +509,8 @@
   </tr>
   <tr>
     <td><span class="role-lider">LIDER</span></td>
-    <td>Vista de su servicio</td>
-    <td>Configurable, filtrado automático a su servicio asignado</td>
+    <td>Vista de su equipo</td>
+    <td>Configurable, filtrado automático a su equipo asignado</td>
   </tr>
 </table>
 </div>
@@ -957,124 +994,197 @@ sin valor         → 36 (default)
 <h2>10. Motor de Cálculo</h2>
 
 <p>
-  El motor de cálculo (<code>lib/domain/calculos.ts</code>) es una función pura sin efectos secundarios.
-  Toma agentes, matrices CP, reductores, días del mes y parámetros de configuración; devuelve un
-  <code>ResultadoGeneral</code> con resultados por servicio.
+  El motor de cálculo (<code>lib/domain/calculos.ts</code>) es una <strong>función pura sin efectos secundarios</strong>:
+  dados los mismos inputs siempre produce el mismo output. Recibe agentes, matrices CP, reductores,
+  días del mes y parámetros de configuración; y devuelve un <code>ResultadoGeneral</code> con métricas
+  por servicio y totales globales.
 </p>
-
-<h3>Preparación — Días al mes (<code>aplicarDiasAlMes</code>)</h3>
-<p>Antes del cálculo principal, se ajustan las horas brutas de cada agente:</p>
-
-<div class="formula">
-<span class="comment">── Agente normal ──</span>
-hsMensualBrutas = hsSemanal × (diasDelMes / 7)
-
-<span class="comment">── Agente en CAPA (tiene fechaInicioAtencion) ──</span>
-diaInicio          = fechaInicioAtencion.getDate()
-diasDisponibles    = max(0, diasDelMes − diaInicio + 1)
-proporcion         = diasDisponibles / diasDelMes
-hsMensualBrutas    = hsSemanal × (diasDelMes / 7) × proporcion
-
-<span class="comment">── Pases entre servicios ──</span>
-Si el DNI del agente está en el mapa de pases configurados,
-su segmentoNorm se reemplaza por el servicio destino antes del cálculo.
-</div>
-
-<h3>Agrupación por Servicio</h3>
-<div class="formula">
-Para cada agente ACTIVO en el servicio:
-  hcActivos          += 1
-  hsBrutas           += hsMensualBrutas
-  hsSemanalSuma      += hsSemanal
-  hsSemanalConteo    += 1
-  si esCapa → hcCapa += 1
-
-Para cada agente no ACTIVO:
-  hcLP               += 1   (licencia / baja)
-
-hsSemanalPromedio = hsSemanalSuma / hsSemanalConteo
-                    (default 36 si no hay activos)
-</div>
-
-<h3>Factor Productivo</h3>
-<div class="formula">
-<span class="comment">── Modo MULTIPLICATIVO (recomendado) ──</span>
-factorProductivo = (1 − deslogueo) × (1 − ausentismo) × (1 − rotacion)
-
-<span class="comment">── Modo ADITIVO (alternativo) ──</span>
-factorProductivo = max(0, 1 − deslogueo − ausentismo − rotacion)
-
-<span class="comment">Ejemplo: deslogueo=5%, ausentismo=4%, rotacion=2%</span>
-Multiplicativo: 0.95 × 0.96 × 0.98 ≈ 0.8933  →  89.33%
-Aditivo:        1 − 0.11 = 0.89               →  89.00%
-</div>
-
-<h3>Horas Netas y Cumplimiento</h3>
-<div class="formula">
-hsNetas       = hsBrutas × factorProductivo
-hsRequeridas  = matrizCP.totalMes   (Hs requeridas por el cliente en el mes)
-cumplimiento  = (hsNetas / hsRequeridas) × 100   [%]
-</div>
-
-<h3>Delta HC al 103% (<code>deltaHC103</code>)</h3>
 <p>
-  Cuántos agentes equivalentes faltan (positivo) o sobran (negativo)
-  para alcanzar exactamente el 103% del requerido:
+  El cálculo se ejecuta en el browser, sin llamadas al servidor. Los pasos se aplican en orden estricto:
+  preparación → agrupación → factor productivo → cumplimiento → delta HC → facturación → franco.
 </p>
-<div class="formula">
-hsNetasPor103       = hsRequeridas × 1.03
-hsBrutasNecesarias  = hsNetasPor103 / factorProductivo
-hsBrutasActuales    = hcActivos × hsSemanalPromedio × (diasDelMes / 7)
-diffHsBrutas        = hsBrutasNecesarias − hsBrutasActuales
-hsPorAgente         = hsSemanalPromedio × (diasDelMes / 7)
-deltaHC103          = diffHsBrutas / hsPorAgente
 
-<span class="comment">deltaHC103 > 0 → faltan agentes para llegar al 103%</span>
-<span class="comment">deltaHC103 < 0 → sobran agentes (exceso sobre 103%)</span>
+<!-- PASO 1 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 1 — Horas brutas por agente (<code>aplicarDiasAlMes</code>)</div>
+  <div class="calc-step-body">
+    <p>
+      Antes de agrupar, el sistema calcula cuántas horas brutas aportó cada agente al mes.
+      El tipo de contrato (<code>hsSemanal</code>) se convierte a horas mensuales usando el
+      número de días del mes cargado.
+    </p>
+    <p><strong>Agente normal (estado ACTIVO sin fecha de inicio de atención):</strong></p>
+    <div class="formula">hsMensualBrutas  =  hsSemanal  ×  (diasDelMes / 7)</div>
+    <p><strong>Agente en capacitación — CAPA (tiene <code>fechaInicioAtencion</code>):</strong><br>
+    Solo se computan las horas desde el día en que empezó a atender. Si ingresó el día 15 de un mes
+    de 30 días, aporta el 50% de las horas.</p>
+    <div class="formula">diaInicio        =  fechaInicioAtencion.getDate()
+diasDisponibles  =  max(0,  diasDelMes − diaInicio + 1)
+proporcion       =  diasDisponibles / diasDelMes
+hsMensualBrutas  =  hsSemanal  ×  (diasDelMes / 7)  ×  proporcion</div>
+    <p><strong>Pases entre servicios:</strong><br>
+    Si el DNI del agente está en el mapa de pases configurados, su <code>segmentoNorm</code>
+    se reemplaza por el servicio destino <em>antes</em> del cálculo. Así el agente queda
+    contabilizado en el servicio al que fue transferido.</p>
+  </div>
 </div>
 
-<h3>Agentes Equivalentes por Tipo de Contrato</h3>
-<p>Cuando hay déficit (<code>deltaHC103 > 0</code>), cuántos agentes de cada tipo de contrato
-se necesitarían para cerrarlo:</p>
-<div class="formula">
-hsGap       = deltaHC103 × hsSemanalPromedio × (diasDelMes / 7)
+<!-- PASO 2 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 2 — Agrupación por servicio</div>
+  <div class="calc-step-body">
+    <p>
+      Los agentes se agrupan por <code>segmentoNorm</code> (el código de servicio normalizado).
+      Solo los agentes con estado <code>ACTIVO</code> contribuyen horas y headcount productivo;
+      el resto (licencias, bajas) se contabilizan como <code>hcLP</code>.
+    </p>
+    <div class="formula"><span class="label">Por cada agente ACTIVO del servicio:</span>
+  hcActivos         +=  1
+  hsBrutas          +=  hsMensualBrutas
+  hsSemanalSuma     +=  hsSemanal
+  hsSemanalConteo   +=  1
+  si esCapa  →  hcCapa  +=  1
 
-hs30        = hsGap / (30 × (diasDelMes/7) × factorProductivo)
-hs35        = hsGap / (35 × (diasDelMes/7) × factorProductivo)
-hs36        = hsGap / (36 × (diasDelMes/7) × factorProductivo)
-mix         = deltaHC103   <span class="comment">(en HC con el promedio actual del pool)</span>
+<span class="label">Por cada agente no activo (licencia / baja):</span>
+  hcLP              +=  1
+
+<span class="label">Promedio de horas semanales del pool activo:</span>
+  hsSemanalPromedio  =  hsSemanalSuma / hsSemanalConteo
+                        (default 36 si no hay activos)</div>
+    <p>El <code>hsSemanalPromedio</code> representa el "agente típico" del servicio y se usa
+    luego para convertir el gap de horas en cantidad de personas.</p>
+  </div>
 </div>
 
-<h3>Facturación</h3>
-<div class="formula">
-tope              = hsRequeridas × (topeFacturacion / 100)  <span class="comment">[default: 103%]</span>
-teoricoFacturable = min(hsNetas, tope)
-hsFacturable100   = min(hsNetas, hsRequeridas)
-recorte           = max(0, hsNetas − tope)    <span class="comment">← horas que exceden el tope (no facturables)</span>
-faltante          = max(0, hsRequeridas − hsNetas)  <span class="comment">← horas que faltan</span>
+<!-- PASO 3 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 3 — Factor productivo (reductor operativo)</div>
+  <div class="calc-step-body">
+    <p>
+      Las horas brutas no son 100% productivas: parte se pierde por deslogueados, ausentismo
+      y rotación. El factor productivo cuantifica esa pérdida y puede calcularse de dos modos
+      configurables por el usuario en la pantalla de Reductores.
+    </p>
+    <p><strong>Modo multiplicativo</strong> (recomendado — cada reductor se aplica sobre el resto que queda):</p>
+    <div class="formula">factorProductivo  =  (1 − deslogueo)  ×  (1 − ausentismo)  ×  (1 − rotacion)</div>
+    <p><strong>Modo aditivo</strong> (simplificado — los reductores se suman directamente):</p>
+    <div class="formula">factorProductivo  =  max(0,  1 − deslogueo − ausentismo − rotacion)</div>
+    <p><strong>Ejemplo numérico</strong> con deslogueo = 5 %, ausentismo = 4 %, rotación = 2 %:</p>
+    <div class="formula">Multiplicativo:  0.95 × 0.96 × 0.98  ≈  0.8933   →  89.33 % de productividad
+Aditivo:         1 − 0.11          =  0.89     →  89.00 % de productividad</div>
+    <p>La diferencia entre modos crece a medida que los reductores individuales aumentan.
+    Para valores bajos (&lt; 5 % cada uno) la diferencia es despreciable.</p>
+  </div>
 </div>
 
-<h3>Ajuste por Franco (<code>francoAjuste</code>)</h3>
-<p>Cuántos agentes adicionales en plantel se necesitan para garantizar cobertura incluso
-en el peor día de franco (aplicado cuando el servicio tiene <code>francoConfig</code>):</p>
-<div class="formula">
-<span class="comment">── Datos del servicio (estático) ──</span>
-francoConfig = { diasVentana: 4, fraccionAfectada: 1.0 }
-<span class="comment">diasVentana = N días en la ventana de franco (ej: Jue-Dom = 4)</span>
-<span class="comment">fraccionAfectada = fracción del plantel que rota en esa ventana (1.0 = todos)</span>
+<!-- PASO 4 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 4 — Horas netas y cumplimiento</div>
+  <div class="calc-step-body">
+    <p>
+      Las <strong>horas netas</strong> son las horas brutas una vez descontado el factor productivo.
+      Representan las horas efectivamente disponibles para atención al cliente.
+      El <strong>cumplimiento</strong> mide cuánto de lo que pide el cliente (matriz CP) se cubre con esas horas.
+    </p>
+    <div class="formula">hsNetas       =  hsBrutas  ×  factorProductivo
 
-factorDisponible  = 1 − (fraccionAfectada / diasVentana)
-                  = 1 − (1.0 / 4) = 0.75   <span class="comment">← en el peor día, 75% del plantel disponible</span>
-hcNecesarioBruto  = hcActivos + deltaHC103  <span class="comment">← plantel óptimo sin franco</span>
-hcConFranco       = hcNecesarioBruto / factorDisponible
-extra             = hcConFranco − hcNecesarioBruto
+hsRequeridas  =  matrizCP.totalMes   <span class="comment">← total de horas exigidas por el cliente en el mes</span>
+
+cumplimiento  =  (hsNetas / hsRequeridas)  ×  100   [%]</div>
+    <p>Un cumplimiento del 100 % significa que el servicio cubre exactamente lo requerido.
+    Por encima del 103 % el exceso no es facturable (ver Paso 6).</p>
+  </div>
 </div>
 
-<div class="info">
-  El valor <strong>HC c/Franco</strong> en la tabla de resumen se calcula reactivamente usando las reglas
-  de franco editadas por el usuario en <code>/planificacion/contratos</code>. El método reactivo usa
-  <code>calcularFrancoPorServicio()</code> que considera la composición real de contratos (30/35/36 hs)
-  de cada servicio.
+<!-- PASO 5 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 5 — Desvío de HC al 103 % (<code>deltaHC103</code>)</div>
+  <div class="calc-step-body">
+    <p>
+      El sistema calcula cuántos <strong>agentes equivalentes</strong> faltan o sobran para que
+      el servicio alcance exactamente el 103 % de lo requerido (el tope facturable óptimo).
+      Un valor positivo indica déficit; negativo, exceso.
+    </p>
+    <div class="formula"><span class="label">¿Cuántas horas brutas necesitaría el servicio para llegar al 103 %?</span>
+hsNetasPor103       =  hsRequeridas  ×  1.03
+hsBrutasNecesarias  =  hsNetasPor103 / factorProductivo
+
+<span class="label">¿Cuántas horas brutas produce el plantel actual?</span>
+hsBrutasActuales    =  hcActivos  ×  hsSemanalPromedio  ×  (diasDelMes / 7)
+
+<span class="label">Diferencia y conversión a agentes:</span>
+diffHsBrutas        =  hsBrutasNecesarias − hsBrutasActuales
+hsPorAgente         =  hsSemanalPromedio  ×  (diasDelMes / 7)
+deltaHC103          =  diffHsBrutas / hsPorAgente
+
+<span class="comment">  deltaHC103 &gt; 0  →  faltan agentes para llegar al 103 %</span>
+<span class="comment">  deltaHC103 &lt; 0  →  sobran agentes (exceso sobre el 103 %)</span></div>
+    <p>
+      Cuando hay déficit (<code>deltaHC103 &gt; 0</code>), el sistema también calcula cuántos agentes
+      de <em>cada tipo de contrato</em> se necesitarían para cerrar el gap:
+    </p>
+    <div class="formula"><span class="label">Gap de horas brutas a cubrir:</span>
+hsGap  =  deltaHC103  ×  hsSemanalPromedio  ×  (diasDelMes / 7)
+
+<span class="label">Agentes necesarios según tipo de contrato:</span>
+hs30   =  hsGap / (30  ×  (diasDelMes/7)  ×  factorProductivo)
+hs35   =  hsGap / (35  ×  (diasDelMes/7)  ×  factorProductivo)
+hs36   =  hsGap / (36  ×  (diasDelMes/7)  ×  factorProductivo)
+mix    =  deltaHC103   <span class="comment">← usando el promedio actual del pool (contrato mixto)</span></div>
+    <p>Estos valores se muestran al expandir la fila del servicio en la tabla de Resumen.</p>
+  </div>
+</div>
+
+<!-- PASO 6 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 6 — Facturación y tope</div>
+  <div class="calc-step-body">
+    <p>
+      El cliente solo paga hasta un cierto porcentaje del requerido (tope de facturación, por defecto 103 %).
+      Las horas que superen ese tope <strong>no son facturables</strong> y se llaman "recorte".
+      Esto incentiva a no sobrepasarse en dotación de forma ineficiente.
+    </p>
+    <div class="formula">tope              =  hsRequeridas  ×  (topeFacturacion / 100)   <span class="comment">[configurable, default 103 %]</span>
+
+teoricoFacturable =  min(hsNetas, tope)     <span class="comment">← lo que realmente factura el servicio</span>
+hsFacturable100   =  min(hsNetas, hsRequeridas)  <span class="comment">← facturación al 100 % (sin bonificación)</span>
+recorte           =  max(0, hsNetas − tope)      <span class="comment">← exceso sobre el tope, no cobrable</span>
+faltante          =  max(0, hsRequeridas − hsNetas)  <span class="comment">← horas que faltan</span></div>
+    <p>El tope es ajustable desde la pantalla de Resumen (input "Tope %"). Al modificarlo,
+    todos los cálculos de facturación se recalculan en tiempo real.</p>
+  </div>
+</div>
+
+<!-- PASO 7 -->
+<div class="calc-step avoid-break">
+  <div class="calc-step-header">Paso 7 — Ajuste por franco (<code>francoAjuste</code>)</div>
+  <div class="calc-step-body">
+    <p>
+      El franco es el descanso rotativo del personal. En el peor día de una ventana de franco,
+      una fracción del plantel no está disponible. El ajuste calcula cuántos agentes
+      <em>adicionales</em> hay que tener en nómina para que, incluso en ese peor día, se cubra
+      el requerimiento.
+    </p>
+    <p>Cada servicio tiene una configuración estática de franco que puede editarse en
+    <code>/planificacion/contratos</code>:</p>
+    <div class="formula">francoConfig  =  { diasVentana: 4,  fraccionAfectada: 1.0 }
+
+<span class="comment">  diasVentana      = cantidad de días en la ventana de franco (ej: Jue-Dom = 4)</span>
+<span class="comment">  fraccionAfectada = fracción del plantel que rota en esa ventana (1.0 = todos)</span></div>
+    <p><strong>Cálculo del plantel necesario con franco:</strong></p>
+    <div class="formula">factorDisponible  =  1 − (fraccionAfectada / diasVentana)
+                  <span class="comment">  Ej: 1 − (1.0 / 4) = 0.75  →  en el peor día, 75 % disponible</span>
+
+hcNecesarioBruto  =  hcActivos + deltaHC103   <span class="comment">← plantel óptimo sin considerar franco</span>
+hcConFranco       =  hcNecesarioBruto / factorDisponible
+extra             =  hcConFranco − hcNecesarioBruto</div>
+    <p>
+      El valor <strong>HC c/Franco</strong> en la tabla de Resumen se calcula <em>reactivamente</em>
+      usando las reglas editadas por el usuario. El método completo (<code>calcularFrancoPorServicio()</code>)
+      considera la composición real de contratos (30/35/36 hs) de cada servicio, la probabilidad
+      diaria de franco por ventana y el peso de cada agente según su tipo.
+    </p>
+  </div>
 </div>
 
 <h3>Sistema de Alertas</h3>
@@ -1194,6 +1304,28 @@ hcNecesarioTotal = max(needed para todos los días)
 <!-- ══════════════════════════════════════════════════════════════════
      12. SIMULADOR
 ════════════════════════════════════════════════════════════════════ -->
+<div class="section page-break" id="sec-curvas">
+<h2>Curvas de Cumplimiento</h2>
+
+<p>
+  Las curvas comparan horas requeridas contra horas disponibles por dia. La disponibilidad toma las horas reales
+  de cada agente, el factor productivo del servicio y la probabilidad esperada de franco segun contrato.
+</p>
+
+<div class="formula">
+Requeridas_dia = matrizCP.totalDiario[dia]
+
+HsBaseDiaAgente = hsMensualBrutasAgente / diasDelMes
+
+Disponibles_dia = Σ (HsBaseDiaAgente * factorProductivo * (1 - probabilidadFrancoDia))
+</div>
+
+<p>
+  Dos dias del mismo servicio pueden tener distinta disponibilidad aunque el HC total no cambie:
+  contratos y ventanas de franco alteran la capacidad esperada diaria.
+</p>
+</div>
+
 <div class="section page-break" id="sec-simulador">
 <h2>12. Simulador de Escenarios</h2>
 
@@ -1208,6 +1340,7 @@ hcNecesarioTotal = max(needed para todos los días)
   <tr><td><code>add_agents</code></td><td>Agregar agentes a un servicio</td><td>servicio, cantidad, hsSemanal</td></tr>
   <tr><td><code>remove_agents</code></td><td>Quitar agentes de un servicio</td><td>servicio, cantidad</td></tr>
   <tr><td><code>move_agents</code></td><td>Mover agentes entre servicios</td><td>servicioOrigen, servicioDestino, cantidad</td></tr>
+  <tr><td><code>move_named_agent</code></td><td>Mover un agente puntual por nombre/DNI/usuario</td><td>servicioOrigen, servicioDestino, agenteDni, hsMensualBrutas</td></tr>
   <tr><td><code>change_contract</code></td><td>Cambiar tipo de contrato a N agentes</td><td>servicio, cantidad, hsSemanal nuevo, contratoDesde</td></tr>
   <tr><td><code>change_reducer</code></td><td>Ajustar reductores de un servicio</td><td>servicio, deslogueoOverride, ausentismoOverride, rotacionOverride</td></tr>
 </table></div>
@@ -1215,11 +1348,39 @@ hcNecesarioTotal = max(needed para todos los días)
 <h3>Lógica de Simulación</h3>
 <ol class="flow-steps">
   <li>El usuario agrega modificaciones desde la UI; cada una genera un objeto <code>SimModificacion</code> con un ID único</li>
-  <li>Al recalcular, el simulador parte de los agentes y reductores originales del store</li>
-  <li>Aplica cada modificación en orden: agrega agentes ficticios, elimina los reales, mueve segmentoNorm, ajusta hsSemanal o reductores</li>
-  <li>Llama a <code>calcularResultados()</code> con el conjunto modificado</li>
+  <li>Al recalcular, el simulador parte del resultado base, la nomina original y los reductores originales del store</li>
+  <li>Aplica deltas de HC y horas brutas por servicio: altas, bajas, reasignaciones, movimientos nominales, contratos y reductores</li>
+  <li>Recalcula <code>factorProductivo</code>, <code>hsNetas</code>, <code>cumplimiento</code>, <code>deltaHC103</code>, facturacion y faltantes</li>
   <li>Muestra los resultados del escenario junto a los originales para comparar</li>
 </ol>
+
+<h3>Formulas del Simulador</h3>
+<div class="formula">
+add_agents:
+  deltaHC = +cantidad
+  deltaHsBrutas = cantidad * hsSemanal * (diasEfectivos / 7)
+
+remove_agents:
+  hsPorAgente = (hsBrutasServicio / hcActivos) * (diasEfectivos / diasDelMes)
+  deltaHC = -cantidad
+  deltaHsBrutas = -cantidad * hsPorAgente
+
+move_agents:
+  hsPorAgenteOrigen = (hsBrutasOrigen / hcActivosOrigen) * (diasEfectivos / diasDelMes)
+  origen:  deltaHC = -cantidad; deltaHsBrutas = -cantidad * hsPorAgenteOrigen
+  destino: deltaHC = +cantidad; deltaHsBrutas = +cantidad * hsPorAgenteOrigen
+
+move_named_agent:
+  hsProrrateadas = hsMensualBrutasAgente * (diasEfectivos / diasDelMes)
+  origen:  deltaHC = -1; deltaHsBrutas = -hsProrrateadas
+  destino: deltaHC = +1; deltaHsBrutas = +hsProrrateadas
+
+change_contract:
+  hsSemanalBase = (hsBrutasServicio / hcActivos) / (diasDelMes / 7)
+  deltaHsBrutas = cantidad * (hsSemanalNueva - hsSemanalBase) * (diasEfectivos / 7)
+</div>
+
+<p>En el movimiento nominal, las horas reales del agente pasan al servicio destino y luego se recalculan con los reductores del destino.</p>
 
 <h3>Filtros de Agentes</h3>
 <p>
@@ -1227,6 +1388,7 @@ hcNecesarioTotal = max(needed para todos los días)
 </p>
 <div class="tbl-wrap"><table>
   <tr><th>Filtro</th><th>Descripción</th></tr>
+  <tr><td>Isla</td><td>Filtrar por servicio/segmento normalizado</td></tr>
   <tr><td>Sitio</td><td>Filtrar por ubicación física del agente</td></tr>
   <tr><td>Modalidad</td><td>PRESENCIAL, HOME OFFICE, HÍBRIDO</td></tr>
   <tr><td>Jefe</td><td>Filtrar por jefe directo</td></tr>

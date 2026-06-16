@@ -3,7 +3,7 @@
 const EXCEL_EPOCH = new Date(Date.UTC(1899, 11, 30));
 
 export function serialToDate(serial: number): Date {
-  const ms = (serial - 1) * 24 * 60 * 60 * 1000;
+  const ms = serial * 24 * 60 * 60 * 1000;
   return new Date(EXCEL_EPOCH.getTime() + ms);
 }
 

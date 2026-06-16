@@ -20,6 +20,16 @@ import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { Activity, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
+import type { MatrizServicio, ServicioKey } from "@/lib/domain/types";
+
+function filtrarMatricesPorIsla(
+  matrices: Map<ServicioKey, MatrizServicio>,
+  isla: string
+): Map<ServicioKey, MatrizServicio> {
+  if (!isla) return matrices;
+  const matriz = matrices.get(isla as ServicioKey);
+  return matriz ? new Map([[isla as ServicioKey, matriz]]) : matrices;
+}
 
 export default function DashboardPage() {
   const {
@@ -31,7 +41,7 @@ export default function DashboardPage() {
     alertas,
     activeFilters,
   } = useResultados();
-  const { modoReductor, topeFacturacion, setTopeFacturacion, porcentajeRotacion, setPorcentajeRotacion } = useUploads();
+  const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
   const { reglas } = useFrancoConfig();
 
   const francoMap = useMemo(() => {
@@ -48,8 +58,22 @@ export default function DashboardPage() {
     const agentesFiltrados = hayFiltrosActivos(activeFilters)
       ? filtrarAgentes(agentes, activeFilters)
       : agentes;
+    const matricesFiltradas = filtrarMatricesPorIsla(matrices, activeFilters.isla);
     try {
-      return calcularResultados(agentesFiltrados, matrices, reductores, diasDelMes, modoReductor, topeFacturacion);
+      const recalculado = calcularResultados(
+        agentesFiltrados,
+        matricesFiltradas,
+        reductores,
+        diasDelMes,
+        modoReductor,
+        topeFacturacion
+      );
+      return activeFilters.isla
+        ? {
+            ...recalculado,
+            resultados: recalculado.resultados.filter((r) => r.servicio === activeFilters.isla),
+          }
+        : recalculado;
     } catch {
       return resultado;
     }
@@ -68,7 +92,15 @@ export default function DashboardPage() {
 
   const filtrado = hayFiltrosActivos(activeFilters);
   const criticas = alertas.filter((a) => a.severidad === "critical");
-  const bajasEstimadas = Math.round(resultadoMostrado.totalHCActivos * (porcentajeRotacion / 100));
+  const bajasEstimadasRaw = resultadoMostrado.resultados.reduce(
+    (total, r) => total + r.hcActivos * r.reductoRes.rotacion,
+    0
+  );
+  const bajasEstimadas = Math.round(bajasEstimadasRaw);
+  const rotacionPonderada =
+    resultadoMostrado.totalHCActivos > 0
+      ? bajasEstimadasRaw / resultadoMostrado.totalHCActivos
+      : 0;
 
   return (
     <div className="px-6 py-6 max-w-7xl mx-auto">
@@ -86,20 +118,6 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {/* Rotación mensual */}
-            <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
-              <span className="text-xs text-gray-500">Rotación</span>
-              <input
-                type="number"
-                min={0}
-                max={30}
-                step={0.5}
-                value={porcentajeRotacion}
-                onChange={(e) => setPorcentajeRotacion(parseFloat(e.target.value) || 0)}
-                className="w-10 bg-transparent text-xs text-gray-700 tabular-nums text-right focus:outline-none"
-              />
-              <span className="text-xs text-gray-500">%</span>
-            </div>
             {/* Tope de facturación */}
             <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
               <span className="text-xs text-gray-500">Tope</span>
@@ -163,7 +181,7 @@ export default function DashboardPage() {
           <KpiCard
             label="Bajas est. mensuales"
             value={fmtNumero(bajasEstimadas)}
-            sublabel={`Rotación ${porcentajeRotacion}% sobre activos`}
+            sublabel={`Rotación ${fmtPct(rotacionPonderada * 100)} desde reductores`}
             accent="rose"
           />
           <KpiCard

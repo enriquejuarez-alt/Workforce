@@ -17,6 +17,16 @@ import { usePlaniConfig, type ServicioNominaRef } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 import { getSheetNames, parseCP, validarHojasCP } from "@/lib/parsers/parseCP";
 import {
+  getSheetNamesPpay,
+  parseCPPpay,
+  validarHojasCPPpay,
+} from "@/lib/parsers/parseCPPpay";
+import {
+  getSheetNamesSmb,
+  parseCPSmb,
+  validarHojasCPSmb,
+} from "@/lib/parsers/parseCPSmb";
+import {
   getNominasSheetNames,
   parseNomina,
   aplicarDiasAlMes,
@@ -24,7 +34,12 @@ import {
 import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularReductoresDesdeArchivos } from "@/lib/parsers/calcularReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
+import type { Reductor } from "@/lib/domain/types";
 import { generarAlertas } from "@/lib/domain/alertEngine";
+import {
+  getServiciosActivos,
+  resolverServicioPorReductorRuntime,
+} from "@/lib/config/servicesRuntime";
 import {
   Select,
   SelectContent,
@@ -100,6 +115,7 @@ export default function UploadPage() {
   const [fuentesReductores, setFuentesReductores] = useState<
     Partial<Record<FuenteCalculadora, { file: File; buffer: ArrayBuffer }>>
   >({});
+  const [reductoresPreview, setReductoresPreview] = useState<Reductor[]>([]);
   const [reqMes, setReqMes] = useState(new Date().getMonth() + 1);
   const [reqAnio, setReqAnio] = useState(new Date().getFullYear());
   const [cargandoNomina, setCargandoNomina] = useState(false);
@@ -121,6 +137,43 @@ export default function UploadPage() {
 
   const servicioActivo = serviciosFiltrados.find((s) => s.id === reqServicioId);
   const servicioDemoActivo = !!servicioActivo && servicioActivo.id < 0;
+  const esPersonalPay = reqServicioId === -1 ||
+    (servicioActivo?.nombre ?? "").toLowerCase().includes("personal pay");
+  const esSmb = reqServicioId === -2 ||
+    (servicioActivo?.nombre ?? "").toLowerCase().includes("smb");
+
+  const reductoresUtilizados = useMemo(() => {
+    if (reductoresPreview.length === 0) return [];
+
+    const serviciosActivos = getServiciosActivos();
+    const label = (servicioActivo?.planiConfig?.label ?? servicioActivo?.nombre ?? "").toLowerCase();
+    const selectedKey = servicioActivo?.planiConfig?.key ?? null;
+
+    const keysSeleccionadas = new Set<string>();
+    if (selectedKey) {
+      keysSeleccionadas.add(selectedKey);
+    } else if (label.includes("smb")) {
+      serviciosActivos
+        .filter((s) => s.key.toLowerCase().startsWith("smb"))
+        .forEach((s) => keysSeleccionadas.add(s.key));
+    } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("técnico")) {
+      serviciosActivos
+        .filter((s) => {
+          const key = s.key.toLowerCase();
+          return key.startsWith("soporte") || key.startsWith("smb");
+        })
+        .forEach((s) => keysSeleccionadas.add(s.key));
+    }
+
+    const reconocidos = reductoresPreview.map((r) => ({
+      ...r,
+      servicioKey: resolverServicioPorReductorRuntime(r.servicioNorm) ?? r.servicioNorm,
+    }));
+
+    if (keysSeleccionadas.size === 0) return reconocidos;
+    const filtrados = reconocidos.filter((r) => keysSeleccionadas.has(r.servicioKey));
+    return filtrados.length > 0 ? filtrados : reconocidos;
+  }, [reductoresPreview, servicioActivo]);
 
   useEffect(() => {
     if (agentesDesdeApi) setCargandoNomina(false);
@@ -131,6 +184,21 @@ export default function UploadPage() {
       window.parent.postMessage({ type: "PLANI_REQUEST_CONFIG" }, "*");
     }
   }, [serviciosNomina]);
+
+  useEffect(() => {
+    if (!archivoReductores || reductoresPreview.length > 0) return;
+    let cancelled = false;
+    archivoReductores.arrayBuffer()
+      .then((buffer) => {
+        if (cancelled) return;
+        const { reductores, errores } = parseReductores(buffer);
+        if (errores.length === 0) setReductoresPreview(reductores);
+      })
+      .catch(() => {
+        if (!cancelled) setReductoresPreview([]);
+      });
+    return () => { cancelled = true; };
+  }, [archivoReductores, reductoresPreview.length]);
 
   const handleServicioSelect = useCallback(
     (id: number) => {
@@ -146,8 +214,16 @@ export default function UploadPage() {
     setLoadingCP(true);
     setErrCP("");
     try {
-      const hojas = getSheetNames(buffer);
-      const errValidacion = validarHojasCP(hojas);
+      const hojas = esPersonalPay
+        ? getSheetNamesPpay(buffer)
+        : esSmb
+          ? getSheetNamesSmb(buffer)
+          : getSheetNames(buffer);
+      const errValidacion = esPersonalPay
+        ? validarHojasCPPpay(hojas)
+        : esSmb
+          ? validarHojasCPSmb(hojas)
+          : validarHojasCP(hojas);
       if (errValidacion.length > 0) { setErrCP(errValidacion.join(" · ")); return; }
       setHojasCP(hojas);
       setArchivoCP(file);
@@ -156,15 +232,17 @@ export default function UploadPage() {
     } finally {
       setLoadingCP(false);
     }
-  }, [setArchivoCP]);
+  }, [esPersonalPay, esSmb, setArchivoCP]);
 
   const handleReductores = useCallback(async (file: File, buffer: ArrayBuffer) => {
     setLoadingRed(true);
     setErrRed("");
     setReductoresCalculados(null);
+    setReductoresPreview([]);
     try {
-      const { errores: err } = parseReductores(buffer);
+      const { reductores, errores: err } = parseReductores(buffer);
       if (err.length > 0) { setErrRed(err.join(" · ")); return; }
+      setReductoresPreview(reductores);
       setArchivoReductores(file);
     } catch (e) {
       setErrRed(`Error al leer el archivo: ${e}`);
@@ -177,6 +255,7 @@ export default function UploadPage() {
     (tipo: FuenteCalculadora) => async (file: File, buffer: ArrayBuffer) => {
       setErrRed("");
       setReductoresCalculados(null);
+      setReductoresPreview([]);
       setFuentesReductores((prev) => ({ ...prev, [tipo]: { file, buffer } }));
     },
     []
@@ -192,10 +271,12 @@ export default function UploadPage() {
     }
     setCalculandoReductores(true);
     setErrRed("");
+    setReductoresPreview([]);
     try {
       const result = await calcularReductoresDesdeArchivos({ deslogueo, ausentismo, rotacion });
       if (result.errores.length > 0) { setErrRed(result.errores.join(" · ")); return; }
       setArchivoReductores(result.file);
+      setReductoresPreview(result.reductores);
       setReductoresCalculados(result.reductores.length);
     } catch (e) {
       setErrRed(`Error al calcular reductores: ${String(e)}`);
@@ -247,7 +328,11 @@ export default function UploadPage() {
       const [bufCP, bufRed] = buffers;
 
       setPasoActual("Procesando requerido del cliente…");
-      const { matrices, diasDelMes, errores: errCP2 } = parseCP(bufCP);
+      const { matrices, diasDelMes, errores: errCP2 } = esPersonalPay
+        ? parseCPPpay(bufCP)
+        : esSmb
+          ? parseCPSmb(bufCP)
+          : parseCP(bufCP);
 
       setPasoActual("Procesando reductores y nómina…");
       const { reductores, errores: errRed2 } = parseReductores(bufRed);
@@ -304,7 +389,7 @@ export default function UploadPage() {
     agentesDesdeApi, archivoCP, archivoReductores, archivoNomina,
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases,
     setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
-    setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
+    setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router, esPersonalPay, esSmb,
   ]);
 
   const currentUser = useAuthStore((s) => s.user);
@@ -318,6 +403,8 @@ export default function UploadPage() {
       {done ? "✓" : n}
     </div>
   );
+
+  const fmtReductorPct = (value: number) => `${(value * 100).toFixed(1)}%`;
 
   return (
     <div className="min-h-full bg-gradient-to-b from-slate-50 to-white px-4 py-5 sm:px-6">
@@ -506,6 +593,41 @@ export default function UploadPage() {
               )}
               {archivoReductores && (
                 <FilePreview nombre={archivoReductores.name} tamanio={archivoReductores.size} />
+              )}
+              {archivoReductores && reductoresUtilizados.length > 0 && (
+                <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-purple-700">
+                      Reductores a usar
+                    </p>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-purple-600">
+                      {reductoresUtilizados.length}
+                    </span>
+                  </div>
+                  <div className="max-h-40 space-y-1.5 overflow-auto pr-1">
+                    {reductoresUtilizados.map((r) => {
+                      const total = r.deslogueo + r.ausentismo + r.rotacion;
+                      return (
+                        <div
+                          key={`${r.servicioKey}-${r.servicio}`}
+                          className="rounded-lg border border-purple-100 bg-white px-2.5 py-2"
+                        >
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <p className="truncate text-[11px] font-bold text-slate-700">{r.servicioKey}</p>
+                            <span className="text-[11px] font-semibold tabular-nums text-purple-700">
+                              {fmtReductorPct(total)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1 text-[10px] text-slate-500">
+                            <span>D {fmtReductorPct(r.deslogueo)}</span>
+                            <span>A {fmtReductorPct(r.ausentismo)}</span>
+                            <span>R {fmtReductorPct(r.rotacion)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           </div>

@@ -1,6 +1,9 @@
 import { SERVICIOS, normalizar } from "./services";
 import type { ServiceDefinition, FrancoConfig } from "./services";
+import { SERVICIOS_PPAY } from "./servicesPpay";
+import { SERVICIOS_SMB } from "./servicesSmb";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
+import { useFrancoConfig } from "@/store/useFrancoConfig";
 
 /**
  * Returns the active service list.
@@ -10,6 +13,10 @@ import { usePlaniConfig } from "@/store/usePlaniConfig";
  * Falls back to the static SERVICIOS when not connected.
  */
 export function getServiciosActivos(): ServiceDefinition[] {
+  const { selectedServicioKey } = useFrancoConfig.getState();
+  if (selectedServicioKey === "-1") return SERVICIOS_PPAY;
+  if (selectedServicioKey === "-2") return SERVICIOS_SMB;
+
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;
 

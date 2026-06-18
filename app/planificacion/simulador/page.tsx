@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
 import { useResultados } from "@/store/useResultados";
-import { useSimulador } from "@/store/useSimulador";
+import { createAjusteServicio, useSimulador } from "@/store/useSimulador";
 import { useUploads } from "@/store/useUploads";
 import { SimuladorTable } from "@/components/tables/SimuladorTable";
 import { Button } from "@/components/ui/button";
@@ -115,7 +115,7 @@ function calcularResultadosSimulados(
   }
 
   return resultado.resultados.map((base) => {
-    const ajuste = ajustes[base.servicio];
+    const ajuste = ajustes[base.servicio] ?? createAjusteServicio(base.servicio);
     const ov     = reducerOvr.get(base.servicio) ?? {};
 
     const deslogueo  = ov.deslogueo  !== undefined ? ov.deslogueo  : ajuste.deslogueoOverride  !== null ? ajuste.deslogueoOverride  : base.reductoRes.deslogueo;
@@ -307,9 +307,8 @@ function AlertasFranja({ resultadosSimulados, resultadosBase }: {
 
 // ── Panel de comparación de escenarios ───────────────────────────────────────
 
-function ComparacionPanel({ resultadosActual, resultadosBase }: {
+function ComparacionPanel({ resultadosActual }: {
   resultadosActual: ResultadoServicio[];
-  resultadosBase: ResultadoServicio[];
 }) {
   const { escenarios, escenarioComparar, setEscenarioComparar, ajustes, periodoDesde, periodoHasta } = useSimulador();
   const { diasDelMes, resultado } = useResultados();
@@ -563,7 +562,6 @@ export default function SimuladorPage() {
         {/* Comparación de escenarios */}
         <ComparacionPanel
           resultadosActual={resultadosSimulados}
-          resultadosBase={resultado.resultados}
         />
 
         <SimuladorTable

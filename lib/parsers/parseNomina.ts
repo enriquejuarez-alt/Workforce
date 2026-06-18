@@ -46,8 +46,10 @@ export function getNominasSheetNames(buffer: ArrayBuffer): string[] {
 export function parseNomina(
   buffer: ArrayBuffer,
   hoja: string,
-  mappingOverrides: MappingOverride[] = []
+  mappingOverrides: MappingOverride[] = [],
+  resolverServicio?: (s: string) => string | null
 ): ParseNominaResult {
+  const _resolverServicio = resolverServicio ?? resolverServicioPorSegmentoRuntime;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wb = XLSX.read(buffer, { type: "array" }) as any;
   const hojas: string[] = wb.SheetNames;
@@ -135,7 +137,7 @@ export function parseNomina(
 
     // Resolver servicio: primero override manual, luego auto-mapeo
     let servicioKey: string | null = overrideMap.get(normalizar(segmentoRaw)) ?? null;
-    if (!servicioKey) servicioKey = resolverServicioPorSegmentoRuntime(segmentoRaw);
+    if (!servicioKey) servicioKey = _resolverServicio(segmentoRaw);
     if (!servicioKey) {
       sinMapeo++;
       segmentosExcluidos.add(segmentoRaw);

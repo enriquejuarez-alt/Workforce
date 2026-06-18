@@ -9,6 +9,7 @@ Sistema para cargar nomina, matrices CP, reductores y simular la planificacion d
 - TailwindCSS para UI
 - `xlsx` para lectura de Excel
 - `exceljs` para exportaciones
+- `react-hot-toast` para notificaciones
 
 ## Instalacion rapida
 
@@ -21,11 +22,12 @@ El servidor de desarrollo corre con Next.js. Si el puerto por defecto esta ocupa
 
 ## Flujo de Plani
 
-1. Cargar nomina.
+1. Seleccionar servicio (requerido antes de procesar).
 2. Cargar matrices CP por servicio.
 3. Cargar reductores o usar la calculadora.
-4. Revisar resumen, curvas, francos y simulador.
-5. Exportar escenarios cuando haga falta.
+4. Cargar nomina desde sistema o subir Excel manualmente.
+5. Revisar resumen, curvas, francos y simulador.
+6. Exportar escenarios cuando haga falta.
 
 ## Conceptos base
 
@@ -60,7 +62,7 @@ Hs semanal promedio = suma de hs semanales activas / HC activos
 
 Los reductores representan perdida esperada de productividad:
 
-- Deslogueo
+- Deslogueo operativo
 - Ausentismo sin LP
 - Rotacion
 
@@ -104,6 +106,12 @@ promedio ponderado = (mes 1 * 80 + mes 2 * 90 + mes 3 * 100) / 270
 
 Ejemplo: para proyectar mayo, usa febrero, marzo y abril.
 
+### Calculo de rotacion real
+
+```text
+Rotacion mes = bajas del mes / ((nomina inicio del mes + nomina fin del mes) / 2)
+```
+
 ### Mapeo de rotacion
 
 El archivo de rotacion viene por `Subarea`, por eso se mapea a servicios de Plani. Ejemplo:
@@ -123,6 +131,25 @@ RESUMEN PONDERADO
 
 Servicio | Deslogueo | Ausentismo | Rotacion
 ```
+
+## Formatos de CP soportados
+
+### Soporte (default)
+
+Una hoja por servicio nombrada igual al servicio. El sistema valida que las hojas esperadas existan.
+
+### KON (Personal Pay)
+
+Hoja unica llamada `KON` con todas las islas del servicio como secciones consecutivas.
+El parser detecta cada seccion buscando encabezados que no sean `Requeridas`/`RQ` y localiza la fila resumen 48 filas mas abajo.
+
+### Formato Onboarding (ONB)
+
+Estructura propia con hojas separadas por isla.
+
+### Formato SMB
+
+Estructura propia para las islas SMB.
 
 ## Matrices CP y horas requeridas
 
@@ -153,6 +180,16 @@ Cumplimiento total:
 ```text
 Cumplimiento total % = (sumatoria Hs netas / sumatoria Hs requeridas) * 100
 ```
+
+### Niveles de cumplimiento
+
+| Nivel  | Rango         |
+|--------|---------------|
+| Critico | < 95%        |
+| Bajo   | 95% – 99%    |
+| Ideal  | 100% – 103%  |
+| Alto   | 104% – 115%  |
+| Exceso | > 115%       |
 
 ## Objetivo 103%
 
@@ -200,6 +237,8 @@ Por defecto el tope suele analizarse al 103%, pero puede ajustarse desde la UI.
 
 ## Contratos y francos
 
+La pagina `/planificacion/contratos` permite configurar contratos y reglas de franco por servicio o como default global.
+
 Cada contrato define:
 
 - Horas semanales.
@@ -207,13 +246,10 @@ Cada contrato define:
 - Cantidad de francos semanales.
 - Dias posibles donde puede caer cada franco.
 
-Ejemplo de regla:
+Los servicios con configuracion personalizada muestran un punto naranja en el selector de servicio.
+Si no hay configuracion personalizada para un servicio, aplican los valores default globales.
 
-```text
-Contrato 24 hs:
-Franco 1: lunes a viernes
-Franco 2: sabado a domingo
-```
+Contratos rapidos disponibles: 30, 35, 36 y 40 hs.
 
 ### Contratos decimales y 32 1/2
 
@@ -266,13 +302,6 @@ La probabilidad esperada de franco por dia se calcula asi:
 
 ```text
 Probabilidad franco dia = suma de 1 / cantidad de dias de cada ventana que contiene ese dia
-```
-
-Ejemplo:
-
-```text
-Si un franco puede caer entre lunes y viernes:
-probabilidad por cada dia = 1 / 5 = 20%
 ```
 
 En la vista de francos:
@@ -400,6 +429,18 @@ Si se define un periodo desde/hasta, todos los cambios se prorratean:
 dias efectivos = dias del periodo que intersectan con el mes cargado
 ```
 
+## Exportacion Excel
+
+El exportable `planificador_<mes>.xlsx` genera 5 hojas:
+
+| Hoja | Contenido |
+|------|-----------|
+| Estado Actual | Dotacion, reductores operativos (Deslogueo / Ausentismo / Rotacion) y cumplimiento por servicio |
+| Simulado | Comparacion base vs. escenario simulado. Muestra "Sin cambios" si los valores son identicos |
+| Brechas | Servicios en deficit y analisis de impacto en facturacion |
+| Resumen | Resumen ejecutivo por servicio con delta en pp |
+| Reductores | Deslogueo, Ausentismo, Rotacion, Hs Brutas, Hs Netas e Hs Impactadas por servicio |
+
 ## Dashboard y filtros
 
 Los filtros recalculan el resultado mostrado con la nomina filtrada:
@@ -416,15 +457,24 @@ Al filtrar, se recalculan HC, horas brutas, horas netas, cumplimiento y deltas s
 ## Archivos importantes
 
 ```text
-app/planificacion/page.tsx              Carga de archivos y calculadora de reductores
+app/planificacion/page.tsx              Carga de archivos, seleccion de servicio y proceso principal
 app/planificacion/resumen/page.tsx      Resumen y filtros
 app/planificacion/curvas/page.tsx       Curvas por servicio
 app/planificacion/franco/page.tsx       Planificacion de francos
+app/planificacion/contratos/page.tsx    Configuracion de contratos y francos por servicio
 app/planificacion/simulador/page.tsx    Simulador de dotacion
+app/ppay/page.tsx                       Flujo especifico para Personal Pay (formato KON)
+components/config/FrancoRulesEditor.tsx Editor de reglas de contratos y francos
 components/tables/SimuladorTable.tsx    UI del constructor de escenarios
+components/charts/CumplimientoBarChart.tsx Grafico de cumplimiento con leyenda de niveles
 lib/domain/calculos.ts                  Matematica principal
 lib/domain/francoEngine.ts              Calculo de francos
-lib/parsers/calcularReductores.ts       Calculadora de reductores
+lib/parsers/calcularReductores.ts       Calculadora de reductores (ponderacion 80/90/100)
+lib/parsers/parseCP.ts                  Parser formato Soporte (+ KON)
+lib/parsers/parseCPPpay.ts              Parser formato Personal Pay
+lib/parsers/parseCPSmb.ts               Parser formato SMB
+lib/parsers/parseCPOnb.ts               Parser formato Onboarding
+lib/utils/exportSimulador.ts            Exportacion Excel (5 hojas)
 CALCULO_REDUCTORES.md                   Nota corta del calculo de reductores
 ```
 
@@ -435,13 +485,4 @@ npm run dev
 npm run lint
 npx tsc --noEmit
 npm run build
-```
-
-## Validaciones
-
-Ultimas validaciones usadas durante desarrollo:
-
-```bash
-npm run lint
-npx tsc --noEmit
 ```

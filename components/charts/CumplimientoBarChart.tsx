@@ -50,6 +50,14 @@ const CustomTooltip = ({ active, payload }: TooltipProps) => {
   );
 };
 
+const LEYENDA = [
+  { nivel: "critico", label: "Crítico", rango: "< 95%" },
+  { nivel: "bajo",    label: "Bajo",    rango: "95% – 99%" },
+  { nivel: "ideal",   label: "Ideal",   rango: "100% – 103%" },
+  { nivel: "alto",    label: "Alto",    rango: "104% – 115%" },
+  { nivel: "exceso",  label: "Exceso",  rango: "> 115%" },
+] as const;
+
 export function CumplimientoBarChart({ resultados }: Props) {
   const data = resultados.map((r) => ({
     ...r,
@@ -59,51 +67,66 @@ export function CumplimientoBarChart({ resultados }: Props) {
   const maxCumplimiento = Math.max(120, ...data.map((r) => r.cumplimiento + 12));
 
   return (
-    <ResponsiveContainer width="100%" height={310}>
-      <BarChart data={data} margin={{ top: 24, right: 22, bottom: 8, left: -8 }} barCategoryGap="28%">
-        <CartesianGrid strokeDasharray="4 6" stroke="#E5E7EB" vertical={false} />
-        <XAxis
-          dataKey="name"
-          interval={0}
-          tick={{ fill: "#64748B", fontSize: 11, fontWeight: 600 }}
-          axisLine={false}
-          tickLine={false}
-          tickMargin={10}
-        />
-        <YAxis
-          tick={{ fill: "#94A3B8", fontSize: 11 }}
-          axisLine={false}
-          tickLine={false}
-          tickFormatter={(v) => `${v}%`}
-          domain={[0, maxCumplimiento]}
-        />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#F1F5F9" }} />
-        <ReferenceLine
-          y={100}
-          stroke="#CBD5E1"
-          strokeDasharray="5 4"
-          label={{ value: "100%", fill: "#64748B", fontSize: 10, fontWeight: 700, position: "right" }}
-        />
-        <ReferenceLine
-          y={103}
-          stroke="#10b981"
-          strokeDasharray="5 4"
-          label={{ value: "103%", fill: "#059669", fontSize: 10, fontWeight: 700, position: "right" }}
-        />
-        <Bar dataKey="cumplimiento" radius={[8, 8, 4, 4]} maxBarSize={54}>
-          <LabelList dataKey="label" position="top" fill="#334155" fontSize={11} fontWeight={700} />
-          {data.map((entry) => {
-            const nivel = nivelCumplimiento(entry.cumplimiento);
-            return (
-              <Cell
-                key={entry.servicio}
-                fill={COLOR_NIVEL[nivel].hex}
-                fillOpacity={0.88}
-              />
-            );
-          })}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div>
+      <ResponsiveContainer width="100%" height={310}>
+        <BarChart data={data} margin={{ top: 24, right: 22, bottom: 8, left: -8 }} barCategoryGap="28%">
+          <CartesianGrid strokeDasharray="4 6" stroke="#E5E7EB" vertical={false} />
+          <XAxis
+            dataKey="name"
+            interval={0}
+            tick={{ fill: "#64748B", fontSize: 11, fontWeight: 600 }}
+            axisLine={false}
+            tickLine={false}
+            tickMargin={10}
+          />
+          <YAxis
+            tick={{ fill: "#94A3B8", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v) => `${v}%`}
+            domain={[0, maxCumplimiento]}
+          />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "#F1F5F9" }} />
+          <ReferenceLine
+            y={100}
+            stroke="#CBD5E1"
+            strokeDasharray="5 4"
+            label={{ value: "100%", fill: "#64748B", fontSize: 10, fontWeight: 700, position: "right" }}
+          />
+          <ReferenceLine
+            y={103}
+            stroke="#10b981"
+            strokeDasharray="5 4"
+            label={{ value: "103%", fill: "#059669", fontSize: 10, fontWeight: 700, position: "right" }}
+          />
+          <Bar dataKey="cumplimiento" radius={[8, 8, 4, 4]} maxBarSize={54}>
+            <LabelList dataKey="label" position="top" fill="#334155" fontSize={11} fontWeight={700} />
+            {data.map((entry) => {
+              const nivel = nivelCumplimiento(entry.cumplimiento);
+              return (
+                <Cell
+                  key={entry.servicio}
+                  fill={COLOR_NIVEL[nivel].hex}
+                  fillOpacity={0.88}
+                />
+              );
+            })}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+
+      <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1.5">
+        {LEYENDA.map(({ nivel, label, rango }) => (
+          <div key={nivel} className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-2.5 rounded-sm shrink-0"
+              style={{ backgroundColor: COLOR_NIVEL[nivel].hex, opacity: 0.88 }}
+            />
+            <span className="text-[11px] font-medium text-gray-600">{label}</span>
+            <span className="text-[11px] text-gray-400">{rango}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

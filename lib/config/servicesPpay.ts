@@ -2,9 +2,9 @@ import type { ServiceDefinition } from "./services";
 
 export const SERVICIOS_PPAY: ServiceDefinition[] = [
   {
-    key: "PPAY-GENERAL",
-    label: "Pay General",
-    hojaCP: "PAY GENERAL",
+    key: "PPAY",
+    label: "Personal Pay",
+    hojaCP: "KON",
     segmentosNomina: [
       "Personal Pay",
       "PERSONAL PAY",
@@ -13,27 +13,11 @@ export const SERVICIOS_PPAY: ServiceDefinition[] = [
       "Pay General",
       "PAY DIGITAL",
       "Pay Digital",
-    ],
-    reductorNombres: ["PPAY", "Personal Pay", "PAY GENERAL", "Pay General"],
-  },
-  {
-    key: "PPAY-CASHIN",
-    label: "Cash In",
-    hojaCP: "CASHIN",
-    segmentosNomina: [
       "CASHIN",
       "Cash In",
       "CASH IN",
       "PPAY CASHIN",
       "Pay Cash In",
-    ],
-    reductorNombres: ["CASHIN", "Cash In", "PPAY CASHIN"],
-  },
-  {
-    key: "PPAY-WSP",
-    label: "WSP + Mail",
-    hojaCP: "WSP + MAIL",
-    segmentosNomina: [
       "WSP + MAIL",
       "WSP+MAIL",
       "WSP MAIL",
@@ -42,14 +26,6 @@ export const SERVICIOS_PPAY: ServiceDefinition[] = [
       "WSP",
       "Wsp Mail",
       "Wsp+Mail",
-    ],
-    reductorNombres: ["WSP + MAIL", "WSP MAIL", "PPAY WSP", "WSP+MAIL"],
-  },
-  {
-    key: "PPAY-LOGUIN",
-    label: "Loguin",
-    hojaCP: "LOGUIN",
-    segmentosNomina: [
       "LOGUIN",
       "Login",
       "LOGIN",
@@ -57,7 +33,23 @@ export const SERVICIOS_PPAY: ServiceDefinition[] = [
       "PPAY LOGUIN",
       "Pay Login",
     ],
-    reductorNombres: ["LOGUIN", "Login", "PPAY LOGIN", "PPAY LOGUIN"],
+    reductorNombres: [
+      "PPAY",
+      "Personal Pay",
+      "PAY GENERAL",
+      "Pay General",
+      "CASHIN",
+      "Cash In",
+      "PPAY CASHIN",
+      "WSP + MAIL",
+      "WSP MAIL",
+      "PPAY WSP",
+      "WSP+MAIL",
+      "LOGUIN",
+      "Login",
+      "PPAY LOGIN",
+      "PPAY LOGUIN",
+    ],
   },
 ];
 

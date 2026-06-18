@@ -27,6 +27,11 @@ import {
   validarHojasCPSmb,
 } from "@/lib/parsers/parseCPSmb";
 import {
+  getSheetNamesOnb,
+  parseCPOnb,
+  validarHojasCPOnb,
+} from "@/lib/parsers/parseCPOnb";
+import {
   getNominasSheetNames,
   parseNomina,
   aplicarDiasAlMes,
@@ -49,6 +54,7 @@ import {
 } from "@/components/ui/select";
 import { useAuthStore } from "@/store/auth";
 import { isReadOnly } from "@/lib/utils/roles";
+import toast from "react-hot-toast";
 
 const MESES = [
   "Enero","Febrero","Marzo","Abril","Mayo","Junio",
@@ -69,6 +75,8 @@ const SERVICIOS_OCULTOS = [
 const SERVICIOS_DEMO: ServicioNominaRef[] = [
   { id: -1, nombre: "Personal Pay", planiConfig: null },
   { id: -2, nombre: "SMB", planiConfig: null },
+  { id: -3, nombre: "Onboarding", planiConfig: null },
+  { id: -4, nombre: "Migracion", planiConfig: null },
 ];
 
 const fade = {
@@ -132,7 +140,7 @@ export default function UploadPage() {
     );
     const nombresVisibles = new Set(visibles.map((s) => s.nombre.toLowerCase()));
     const demosFaltantes = SERVICIOS_DEMO.filter((s) => !nombresVisibles.has(s.nombre.toLowerCase()));
-    return [...visibles, ...demosFaltantes];
+    return [...visibles, ...demosFaltantes].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [serviciosNomina]);
 
   const servicioActivo = serviciosFiltrados.find((s) => s.id === reqServicioId);
@@ -141,6 +149,12 @@ export default function UploadPage() {
     (servicioActivo?.nombre ?? "").toLowerCase().includes("personal pay");
   const esSmb = reqServicioId === -2 ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("smb");
+  const esOnboarding = reqServicioId === -3 ||
+    (servicioActivo?.nombre ?? "").toLowerCase().includes("onboarding") ||
+    (servicioActivo?.nombre ?? "").toLowerCase().includes("onb");
+  const esMigracion = reqServicioId === -4 ||
+    (servicioActivo?.nombre ?? "").toLowerCase().includes("migracion") ||
+    (servicioActivo?.nombre ?? "").toLowerCase().includes("cobre");
 
   const reductoresUtilizados = useMemo(() => {
     if (reductoresPreview.length === 0) return [];
@@ -148,13 +162,24 @@ export default function UploadPage() {
     const serviciosActivos = getServiciosActivos();
     const label = (servicioActivo?.planiConfig?.label ?? servicioActivo?.nombre ?? "").toLowerCase();
     const selectedKey = servicioActivo?.planiConfig?.key ?? null;
+    const filtroEstricto = esPersonalPay || esSmb || esOnboarding || esMigracion || Boolean(selectedKey);
 
     const keysSeleccionadas = new Set<string>();
     if (selectedKey) {
       keysSeleccionadas.add(selectedKey);
+    } else if (label.includes("personal pay") || label.includes("ppay")) {
+      keysSeleccionadas.add("PPAY");
+    } else if (label.includes("onboarding") || label.includes("onb")) {
+      serviciosActivos
+        .filter((s) => s.key.toLowerCase().startsWith("onb"))
+        .forEach((s) => keysSeleccionadas.add(s.key));
     } else if (label.includes("smb")) {
       serviciosActivos
         .filter((s) => s.key.toLowerCase().startsWith("smb"))
+        .forEach((s) => keysSeleccionadas.add(s.key));
+    } else if (label.includes("migracion") || label.includes("cobre")) {
+      serviciosActivos
+        .filter((s) => s.key.toLowerCase().startsWith("migracion"))
         .forEach((s) => keysSeleccionadas.add(s.key));
     } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("técnico")) {
       serviciosActivos
@@ -172,8 +197,18 @@ export default function UploadPage() {
 
     if (keysSeleccionadas.size === 0) return reconocidos;
     const filtrados = reconocidos.filter((r) => keysSeleccionadas.has(r.servicioKey));
-    return filtrados.length > 0 ? filtrados : reconocidos;
-  }, [reductoresPreview, servicioActivo]);
+    return filtroEstricto ? filtrados : (filtrados.length > 0 ? filtrados : reconocidos);
+  }, [reductoresPreview, servicioActivo, esPersonalPay, esSmb, esOnboarding, esMigracion]);
+
+  const cpDropzoneLabel = esPersonalPay
+    ? "CP_Personal_Pay_MM-AAAA.xlsx"
+    : esSmb
+      ? "CP_SMB_MM-AAAA.xlsx"
+      : esOnboarding
+        ? "CP_Onboarding_MM-AAAA.xlsx"
+        : esMigracion
+          ? "CP_Migracion_Cobre_MM-AAAA.xlsx"
+          : "CP_Soporte_MM-AAAA.xlsx";
 
   useEffect(() => {
     if (agentesDesdeApi) setCargandoNomina(false);
@@ -218,11 +253,15 @@ export default function UploadPage() {
         ? getSheetNamesPpay(buffer)
         : esSmb
           ? getSheetNamesSmb(buffer)
+          : esOnboarding
+            ? getSheetNamesOnb(buffer)
           : getSheetNames(buffer);
       const errValidacion = esPersonalPay
         ? validarHojasCPPpay(hojas)
         : esSmb
           ? validarHojasCPSmb(hojas)
+          : esOnboarding
+            ? validarHojasCPOnb(hojas)
           : validarHojasCP(hojas);
       if (errValidacion.length > 0) { setErrCP(errValidacion.join(" · ")); return; }
       setHojasCP(hojas);
@@ -232,7 +271,7 @@ export default function UploadPage() {
     } finally {
       setLoadingCP(false);
     }
-  }, [esPersonalPay, esSmb, setArchivoCP]);
+  }, [esPersonalPay, esSmb, esOnboarding, setArchivoCP]);
 
   const handleReductores = useCallback(async (file: File, buffer: ArrayBuffer) => {
     setLoadingRed(true);
@@ -311,6 +350,10 @@ export default function UploadPage() {
   }, [reqServicioId, reqMes, reqAnio]);
 
   const handleProcesar = useCallback(async () => {
+    if (!servicioActivo) {
+      toast.error("Seleccioná un servicio antes de procesar.", { duration: 3500 });
+      return;
+    }
     const nominaDesdeApi = !!agentesDesdeApi;
     const nominaDesdeArchivo = !!(archivoNomina && hojaNomina);
     if (!archivoCP || !archivoReductores || (!nominaDesdeApi && !nominaDesdeArchivo)) return;
@@ -332,6 +375,8 @@ export default function UploadPage() {
         ? parseCPPpay(bufCP)
         : esSmb
           ? parseCPSmb(bufCP)
+          : esOnboarding
+            ? parseCPOnb(bufCP)
           : parseCP(bufCP);
 
       setPasoActual("Procesando reductores y nómina…");
@@ -389,7 +434,7 @@ export default function UploadPage() {
     agentesDesdeApi, archivoCP, archivoReductores, archivoNomina,
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases,
     setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
-    setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router, esPersonalPay, esSmb,
+    setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router, esPersonalPay, esSmb, esOnboarding,
   ]);
 
   const currentUser = useAuthStore((s) => s.user);
@@ -510,7 +555,7 @@ export default function UploadPage() {
                 <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Requerido del cliente</p>
               </div>
               <DropZone
-                label="CP_Soporte_MM-AAAA.xlsx"
+                label={cpDropzoneLabel}
                 onFile={handleCP}
                 hasFile={!!archivoCP}
                 fileName={archivoCP?.name}

@@ -16,9 +16,11 @@ backend/.env
 # Uploads
 backend/uploads/
 
-# Local notes and Excel workbooks
+# Local notes and working files
 *.txt
 *.xlsx
+*.docx
+DOCUMENTACION.html
 
 # Prisma generated (regenerated on install)
 backend/node_modules/.prisma/

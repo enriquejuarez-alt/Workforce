@@ -31,11 +31,22 @@ export interface PeriodoReplan {
   anio: number;
 }
 
+export function createAjusteServicio(servicio: ServicioKey): AjusteServicio {
+  return {
+    servicio,
+    hcExtra: 0,
+    hsSemanalExtra: 36,
+    deslogueoOverride: null,
+    ausentismoOverride: null,
+    rotacionOverride: null,
+  };
+}
+
 function ajustesInicial(): Record<ServicioKey, AjusteServicio> {
   return Object.fromEntries(
     SERVICIOS_KEYS.map((k) => [
       k,
-      { servicio: k, hcExtra: 0, hsSemanalExtra: 36, deslogueoOverride: null, ausentismoOverride: null, rotacionOverride: null },
+      createAjusteServicio(k),
     ])
   ) as Record<ServicioKey, AjusteServicio>;
 }
@@ -74,7 +85,12 @@ export const useSimulador = create<SimuladorState>()(
   periodoHasta: null,
 
   setAjuste: (servicio, patch) =>
-    set((state) => ({ ajustes: { ...state.ajustes, [servicio]: { ...state.ajustes[servicio], ...patch } } })),
+    set((state) => ({
+      ajustes: {
+        ...state.ajustes,
+        [servicio]: { ...(state.ajustes[servicio] ?? createAjusteServicio(servicio)), ...patch },
+      },
+    })),
 
   resetAjustes: () => set({ ajustes: ajustesInicial(), modificaciones: [], escenarioComparar: null, periodoDesde: null, periodoHasta: null }),
 

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import type { ResultadoServicio } from "@/lib/domain/types";
 import { type ServicioKey } from "@/lib/domain/types";
-import { useSimulador } from "@/store/useSimulador";
+import { createAjusteServicio, useSimulador } from "@/store/useSimulador";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 import { useResultados } from "@/store/useResultados";
 import { fmtPct } from "@/lib/utils/formato";
@@ -135,7 +135,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
   const editorInputCls = "w-16 h-7 bg-white border border-gray-300 rounded-lg px-2 text-xs tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
 
   const tieneOverrides = resultadosBase.some((r) => {
-    const aj = ajustes[r.servicio];
+    const aj = ajustes[r.servicio] ?? createAjusteServicio(r.servicio as ServicioKey);
     return aj.deslogueoOverride !== null || aj.ausentismoOverride !== null || aj.rotacionOverride !== null;
   });
 
@@ -198,7 +198,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
               </thead>
               <tbody>
                 {resultadosBase.map((r) => {
-                  const aj = ajustes[r.servicio as ServicioKey];
+                  const aj = ajustes[r.servicio as ServicioKey] ?? createAjusteServicio(r.servicio as ServicioKey);
                   const base = r.reductoRes;
                   const hasOverride = aj.deslogueoOverride !== null || aj.ausentismoOverride !== null || aj.rotacionOverride !== null;
 

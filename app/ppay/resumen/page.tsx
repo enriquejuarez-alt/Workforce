@@ -1,0 +1,281 @@
+"use client";
+
+import { useMemo } from "react";
+import { motion } from "framer-motion";
+import { useResultadosPpay } from "@/store/useResultadosPpay";
+import { useUploadsPpay } from "@/store/useUploadsPpay";
+import { KpiCard } from "@/components/KpiCard";
+import { ResumenTable } from "@/components/tables/ResumenTable";
+import { CumplimientoBarChart } from "@/components/charts/CumplimientoBarChart";
+import { AlertsPanel } from "@/components/alerts/AlertsPanel";
+import { FilterBarPpay } from "@/components/filters/FilterBarPpay";
+import { nivelCumplimiento } from "@/lib/domain/types";
+import { fmtNumero, fmtPct, fmtHoras } from "@/lib/utils/formato";
+import { filtrarAgentes, hayFiltrosActivos } from "@/lib/domain/filterEngine";
+import { calcularResultados } from "@/lib/domain/calculos";
+import { exportarSimulacion } from "@/lib/utils/exportSimulador";
+import { Activity, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SinDatos } from "@/components/SinDatos";
+import type { MatrizServicio, ServicioKey } from "@/lib/domain/types";
+
+function filtrarMatricesPorServicio(
+  matrices: Map<ServicioKey, MatrizServicio>,
+  servicio: string
+): Map<ServicioKey, MatrizServicio> {
+  if (!servicio) return matrices;
+  const m = matrices.get(servicio as ServicioKey);
+  return m ? new Map([[servicio as ServicioKey, m]]) : matrices;
+}
+
+export default function PpayResumenPage() {
+  const {
+    resultado,
+    agentes,
+    matrices,
+    reductores,
+    diasDelMes,
+    alertas,
+    activeFilters,
+  } = useResultadosPpay();
+
+  const {
+    modoReductor,
+    topeFacturacion,
+    setTopeFacturacion,
+  } = useUploadsPpay();
+
+  const resultadoMostrado = useMemo(() => {
+    if (!resultado || agentes.length === 0) return resultado;
+    const agentesFiltrados = hayFiltrosActivos(activeFilters)
+      ? filtrarAgentes(agentes, activeFilters)
+      : agentes;
+    const matricesFiltradas = filtrarMatricesPorServicio(matrices, activeFilters.isla);
+    try {
+      const recalculado = calcularResultados(
+        agentesFiltrados,
+        matricesFiltradas,
+        reductores,
+        diasDelMes,
+        modoReductor,
+        topeFacturacion
+      );
+      return activeFilters.isla
+        ? {
+            ...recalculado,
+            resultados: recalculado.resultados.filter(
+              (r) => r.servicio === activeFilters.isla
+            ),
+          }
+        : recalculado;
+    } catch {
+      return resultado;
+    }
+  }, [resultado, agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, activeFilters]);
+
+  if (!resultado || !resultadoMostrado) return <SinDatos />;
+
+  const nivel = nivelCumplimiento(resultadoMostrado.cumplimientoTotal);
+  const accentMap = {
+    critico: "rose",
+    bajo: "amber",
+    ideal: "emerald",
+    alto: "sky",
+    exceso: "violet",
+  } as const;
+
+  const filtrado = hayFiltrosActivos(activeFilters);
+  const criticas = alertas.filter((a) => a.severidad === "critical");
+  const bajasEstimadasRaw = resultadoMostrado.resultados.reduce(
+    (total, r) => total + r.hcActivos * r.reductoRes.rotacion,
+    0
+  );
+  const bajasEstimadas = Math.round(bajasEstimadasRaw);
+  const rotacionPonderada =
+    resultadoMostrado.totalHCActivos > 0
+      ? bajasEstimadasRaw / resultadoMostrado.totalHCActivos
+      : 0;
+
+  return (
+    <div className="px-6 py-6 max-w-7xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-0.5">
+              Personal Pay — Resumen
+            </h2>
+            <p className="text-sm text-gray-500">
+              {resultado.mes} · {resultado.diasDelMes} días
+              {filtrado && (
+                <span className="ml-2 text-[#0054A6] font-medium">· Filtrado</span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
+              <span className="text-xs text-gray-500">Tope</span>
+              <input
+                type="number"
+                min={100}
+                max={130}
+                step={0.5}
+                value={topeFacturacion}
+                onChange={(e) =>
+                  setTopeFacturacion(parseFloat(e.target.value) || 103)
+                }
+                className="w-14 bg-transparent text-xs text-gray-700 tabular-nums text-right focus:outline-none"
+              />
+              <span className="text-xs text-gray-500">%</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() =>
+                resultadoMostrado &&
+                exportarSimulacion(
+                  resultadoMostrado.mes,
+                  resultadoMostrado.resultados
+                )
+              }
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exportar
+            </Button>
+            {alertas.length > 0 && <AlertsPanel alertas={alertas} compact />}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <FilterBarPpay />
+        </div>
+
+        {criticas.length > 0 && (
+          <div className="mb-6">
+            <AlertsPanel alertas={criticas} />
+          </div>
+        )}
+
+        {/* KPIs — personas */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+          <KpiCard
+            label="Personas activas"
+            value={fmtNumero(resultadoMostrado.totalHCActivos)}
+            sublabel={filtrado ? "Filtradas por criterio" : "Agentes activos en nómina"}
+            accent="gray"
+          />
+          <KpiCard
+            label="En licencia"
+            value={fmtNumero(resultadoMostrado.totalHCLP)}
+            sublabel="Licencias y bajas"
+            accent="amber"
+          />
+          <KpiCard
+            label="En capacitación"
+            value={fmtNumero(resultadoMostrado.totalHCCapa)}
+            sublabel="Capa — ingreso parcial al mes"
+            accent="violet"
+          />
+          <KpiCard
+            label="Bajas est. mensuales"
+            value={fmtNumero(bajasEstimadas)}
+            sublabel={`Rotación ${fmtPct(rotacionPonderada * 100)} desde reductores`}
+            accent="rose"
+          />
+          <KpiCard
+            label="Cumplimiento Total"
+            value={fmtPct(resultadoMostrado.cumplimientoTotal)}
+            sublabel="Hs netas / Hs requeridas"
+            accent={accentMap[nivel]}
+          />
+        </div>
+
+        {/* KPIs — horas */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <KpiCard
+            label="Hs Requeridas"
+            value={fmtHoras(resultadoMostrado.totalHsRequeridas)}
+            sublabel="Total del mes por cliente"
+            accent="sky"
+          />
+          <KpiCard
+            label="Tope facturable"
+            value={fmtHoras(
+              resultadoMostrado.resultados.reduce((a, r) => a + r.tope, 0)
+            )}
+            sublabel={`Cap. al ${topeFacturacion}% del requerido`}
+            accent="gray"
+          />
+          <KpiCard
+            label="Teórico a facturar"
+            value={fmtHoras(resultadoMostrado.totalTeoricoFacturable)}
+            sublabel="min(Hs netas, Tope)"
+            accent="emerald"
+          />
+          <KpiCard
+            label="Recorte total"
+            value={fmtHoras(
+              resultadoMostrado.resultados.reduce((a, r) => a + r.recorte, 0)
+            )}
+            sublabel="Exceso sobre tope — no factura"
+            accent="rose"
+          />
+        </div>
+
+        {/* Gráfico de barras */}
+        <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">
+                  Cumplimiento por servicio
+                </h3>
+                <p className="text-[11px] text-gray-400">
+                  Comparativo mensual contra objetivo operativo
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-[11px] font-semibold text-gray-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Objetivo 103%
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-slate-300" />
+                Base 100%
+              </span>
+            </div>
+          </div>
+          <div className="px-4 py-4">
+            <CumplimientoBarChart resultados={resultadoMostrado.resultados} />
+          </div>
+        </div>
+
+        {/* Tabla */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            Detalle por servicio
+          </h3>
+          <ResumenTable
+            resultados={resultadoMostrado.resultados}
+            francoMap={new Map()}
+          />
+        </div>
+
+        {alertas.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Alertas</h3>
+            <AlertsPanel alertas={alertas} />
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}

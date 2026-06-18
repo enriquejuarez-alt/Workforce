@@ -2,6 +2,8 @@ import { SERVICIOS, normalizar } from "./services";
 import type { ServiceDefinition, FrancoConfig } from "./services";
 import { SERVICIOS_PPAY } from "./servicesPpay";
 import { SERVICIOS_SMB } from "./servicesSmb";
+import { SERVICIOS_ONB } from "./servicesOnb";
+import { SERVICIOS_MIGRACION } from "./servicesMigracion";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 
@@ -16,6 +18,8 @@ export function getServiciosActivos(): ServiceDefinition[] {
   const { selectedServicioKey } = useFrancoConfig.getState();
   if (selectedServicioKey === "-1") return SERVICIOS_PPAY;
   if (selectedServicioKey === "-2") return SERVICIOS_SMB;
+  if (selectedServicioKey === "-3") return SERVICIOS_ONB;
+  if (selectedServicioKey === "-4") return SERVICIOS_MIGRACION;
 
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;

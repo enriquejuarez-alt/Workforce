@@ -50,8 +50,12 @@ function detectarSecciones(raw: unknown[][]): Seccion[] {
   return secciones;
 }
 
+function esSeccionGeneralPpay(nombre: string): boolean {
+  const norm = normalizar(nombre);
+  return norm === "pay general" || norm === "pay digital" || norm === "personal pay";
+}
+
 export function parseCPPpay(buffer: ArrayBuffer): ParseCPPpayResult {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wb = XLSX.read(buffer, { type: "array", cellDates: false }) as any;
   const errores: string[] = [];
   const matrices = new Map<ServicioKey, MatrizServicio>();
@@ -61,7 +65,6 @@ export function parseCPPpay(buffer: ArrayBuffer): ParseCPPpayResult {
   }
 
   const ws = wb.Sheets[HOJA_KON];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
 
   if (raw.length < 4) {
@@ -101,37 +104,29 @@ export function parseCPPpay(buffer: ArrayBuffer): ParseCPPpayResult {
 
   const franjas = generarFranjas();
   const secciones = detectarSecciones(raw);
+  const servicioPpay = SERVICIOS_PPAY[0];
+  const matrizAgrupada: number[][] = Array.from({ length: 48 }, () =>
+    Array(dias.length).fill(0)
+  );
+  let seccionesConHoras = 0;
 
   for (const seccion of secciones) {
-    const servicioDef = SERVICIOS_PPAY.find((s) => {
-      const hojas = Array.isArray(s.hojaCP) ? s.hojaCP : [s.hojaCP];
-      return hojas.some(
-        (h) => normalizar(h) === normalizar(seccion.nombre)
-      );
-    });
-
-    if (!servicioDef) continue;
+    if (!esSeccionGeneralPpay(seccion.nombre)) continue;
     if (seccion.totalHoras === 0) continue;
+    seccionesConHoras += 1;
 
-    const matriz: number[][] = [];
-    const totalDiario: number[] = Array(dias.length).fill(0);
-
-    for (let fila = seccion.filaInicio; fila < seccion.filaInicio + 48; fila++) {
+    for (let offset = 0; offset < 48; offset++) {
+      const fila = seccion.filaInicio + offset;
       if (fila >= raw.length) break;
-      const filaValores: number[] = columnasValidas.map((col) =>
-        safeNum(raw[fila]?.[col])
-      );
-      matriz.push(filaValores);
-    }
-
-    const filaResumen = seccion.filaInicio + 48;
-    if (filaResumen < raw.length) {
       for (let i = 0; i < columnasValidas.length; i++) {
-        totalDiario[i] = safeNum(raw[filaResumen]?.[columnasValidas[i]]);
+        matrizAgrupada[offset][i] += safeNum(raw[fila]?.[columnasValidas[i]]);
       }
     }
+  }
 
-    const sample = matriz
+  if (seccionesConHoras > 0 && servicioPpay) {
+    const totalDiario: number[] = Array(dias.length).fill(0);
+    const sample = matrizAgrupada
       .flat()
       .filter((v) => v > 0)
       .slice(0, 20);
@@ -140,20 +135,26 @@ export function parseCPPpay(buffer: ArrayBuffer): ParseCPPpayResult {
     const tieneDecimales = sample.some((v) => Math.abs(v - Math.round(v)) > 0.01);
     const formato: "hc" | "hs" = !tieneDecimales && promedio > 1 ? "hc" : "hs";
 
-    const hcMatrix = matriz.map((fila) =>
+    const hcMatrix = matrizAgrupada.map((fila) =>
       fila.map((v) => (formato === "hs" ? v / 0.5 : v))
     );
+
+    for (let dia = 0; dia < dias.length; dia++) {
+      for (const fila of hcMatrix) {
+        totalDiario[dia] += fila[dia] * 0.5;
+      }
+    }
 
     const totalMes =
       formato === "hc"
         ? hcMatrix.reduce((sum, fila) => sum + fila.reduce((s, v) => s + v * 0.5, 0), 0)
         : totalDiario.reduce((a, b) => a + b, 0);
 
-    matrices.set(servicioDef.key, {
-      servicio: servicioDef.key,
-      franjas: franjas.slice(0, matriz.length),
+    matrices.set(servicioPpay.key, {
+      servicio: servicioPpay.key,
+      franjas: franjas.slice(0, matrizAgrupada.length),
       dias,
-      matriz,
+      matriz: matrizAgrupada,
       hcMatrix,
       totalDiario,
       totalMes,
@@ -175,7 +176,6 @@ export function validarHojasCPPpay(sheetNames: string[]): string[] {
 }
 
 export function getSheetNamesPpay(buffer: ArrayBuffer): string[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wb = XLSX.read(buffer, { type: "array" }) as any;
   return wb.SheetNames as string[];
 }

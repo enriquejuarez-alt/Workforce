@@ -4,6 +4,7 @@ import { SERVICIOS_PPAY } from "./servicesPpay";
 import { SERVICIOS_SMB } from "./servicesSmb";
 import { SERVICIOS_ONB } from "./servicesOnb";
 import { SERVICIOS_MIGRACION } from "./servicesMigracion";
+import { SERVICIOS_RETENCION } from "./servicesRetencion";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 
@@ -20,9 +21,18 @@ export function getServiciosActivos(): ServiceDefinition[] {
   if (selectedServicioKey === "-2") return SERVICIOS_SMB;
   if (selectedServicioKey === "-3") return SERVICIOS_ONB;
   if (selectedServicioKey === "-4") return SERVICIOS_MIGRACION;
+  if (selectedServicioKey === "-5") return [SERVICIOS_RETENCION[0]];
+  if (selectedServicioKey === "-6") return [SERVICIOS_RETENCION[1]];
 
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;
+
+  const selected = serviciosNomina.find((s) => String(s.id) === selectedServicioKey);
+  if (selected) {
+    const nombre = normalizar(selected.nombre);
+    if (nombre.includes("retencion") && nombre.includes("convergente")) return [SERVICIOS_RETENCION[1]];
+    if (nombre === "retencion" || nombre.includes("retencion")) return [SERVICIOS_RETENCION[0]];
+  }
 
   const result: ServiceDefinition[] = [];
 
@@ -37,8 +47,10 @@ export function getServiciosActivos(): ServiceDefinition[] {
       });
     } else {
       // No explicit config — match by nombre against the static list
-      const staticDef = SERVICIOS.find(
-        (def) => normalizar(def.key) === normalizar(s.nombre)
+      const staticDef = [...SERVICIOS, ...SERVICIOS_RETENCION].find(
+        (def) =>
+          normalizar(def.key) === normalizar(s.nombre) ||
+          normalizar(def.label) === normalizar(s.nombre)
       );
       if (staticDef) result.push(staticDef);
     }
@@ -75,7 +87,9 @@ export function resolverHojaCPRuntime(servicioKey: string, hojasPresentes: strin
   const def = getServiciosActivos().find((s) => s.key === servicioKey);
   if (!def) return null;
   const aliases = Array.isArray(def.hojaCP) ? def.hojaCP : [def.hojaCP];
-  return aliases.find((h) => hojasPresentes.includes(h)) ?? null;
+  return hojasPresentes.find((hoja) =>
+    aliases.some((h) => normalizar(hoja) === normalizar(h))
+  ) ?? null;
 }
 
 export function getHojasCPRuntime(servicioKey: string): string[] {

@@ -126,7 +126,12 @@ export type ServicioKey = string;
 export const SERVICIOS_KEYS: ServicioKey[] = SERVICIOS.map((s) => s.key);
 
 export function normalizar(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 /**

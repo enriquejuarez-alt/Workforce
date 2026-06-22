@@ -72,6 +72,8 @@ interface SimuladorState {
   saveEscenario: (nombre: string) => void;
   loadEscenario: (id: string) => void;
   deleteEscenario: (id: string) => void;
+  exportEscenario: (id: string) => string;
+  importEscenario: (json: string) => boolean;
 }
 
 export const useSimulador = create<SimuladorState>()(
@@ -138,6 +140,33 @@ export const useSimulador = create<SimuladorState>()(
 
   deleteEscenario: (id) =>
     set((state) => ({ escenarios: state.escenarios.filter((e) => e.id !== id) })),
+
+  exportEscenario: (id) => {
+    const esc = get().escenarios.find((e) => e.id === id);
+    if (!esc) return "";
+    return JSON.stringify({ _type: "plani-escenario", version: 1, ...esc }, null, 2);
+  },
+
+  importEscenario: (json) => {
+    try {
+      const data = JSON.parse(json);
+      if (data._type !== "plani-escenario" || !Array.isArray(data.modificaciones)) return false;
+      set((state) => ({
+        escenarios: [
+          ...state.escenarios,
+          {
+            id: nextId("esc"),
+            nombre: `${data.nombre} (importado)`,
+            modificaciones: data.modificaciones,
+            timestamp: Date.now(),
+          },
+        ],
+      }));
+      return true;
+    } catch {
+      return false;
+    }
+  },
   }),
   {
     name: "plani-simulador",

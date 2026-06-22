@@ -17,10 +17,11 @@ import { calcularResultados } from "@/lib/domain/calculos";
 import { calcularFrancoPorServicio } from "@/lib/domain/francoEngine";
 import { getServiciosKeys } from "@/lib/config/servicesRuntime";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
-import { Activity, Download } from "lucide-react";
+import { Activity, Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
 import type { MatrizServicio, ServicioKey } from "@/lib/domain/types";
+import type { HistorialSnapshot } from "@/store/useResultados";
 
 function filtrarMatricesPorIsla(
   matrices: Map<ServicioKey, MatrizServicio>,
@@ -40,6 +41,8 @@ export default function DashboardPage() {
     diasDelMes,
     alertas,
     activeFilters,
+    historial,
+    setFilter,
   } = useResultados();
   const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
   const { reglas } = useFrancoConfig();
@@ -154,7 +157,10 @@ export default function DashboardPage() {
         {/* Alertas críticas destacadas */}
         {criticas.length > 0 && (
           <div className="mb-6">
-            <AlertsPanel alertas={criticas} />
+            <AlertsPanel
+              alertas={criticas}
+              onServiceClick={(servicio) => setFilter("isla", servicio)}
+            />
           </div>
         )}
 
@@ -187,10 +193,43 @@ export default function DashboardPage() {
           <KpiCard
             label="Cumplimiento Total"
             value={fmtPct(resultadoMostrado.cumplimientoTotal)}
-            sublabel="Hs netas / Hs requeridas"
+            sublabel="Objetivo 103% · Hs netas / Hs requeridas"
             accent={accentMap[nivel]}
           />
         </div>
+
+        {/* Historial de meses */}
+        {historial.length > 1 && (
+          <div className="mb-2 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+            <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Historial reciente</p>
+            <div className="flex flex-wrap gap-3">
+              {[...historial].sort((a, b) => a.timestamp - b.timestamp).map((h, i, arr) => {
+                const prev = arr[i - 1];
+                const delta = prev ? h.cumplimientoTotal - prev.cumplimientoTotal : null;
+                const isActual = h.mesNum === resultado!.mesNum && h.anioNum === resultado!.anioNum;
+                return (
+                  <div
+                    key={`${h.mesNum}-${h.anioNum}`}
+                    className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 ${isActual ? "border-[#0054A6]/30 bg-white shadow-sm" : "border-slate-200 bg-white/60"}`}
+                  >
+                    <div>
+                      <p className={`text-[11px] font-semibold capitalize ${isActual ? "text-[#0054A6]" : "text-slate-500"}`}>
+                        {h.mes}{isActual && " ·actual"}
+                      </p>
+                      <p className="text-base font-bold tabular-nums text-slate-800">{h.cumplimientoTotal.toFixed(1)}%</p>
+                    </div>
+                    {delta !== null && (
+                      <div className={`flex items-center gap-0.5 text-[11px] font-semibold ${delta > 0.5 ? "text-emerald-600" : delta < -0.5 ? "text-rose-600" : "text-slate-400"}`}>
+                        {delta > 0.5 ? <TrendingUp className="h-3 w-3" /> : delta < -0.5 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                        {delta > 0 ? "+" : ""}{delta.toFixed(1)}pp
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* KPIs facturables */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -260,7 +299,10 @@ export default function DashboardPage() {
         {alertas.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Alertas</h3>
-            <AlertsPanel alertas={alertas} />
+            <AlertsPanel
+              alertas={alertas}
+              onServiceClick={(servicio) => setFilter("isla", servicio)}
+            />
           </div>
         )}
       </motion.div>

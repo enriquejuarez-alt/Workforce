@@ -8,6 +8,7 @@ import type { Alerta, AlertSeveridad } from "@/lib/domain/types";
 interface Props {
   alertas: Alerta[];
   compact?: boolean;
+  onServiceClick?: (servicio: string) => void;
 }
 
 const CONFIG: Record<AlertSeveridad, { icon: typeof AlertTriangle; color: string; bg: string; border: string; label: string }> = {
@@ -34,7 +35,7 @@ const CONFIG: Record<AlertSeveridad, { icon: typeof AlertTriangle; color: string
   },
 };
 
-function AlertaItem({ alerta }: { alerta: Alerta }) {
+function AlertaItem({ alerta, onServiceClick }: { alerta: Alerta; onServiceClick?: (s: string) => void }) {
   const [expandido, setExpandido] = useState(false);
   const cfg = CONFIG[alerta.severidad];
   const Icon = cfg.icon;
@@ -51,9 +52,18 @@ function AlertaItem({ alerta }: { alerta: Alerta }) {
             <p className="text-sm font-medium text-gray-800">{alerta.mensaje}</p>
             <div className="flex items-center gap-2 shrink-0">
               {alerta.servicio !== "global" && (
-                <span className="text-xs text-gray-500 border border-gray-200 bg-white rounded px-1.5 py-0.5">
-                  {alerta.servicio}
-                </span>
+                onServiceClick ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onServiceClick(alerta.servicio); }}
+                    className="text-xs text-[#0054A6] border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded px-1.5 py-0.5 transition-colors"
+                  >
+                    {alerta.servicio} →
+                  </button>
+                ) : (
+                  <span className="text-xs text-gray-500 border border-gray-200 bg-white rounded px-1.5 py-0.5">
+                    {alerta.servicio}
+                  </span>
+                )
               )}
               {alerta.metrica !== undefined && (
                 <span className={cn("text-xs font-semibold tabular-nums", cfg.color)}>
@@ -77,7 +87,7 @@ function AlertaItem({ alerta }: { alerta: Alerta }) {
   );
 }
 
-export function AlertsPanel({ alertas, compact = false }: Props) {
+export function AlertsPanel({ alertas, compact = false, onServiceClick }: Props) {
   const criticas = alertas.filter((a) => a.severidad === "critical");
   const warnings = alertas.filter((a) => a.severidad === "warning");
   const infos = alertas.filter((a) => a.severidad === "info");
@@ -118,7 +128,7 @@ export function AlertsPanel({ alertas, compact = false }: Props) {
   return (
     <div className="space-y-2">
       {[...criticas, ...warnings, ...infos].map((a) => (
-        <AlertaItem key={a.id} alerta={a} />
+        <AlertaItem key={a.id} alerta={a} onServiceClick={onServiceClick} />
       ))}
     </div>
   );

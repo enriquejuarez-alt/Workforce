@@ -15,7 +15,11 @@ import { useUploads } from "@/store/useUploads";
 import { useResultados } from "@/store/useResultados";
 import { usePlaniConfig, type ServicioNominaRef } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
-import { getSheetNames, parseCP, validarHojasCP } from "@/lib/parsers/parseCP";
+import {
+  getSheetNames,
+  parseCP,
+  validarHojasCP,
+} from "@/lib/parsers/parseCP";
 import {
   getSheetNamesPpay,
   parseCPPpay,
@@ -45,6 +49,8 @@ import {
   getServiciosActivos,
   resolverServicioPorReductorRuntime,
 } from "@/lib/config/servicesRuntime";
+import { normalizar } from "@/lib/config/services";
+import { SERVICIOS_RETENCION } from "@/lib/config/servicesRetencion";
 import {
   Select,
   SelectContent,
@@ -61,10 +67,10 @@ const MESES = [
   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
 ];
 
-// Sub-servicios que no deben aparecer como opción de primer nivel
-// (son islas dentro de Soporte Técnico)
+// Sub-servicios que no deben aparecer como opcion de primer nivel
+// (son islas dentro de Soporte Tecnico)
 const SERVICIOS_OCULTOS = [
-  "atención al cliente",
+  "atencion al cliente",
   "atencion al cliente",
   "backoffice",
   "cobranzas",
@@ -77,6 +83,8 @@ const SERVICIOS_DEMO: ServicioNominaRef[] = [
   { id: -2, nombre: "SMB", planiConfig: null },
   { id: -3, nombre: "Onboarding", planiConfig: null },
   { id: -4, nombre: "Migracion", planiConfig: null },
+  { id: -5, nombre: "Retencion", planiConfig: null },
+  { id: -6, nombre: "Retencion Convergente", planiConfig: null },
 ];
 
 const fade = {
@@ -132,14 +140,14 @@ export default function UploadPage() {
   // Derive numeric service ID from the shared selectedServicioKey
   const reqServicioId = selectedServicioKey ? parseInt(selectedServicioKey) : null;
 
-  // Filtered service list — hide sub-services that belong to Soporte Técnico
+  // Filtered service list - hide sub-services that belong to Soporte Tecnico
   const serviciosFiltrados = useMemo(() => {
     if (!serviciosNomina) return [];
     const visibles = serviciosNomina.filter(
       (s) => !SERVICIOS_OCULTOS.includes(s.nombre.toLowerCase())
     );
-    const nombresVisibles = new Set(visibles.map((s) => s.nombre.toLowerCase()));
-    const demosFaltantes = SERVICIOS_DEMO.filter((s) => !nombresVisibles.has(s.nombre.toLowerCase()));
+    const nombresVisibles = new Set(visibles.map((s) => normalizar(s.nombre)));
+    const demosFaltantes = SERVICIOS_DEMO.filter((s) => !nombresVisibles.has(normalizar(s.nombre)));
     return [...visibles, ...demosFaltantes].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [serviciosNomina]);
 
@@ -155,17 +163,24 @@ export default function UploadPage() {
   const esMigracion = reqServicioId === -4 ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("migracion") ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("cobre");
+  const esRetencion = reqServicioId === -5 || reqServicioId === -6 ||
+    normalizar(servicioActivo?.nombre ?? "").includes("retencion");
+  const esRetencionConvergente = reqServicioId === -6 ||
+    normalizar(servicioActivo?.nombre ?? "").includes("retencion convergente");
 
   const reductoresUtilizados = useMemo(() => {
     if (reductoresPreview.length === 0) return [];
 
     const serviciosActivos = getServiciosActivos();
-    const label = (servicioActivo?.planiConfig?.label ?? servicioActivo?.nombre ?? "").toLowerCase();
+    const serviciosParaResolver = [...serviciosActivos, ...SERVICIOS_RETENCION];
+    const label = normalizar(servicioActivo?.planiConfig?.label ?? servicioActivo?.nombre ?? "");
     const selectedKey = servicioActivo?.planiConfig?.key ?? null;
-    const filtroEstricto = esPersonalPay || esSmb || esOnboarding || esMigracion || Boolean(selectedKey);
+    const filtroEstricto = esPersonalPay || esSmb || esOnboarding || esMigracion || esRetencion || Boolean(selectedKey);
 
     const keysSeleccionadas = new Set<string>();
-    if (selectedKey) {
+    if (label.includes("retencion")) {
+      keysSeleccionadas.add(label.includes("convergente") ? "RETENCION-CONVERGENTE" : "RETENCION-MOVIL");
+    } else if (selectedKey) {
       keysSeleccionadas.add(selectedKey);
     } else if (label.includes("personal pay") || label.includes("ppay")) {
       keysSeleccionadas.add("PPAY");
@@ -181,7 +196,7 @@ export default function UploadPage() {
       serviciosActivos
         .filter((s) => s.key.toLowerCase().startsWith("migracion"))
         .forEach((s) => keysSeleccionadas.add(s.key));
-    } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("técnico")) {
+    } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("tecnico")) {
       serviciosActivos
         .filter((s) => {
           const key = s.key.toLowerCase();
@@ -190,15 +205,22 @@ export default function UploadPage() {
         .forEach((s) => keysSeleccionadas.add(s.key));
     }
 
-    const reconocidos = reductoresPreview.map((r) => ({
-      ...r,
-      servicioKey: resolverServicioPorReductorRuntime(r.servicioNorm) ?? r.servicioNorm,
-    }));
+    const reconocidos = reductoresPreview.map((r) => {
+      const servicioKey =
+        serviciosParaResolver.find((def) =>
+          def.reductorNombres.some((alias) => normalizar(alias) === normalizar(r.servicioNorm))
+        )?.key ??
+        resolverServicioPorReductorRuntime(r.servicioNorm) ??
+        r.servicioNorm;
+
+      return { ...r, servicioKey };
+    });
 
     if (keysSeleccionadas.size === 0) return reconocidos;
     const filtrados = reconocidos.filter((r) => keysSeleccionadas.has(r.servicioKey));
-    return filtroEstricto ? filtrados : (filtrados.length > 0 ? filtrados : reconocidos);
-  }, [reductoresPreview, servicioActivo, esPersonalPay, esSmb, esOnboarding, esMigracion]);
+    const visibles = filtroEstricto ? filtrados : (filtrados.length > 0 ? filtrados : reconocidos);
+    return Array.from(new Map(visibles.map((r) => [r.servicioKey, r])).values());
+  }, [reductoresPreview, servicioActivo, esPersonalPay, esSmb, esOnboarding, esMigracion, esRetencion]);
 
   const cpDropzoneLabel = esPersonalPay
     ? "CP_Personal_Pay_MM-AAAA.xlsx"
@@ -208,7 +230,11 @@ export default function UploadPage() {
         ? "CP_Onboarding_MM-AAAA.xlsx"
         : esMigracion
           ? "CP_Migracion_Cobre_MM-AAAA.xlsx"
-          : "CP_Soporte_MM-AAAA.xlsx";
+          : esRetencionConvergente
+            ? "CP Retencion Convergente 07-2026.xlsx"
+            : esRetencion
+              ? "CP Retencion 07-2026.xlsx"
+            : "CP_Soporte_MM-AAAA.xlsx";
 
   useEffect(() => {
     if (agentesDesdeApi) setCargandoNomina(false);
@@ -239,10 +265,14 @@ export default function UploadPage() {
     (id: number) => {
       const key = String(id);
       setSelectedServicioKey(selectedServicioKey === key ? null : key);
-      // Reset nómina from API when service changes
+      setArchivoCP(null);
+      setHojasCP([]);
+      setErrCP("");
+      setReductoresPreview([]);
+      // Reset nomina from API when service changes
       clearAgentesDesdeApi();
     },
-    [selectedServicioKey, setSelectedServicioKey, clearAgentesDesdeApi]
+    [selectedServicioKey, setSelectedServicioKey, setArchivoCP, clearAgentesDesdeApi]
   );
 
   const handleCP = useCallback(async (file: File, buffer: ArrayBuffer) => {
@@ -263,7 +293,7 @@ export default function UploadPage() {
           : esOnboarding
             ? validarHojasCPOnb(hojas)
           : validarHojasCP(hojas);
-      if (errValidacion.length > 0) { setErrCP(errValidacion.join(" · ")); return; }
+      if (errValidacion.length > 0) { setErrCP(errValidacion.join(" - ")); return; }
       setHojasCP(hojas);
       setArchivoCP(file);
     } catch (e) {
@@ -280,7 +310,7 @@ export default function UploadPage() {
     setReductoresPreview([]);
     try {
       const { reductores, errores: err } = parseReductores(buffer);
-      if (err.length > 0) { setErrRed(err.join(" · ")); return; }
+      if (err.length > 0) { setErrRed(err.join(" - ")); return; }
       setReductoresPreview(reductores);
       setArchivoReductores(file);
     } catch (e) {
@@ -305,7 +335,7 @@ export default function UploadPage() {
     const ausentismo = fuentesReductores.ausentismo?.buffer;
     const rotacion = fuentesReductores.rotacion?.buffer;
     if (!deslogueo || !ausentismo || !rotacion) {
-      setErrRed("Subí los archivos de deslogueo, ausentismo y rotación.");
+      setErrRed("Subi los archivos de deslogueo, ausentismo y rotacion.");
       return;
     }
     setCalculandoReductores(true);
@@ -313,7 +343,7 @@ export default function UploadPage() {
     setReductoresPreview([]);
     try {
       const result = await calcularReductoresDesdeArchivos({ deslogueo, ausentismo, rotacion });
-      if (result.errores.length > 0) { setErrRed(result.errores.join(" · ")); return; }
+      if (result.errores.length > 0) { setErrRed(result.errores.join(" - ")); return; }
       setArchivoReductores(result.file);
       setReductoresPreview(result.reductores);
       setReductoresCalculados(result.reductores.length);
@@ -329,7 +359,7 @@ export default function UploadPage() {
     setErrNom("");
     try {
       const hojas = getNominasSheetNames(buffer);
-      if (hojas.length === 0) { setErrNom("El archivo de nómina no tiene hojas"); return; }
+      if (hojas.length === 0) { setErrNom("El archivo de nomina no tiene hojas"); return; }
       setArchivoNomina(file, hojas);
       clearAgentesDesdeApi();
     } catch (e) {
@@ -351,7 +381,7 @@ export default function UploadPage() {
 
   const handleProcesar = useCallback(async () => {
     if (!servicioActivo) {
-      toast.error("Seleccioná un servicio antes de procesar.", { duration: 3500 });
+      toast.error("Selecciona un servicio antes de procesar.", { duration: 3500 });
       return;
     }
     const nominaDesdeApi = !!agentesDesdeApi;
@@ -361,16 +391,16 @@ export default function UploadPage() {
     setProcesandoLocal(true);
     setProcesando(true);
     setErrores([]);
-    setPasoActual("Leyendo archivos…");
+    setPasoActual("Leyendo archivos...");
 
     try {
       const buffers = nominaDesdeApi
         ? await Promise.all([archivoCP.arrayBuffer(), archivoReductores.arrayBuffer()])
         : await Promise.all([archivoCP.arrayBuffer(), archivoReductores.arrayBuffer(), archivoNomina!.arrayBuffer()]);
 
-      const [bufCP, bufRed] = buffers;
+      const [bufCP, bufRed, bufNomina] = buffers;
 
-      setPasoActual("Procesando requerido del cliente…");
+      setPasoActual("Procesando requerido del cliente...");
       const { matrices, diasDelMes, errores: errCP2 } = esPersonalPay
         ? parseCPPpay(bufCP)
         : esSmb
@@ -379,7 +409,7 @@ export default function UploadPage() {
             ? parseCPOnb(bufCP)
           : parseCP(bufCP);
 
-      setPasoActual("Procesando reductores y nómina…");
+      setPasoActual("Procesando reductores y nomina...");
       const { reductores, errores: errRed2 } = parseReductores(bufRed);
 
       let agentesRaw = agentesDesdeApi ?? [];
@@ -388,7 +418,7 @@ export default function UploadPage() {
       const errNom2: string[] = [];
 
       if (!nominaDesdeApi) {
-        const result = parseNomina(buffers[2]!, hojaNomina!, mappingOverrides);
+        const result = parseNomina(bufNomina!, hojaNomina!, mappingOverrides);
         agentesRaw = result.agentes;
         excl = result.agentesExcluidos;
         segs = result.segmentosNoReconocidos;
@@ -398,7 +428,7 @@ export default function UploadPage() {
       const todosErrores = [...errCP2, ...errRed2, ...errNom2];
       if (todosErrores.length > 0) { setErrores(todosErrores); return; }
 
-      setPasoActual("Calculando cumplimiento…");
+      setPasoActual("Calculando cumplimiento...");
       const paseMap = new Map(pases.map((p) => [p.dni.trim().toLowerCase(), p.servicioDestino]));
       const agentesConPases = agentesRaw.map((a) => {
         const dest = paseMap.get(a.dni.trim().toLowerCase());
@@ -407,7 +437,7 @@ export default function UploadPage() {
       const agentes = aplicarDiasAlMes(agentesConPases, diasDelMes);
       const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion);
 
-      setPasoActual("Generando alertas…");
+      setPasoActual("Generando alertas...");
       const alertas = generarAlertas(resultado);
 
       setMatrices(matrices);
@@ -418,6 +448,18 @@ export default function UploadPage() {
       setAlertas(alertas);
       setAgentesExcluidos(excl, segs);
       clearFilters();
+
+      const nIslas = resultado.resultados.filter((r) => r.hcActivos > 0).length;
+      toast.success(
+        `${agentes.length} agentes - ${nIslas} isla${nIslas !== 1 ? "s" : ""} - ${resultado.cumplimientoTotal.toFixed(1)}% cumpl.`,
+        { duration: 4000 }
+      );
+      if (segs.length > 0) {
+        toast(`${segs.length} segmento${segs.length > 1 ? "s" : ""} sin mapear - revisa el mapeo`, {
+          icon: "!",
+          duration: 6000,
+        });
+      }
 
       router.push("/planificacion/resumen");
       if (window.parent !== window) {
@@ -434,18 +476,19 @@ export default function UploadPage() {
     agentesDesdeApi, archivoCP, archivoReductores, archivoNomina,
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases,
     setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
-    setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router, esPersonalPay, esSmb, esOnboarding,
+    setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
+    esPersonalPay, esSmb, esOnboarding, servicioActivo,
   ]);
-
   const currentUser = useAuthStore((s) => s.user);
   const readOnly = isReadOnly(currentUser?.rol);
 
   const nominaLista = !!agentesDesdeApi || !!(archivoNomina && hojaNomina);
-  const listo = !!(archivoCP && archivoReductores && nominaLista) && !procesandoLocal && !readOnly;
+  const cpListo = !!archivoCP;
+  const listo = !!(cpListo && archivoReductores && nominaLista) && !procesandoLocal && !readOnly;
 
   const stepDot = (done: boolean, color: string, n: number) => (
     <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ring-4 ring-white transition-colors ${done ? `${color} text-white shadow-sm` : "bg-slate-100 text-slate-400"}`}>
-      {done ? "✓" : n}
+      {done ? "OK" : n}
     </div>
   );
 
@@ -459,7 +502,7 @@ export default function UploadPage() {
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-950 leading-tight">Carga de archivos</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Procesamiento local · los datos no salen del navegador</p>
+            <p className="text-xs text-gray-400 mt-0.5">Procesamiento local - los datos no salen del navegador</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link
@@ -477,7 +520,7 @@ export default function UploadPage() {
           </div>
           {/* Mini stepper */}
           <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:flex">
-            {stepDot(!!archivoCP, "bg-blue-500", 1)}
+            {stepDot(cpListo, "bg-blue-500", 1)}
             <div className="h-px w-6 bg-slate-200" />
             {stepDot(!!archivoReductores, "bg-purple-500", 2)}
             <div className="h-px w-6 bg-slate-200" />
@@ -489,7 +532,7 @@ export default function UploadPage() {
           </div>
         </div>
 
-        {/* ── Selector de servicio ── */}
+        {/* Selector de servicio */}
         {serviciosNomina && (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
@@ -498,7 +541,7 @@ export default function UploadPage() {
                 <p className="text-[11px] text-gray-400 mt-0.5">
                   {servicioActivo
                     ? `Editando: ${servicioActivo.nombre}`
-                    : "Seleccioná el servicio antes de cargar los archivos"}
+                    : "Selecciona el servicio antes de cargar los archivos"}
                 </p>
               </div>
               {servicioActivo && (
@@ -537,8 +580,8 @@ export default function UploadPage() {
           <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
             <p className="text-xs font-medium text-amber-700">
-              Tu perfil es <strong>Visualizador</strong> — podés ver los resultados de la planificación
-              pero no cargar archivos ni ejecutar cálculos.
+              Tu perfil es <strong>Visualizador</strong> - podes ver los resultados de la planificacion
+              pero no cargar archivos ni ejecutar calculos.
             </p>
           </div>
         )}
@@ -546,12 +589,12 @@ export default function UploadPage() {
         {/* Step cards */}
         <div className={`grid grid-cols-1 gap-4 md:grid-cols-3 ${readOnly ? "pointer-events-none opacity-50 select-none" : ""}`}>
 
-          {/* Card 1 — CP */}
+          {/* Card 1 - CP */}
           <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
             <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
             <div className="flex min-h-[300px] flex-col gap-3 p-4">
               <div className="flex items-center gap-2.5 pt-1">
-                {stepDot(!!archivoCP, "bg-blue-500", 1)}
+                {stepDot(cpListo, "bg-blue-500", 1)}
                 <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Requerido del cliente</p>
               </div>
               <DropZone
@@ -567,8 +610,7 @@ export default function UploadPage() {
               )}
             </div>
           </div>
-
-          {/* Card 2 — Reductores */}
+          {/* Card 2 - Reductores */}
           <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
             <div className="absolute top-0 left-0 right-0 h-1 bg-purple-500" />
             <div className="flex min-h-[300px] flex-col gap-3 p-4">
@@ -609,9 +651,9 @@ export default function UploadPage() {
               ) : (
                 <div className="space-y-2">
                   <div className="grid grid-cols-1 gap-2">
-                    <DropZone label="Deslogueo operativo" sublabel="últimos 3 meses" onFile={handleFuenteReductor("deslogueo")} hasFile={!!fuentesReductores.deslogueo} fileName={fuentesReductores.deslogueo?.file.name} />
-                    <DropZone label="Ausentismo sin LP" sublabel="últimos 3 meses" onFile={handleFuenteReductor("ausentismo")} hasFile={!!fuentesReductores.ausentismo} fileName={fuentesReductores.ausentismo?.file.name} />
-                    <DropZone label="Rotación" sublabel="últimos 3 meses" onFile={handleFuenteReductor("rotacion")} hasFile={!!fuentesReductores.rotacion} fileName={fuentesReductores.rotacion?.file.name} />
+                    <DropZone label="Deslogueo operativo" sublabel="ultimos 3 meses" onFile={handleFuenteReductor("deslogueo")} hasFile={!!fuentesReductores.deslogueo} fileName={fuentesReductores.deslogueo?.file.name} />
+                    <DropZone label="Ausentismo sin LP" sublabel="ultimos 3 meses" onFile={handleFuenteReductor("ausentismo")} hasFile={!!fuentesReductores.ausentismo} fileName={fuentesReductores.ausentismo?.file.name} />
+                    <DropZone label="Rotacion" sublabel="ultimos 3 meses" onFile={handleFuenteReductor("rotacion")} hasFile={!!fuentesReductores.rotacion} fileName={fuentesReductores.rotacion?.file.name} />
                   </div>
                   {errRed && <p className="text-xs text-red-500 leading-relaxed">{errRed}</p>}
                   <button
@@ -640,7 +682,10 @@ export default function UploadPage() {
                 <FilePreview nombre={archivoReductores.name} tamanio={archivoReductores.size} />
               )}
               {archivoReductores && reductoresUtilizados.length > 0 && (
-                <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-3">
+                <div
+                  key={`reductores-${selectedServicioKey ?? "none"}-${reductoresUtilizados.map((r) => r.servicioKey).join("-")}`}
+                  className="rounded-xl border border-purple-100 bg-purple-50/60 p-3"
+                >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-purple-700">
                       Reductores a usar
@@ -654,7 +699,7 @@ export default function UploadPage() {
                       const total = r.deslogueo + r.ausentismo + r.rotacion;
                       return (
                         <div
-                          key={`${r.servicioKey}-${r.servicio}`}
+                          key={`reductor-${selectedServicioKey ?? "none"}-${r.servicioKey}`}
                           className="rounded-lg border border-purple-100 bg-white px-2.5 py-2"
                         >
                           <div className="mb-1 flex items-center justify-between gap-2">
@@ -677,14 +722,14 @@ export default function UploadPage() {
             </div>
           </div>
 
-          {/* Card 3 — Nómina */}
+          {/* Card 3 - Nomina */}
           <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
             <div className={`absolute top-0 left-0 right-0 h-1 ${nominaLista ? "bg-green-500" : "bg-orange-400"}`} />
             <div className="flex min-h-[300px] flex-col gap-3 p-4">
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-2.5">
                   {stepDot(nominaLista, "bg-green-500", 3)}
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nómina activa</p>
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nomina activa</p>
                 </div>
                 {agentesDesdeApi && (
                   <button onClick={clearAgentesDesdeApi} className="text-gray-300 hover:text-gray-500 transition-colors" title="Quitar y cargar otra">
@@ -700,13 +745,13 @@ export default function UploadPage() {
                     <p className="text-xs font-semibold text-green-800">Cargada desde el sistema</p>
                     <p className="text-[11px] text-green-600 mt-0.5">
                       {agentesDesdeApi.length} agentes
-                      {mesDesdeApi && anioDesdeApi ? ` · ${MESES[mesDesdeApi - 1]} ${anioDesdeApi}` : ""}
+                      {mesDesdeApi && anioDesdeApi ? ` - ${MESES[mesDesdeApi - 1]} ${anioDesdeApi}` : ""}
                     </p>
                   </div>
                 </div>
               ) : serviciosNomina && !useArchivoNomina ? (
                 <div className="space-y-2.5">
-                  {/* Mes / Año */}
+                  {/* Mes / Anio */}
                   <div className="flex gap-2">
                     <select
                       className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm outline-none transition-colors focus:border-[#0054A6]"
@@ -733,12 +778,12 @@ export default function UploadPage() {
                       <div className="w-1.5 h-1.5 rounded-full bg-[#0054A6] shrink-0" />
                     <p className="text-[11px] font-semibold text-[#0054A6]">
                       {servicioActivo.nombre}
-                      {servicioDemoActivo ? " · demo" : ""}
+                      {servicioDemoActivo ? " - demo" : ""}
                     </p>
                     </div>
                   ) : (
                     <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
-                      Seleccioná un servicio arriba primero
+                      Selecciona un servicio arriba primero
                     </p>
                   )}
 
@@ -748,7 +793,7 @@ export default function UploadPage() {
                     className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#0054A6] text-xs font-semibold text-white transition-colors hover:bg-[#00449A] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {cargandoNomina ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin" />Cargando…</>
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" />Cargando...</>
                     ) : (
                       <><Database className="h-3.5 w-3.5" />Cargar desde sistema</>
                     )}
@@ -767,7 +812,7 @@ export default function UploadPage() {
                       onClick={() => setUseArchivoNomina(false)}
                       className="flex items-center gap-1 text-[11px] font-semibold text-[#0054A6] transition-colors hover:text-[#00449A]"
                     >
-                      ← Cargar desde sistema
+                      &lt;- Cargar desde sistema
                     </button>
                   )}
                   <DropZone
@@ -788,7 +833,7 @@ export default function UploadPage() {
                           </label>
                           <Select value={hojaNomina ?? ""} onValueChange={setHojaNomina}>
                             <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Seleccioná una hoja" />
+                              <SelectValue placeholder="Selecciona una hoja" />
                             </SelectTrigger>
                             <SelectContent>
                               {hojasNomina.map((h) => (
@@ -812,10 +857,10 @@ export default function UploadPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-lg border border-red-200 bg-red-50 p-3.5">
             <div className="flex items-center gap-2 text-red-600 mb-1.5">
               <AlertCircle className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold">Errores de validación</span>
+              <span className="text-xs font-semibold">Errores de validacion</span>
             </div>
             <ul className="space-y-0.5">
-              {errores.map((e, i) => <li key={i} className="text-xs text-red-500">· {e}</li>)}
+              {errores.map((e, i) => <li key={i} className="text-xs text-red-500">- {e}</li>)}
             </ul>
           </motion.div>
         )}
@@ -832,8 +877,8 @@ export default function UploadPage() {
                 {segmentosNoReconocidos.length > 0 && (
                   <p className="text-xs text-amber-600 mt-0.5">
                     Segmentos sin mapeo: {segmentosNoReconocidos.slice(0, 5).join(", ")}
-                    {segmentosNoReconocidos.length > 5 && ` y ${segmentosNoReconocidos.length - 5} más`}.
-                    Usá el mapeo de segmentos para incluirlos.
+                    {segmentosNoReconocidos.length > 5 && ` y ${segmentosNoReconocidos.length - 5} mas`}.
+                    Usa el mapeo de segmentos para incluirlos.
                   </p>
                 )}
               </div>
@@ -843,10 +888,15 @@ export default function UploadPage() {
 
         {/* Action bar */}
         <div className="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg shadow-slate-200/80 backdrop-blur">
-          <p className="hidden text-[11px] font-medium text-slate-500 sm:block">
-            {[archivoCP && "✓ CP", archivoReductores && "✓ Reductores", nominaLista && "✓ Nómina"]
-              .filter(Boolean).join("  ·  ") || "Completá los 3 pasos para continuar"}
-          </p>
+          <div className="hidden flex-col gap-0.5 sm:flex">
+            {servicioActivo && (
+              <span className="text-[11px] font-bold text-[#0054A6]">{servicioActivo.nombre}</span>
+            )}
+            <p className="text-[11px] font-medium text-slate-500">
+              {[cpListo && "OK CP", archivoReductores && "OK Reductores", nominaLista && "OK Nomina"]
+                .filter(Boolean).join("  -  ") || (servicioActivo ? "Completa los 3 pasos para continuar" : "Selecciona un servicio para empezar")}
+            </p>
+          </div>
           <div className="ml-auto flex items-center gap-3">
             {procesandoLocal && pasoActual && (
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -855,7 +905,7 @@ export default function UploadPage() {
               </div>
             )}
             <Button size="lg" onClick={handleProcesar} disabled={!listo} className="min-w-[220px] gap-2 shadow-sm">
-              {procesandoLocal ? "Procesando…" : "Procesar y ver resumen"}
+              {procesandoLocal ? "Procesando..." : "Procesar y ver resumen"}
               {procesandoLocal ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>

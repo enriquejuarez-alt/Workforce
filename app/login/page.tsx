@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 function GoogleIcon() {
   return (
@@ -15,10 +15,43 @@ function GoogleIcon() {
   )
 }
 
+const LOADING_STEPS = [
+  "Conectando con Google...",
+  "Verificando credenciales...",
+  "Preparando tu sesión...",
+]
+
 export default function LoginPage() {
   const searchParams = useSearchParams()
   const oauthError = searchParams.get('oauth_error')
   const [startingLogin, setStartingLogin] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [stepIdx, setStepIdx] = useState(0)
+
+  useEffect(() => {
+    if (!startingLogin) return
+
+    setProgress(0)
+    setStepIdx(0)
+
+    // Animate progress 0 → 85% over ~800ms, then hold
+    const ramp = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 85) { clearInterval(ramp); return 85; }
+        return p + 6;
+      });
+    }, 55);
+
+    // Cycle through step labels
+    const stepTimer = setInterval(() => {
+      setStepIdx((i) => (i + 1) % LOADING_STEPS.length)
+    }, 900);
+
+    return () => {
+      clearInterval(ramp);
+      clearInterval(stepTimer);
+    };
+  }, [startingLogin])
 
   const handleGoogleLogin = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
@@ -55,10 +88,17 @@ export default function LoginPage() {
           0%, 100% { opacity: 0.38; transform: scale(0.96); }
           50% { opacity: 0.62; transform: scale(1.04); }
         }
-        @keyframes loginPulse {
-          0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.28); }
-          70% { box-shadow: 0 0 0 18px rgba(96, 165, 250, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes progressGlow {
+          0%, 100% { box-shadow: 0 0 6px rgba(96,165,250,0.5); }
+          50% { box-shadow: 0 0 14px rgba(96,165,250,0.9), 0 0 22px rgba(129,140,248,0.4); }
+        }
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .login-grid { animation: gridDrift 22s linear infinite; }
         .login-stars {
@@ -78,10 +118,17 @@ export default function LoginPage() {
           background: linear-gradient(90deg, transparent, rgba(34,197,94,0.08), rgba(96,165,250,0.13), transparent);
         }
         .login-card-glow { animation: cardGlow 8s ease-in-out infinite; }
-        .login-pulse { animation: loginPulse 1.2s ease-out infinite; }
+        .btn-shimmer {
+          background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 40%, #dbeafe 60%, #bfdbfe 100%);
+          background-size: 200% auto;
+          animation: shimmer 1.4s linear infinite;
+          color: #1d4ed8;
+        }
+        .progress-bar { animation: progressGlow 1.2s ease-in-out infinite; }
+        .fade-slide { animation: fadeSlideUp 0.35s ease-out both; }
       `}</style>
 
-      {/* Grid pattern */}
+      {/* Backgrounds */}
       <div
         className="login-grid fixed inset-[-48px] opacity-[0.055] pointer-events-none"
         style={{
@@ -133,34 +180,53 @@ export default function LoginPage() {
             href="/api/auth/google"
             onClick={handleGoogleLogin}
             aria-disabled={startingLogin}
-            className={`w-full h-12 rounded-xl flex items-center justify-center gap-3 text-sm font-semibold transition-all active:scale-[.98] ${
-              startingLogin
-                ? 'login-pulse bg-blue-50 text-[#0054A6] cursor-wait'
-                : 'bg-white hover:bg-gray-50 text-gray-800'
+            className={`w-full h-12 rounded-xl flex items-center justify-center gap-3 text-sm font-semibold transition-all duration-300 active:scale-[.98] select-none ${
+              startingLogin ? 'btn-shimmer cursor-wait' : 'bg-white hover:bg-gray-50 text-gray-800'
             }`}
             style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.3)' }}
           >
-            {startingLogin ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
-            {startingLogin ? 'Conectando con Google...' : 'Continuar con Google'}
+            {!startingLogin && <GoogleIcon />}
+            {startingLogin ? LOADING_STEPS[stepIdx] : 'Continuar con Google'}
           </a>
 
           {startingLogin && (
-            <div className="rounded-xl border border-blue-400/20 bg-blue-400/10 px-3.5 py-3">
-              <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-2/3 rounded-full bg-blue-300 transition-all duration-700" />
+            <div key="progress" className="fade-slide rounded-xl border border-blue-400/20 bg-blue-400/[0.07] px-3.5 py-3 space-y-2">
+              {/* Progress bar */}
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+                <div
+                  className="progress-bar h-full rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${progress}%`,
+                    background: 'linear-gradient(90deg, #3b82f6, #818cf8, #60a5fa)',
+                  }}
+                />
               </div>
-              <p className="text-center text-[11px] font-medium text-blue-200/80">
-                Preparando autenticacion segura...
-              </p>
+              {/* Dots */}
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-medium text-blue-200/70">
+                  Autenticación segura via Google OAuth
+                </p>
+                <span className="flex gap-0.5">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="inline-block h-1 w-1 rounded-full bg-blue-300/60"
+                      style={{ animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
+                    />
+                  ))}
+                </span>
+              </div>
             </div>
           )}
 
-          <div className="flex items-start gap-2.5 bg-blue-500/[0.08] border border-blue-500/[0.15] rounded-xl px-3.5 py-3">
-            <span className="text-blue-400 text-sm leading-none mt-0.5 shrink-0">ℹ</span>
-            <p className="text-xs text-blue-300/80 leading-relaxed">
-              Usá tu cuenta <span className="font-bold text-blue-300">nombre.apellido@konecta.com</span>. Otros dominios no tienen acceso al sistema.
-            </p>
-          </div>
+          {!startingLogin && (
+            <div className="flex items-start gap-2.5 bg-blue-500/[0.08] border border-blue-500/[0.15] rounded-xl px-3.5 py-3">
+              <span className="text-blue-400 text-sm leading-none mt-0.5 shrink-0">ℹ</span>
+              <p className="text-xs text-blue-300/80 leading-relaxed">
+                Usá tu cuenta <span className="font-bold text-blue-300">nombre.apellido@konecta.com</span>. Otros dominios no tienen acceso al sistema.
+              </p>
+            </div>
+          )}
         </div>
 
         <p className="text-center text-white/15 text-[11px] tracking-widest uppercase font-medium mt-8">

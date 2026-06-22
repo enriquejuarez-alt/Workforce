@@ -32,6 +32,7 @@ interface ResultadosState {
   agentesDesdeApi: Agente[] | null;
   mesDesdeApi: number | null;
   anioDesdeApi: number | null;
+  historial: HistorialSnapshot[];
 
   setResultado: (r: ResultadoGeneral) => void;
   setMatrices: (m: Map<ServicioKey, MatrizServicio>) => void;
@@ -51,10 +52,23 @@ interface ResultadosState {
   removePase: (id: string) => void;
   setAgentesDesdeApi: (agentes: Agente[], mes: number, anio: number) => void;
   clearAgentesDesdeApi: () => void;
+  clearHistorial: () => void;
   reset: () => void;
 }
 
-const STORAGE_VERSION = 2;
+export interface HistorialSnapshot {
+  mes: string;
+  mesNum: number;
+  anioNum: number;
+  cumplimientoTotal: number;
+  totalHCActivos: number;
+  totalHsRequeridas: number;
+  totalTeoricoFacturable: number;
+  timestamp: number;
+  servicios: { servicio: string; cumplimiento: number; hcActivos: number }[];
+}
+
+const STORAGE_VERSION = 3;
 
 // Storage personalizado que maneja la serialización del Map y objetos Date
 const sessionStorageWithMap = {
@@ -127,8 +141,30 @@ export const useResultados = create<ResultadosState>()(
       agentesDesdeApi: null,
       mesDesdeApi: null,
       anioDesdeApi: null,
+      historial: [],
 
-      setResultado: (r) => set({ resultado: r }),
+      setResultado: (r) =>
+        set((state) => {
+          const snap: HistorialSnapshot = {
+            mes: r.mes,
+            mesNum: r.mesNum,
+            anioNum: r.anioNum,
+            cumplimientoTotal: r.cumplimientoTotal,
+            totalHCActivos: r.totalHCActivos,
+            totalHsRequeridas: r.totalHsRequeridas,
+            totalTeoricoFacturable: r.totalTeoricoFacturable,
+            timestamp: Date.now(),
+            servicios: r.resultados.map((s) => ({
+              servicio: s.servicio,
+              cumplimiento: s.cumplimiento,
+              hcActivos: s.hcActivos,
+            })),
+          };
+          const sinActual = state.historial.filter(
+            (h) => !(h.mesNum === r.mesNum && h.anioNum === r.anioNum)
+          );
+          return { resultado: r, historial: [...sinActual, snap].slice(-3) };
+        }),
       setMatrices: (m) => set({ matrices: m }),
       setAgentes: (a) => set({ agentes: a }),
       setReductores: (r) => set({ reductores: r }),
@@ -164,6 +200,7 @@ export const useResultados = create<ResultadosState>()(
         set({ agentesDesdeApi: agentes, mesDesdeApi: mes, anioDesdeApi: anio }),
       clearAgentesDesdeApi: () =>
         set({ agentesDesdeApi: null, mesDesdeApi: null, anioDesdeApi: null }),
+      clearHistorial: () => set({ historial: [] }),
       reset: () =>
         set({
           resultado: null,
@@ -182,6 +219,7 @@ export const useResultados = create<ResultadosState>()(
           agentesDesdeApi: null,
           mesDesdeApi: null,
           anioDesdeApi: null,
+          historial: [],
         }),
     }),
     {
@@ -203,6 +241,7 @@ export const useResultados = create<ResultadosState>()(
         agentesDesdeApi: state.agentesDesdeApi,
         mesDesdeApi: state.mesDesdeApi,
         anioDesdeApi: state.anioDesdeApi,
+        historial: state.historial,
       }),
     }
   )

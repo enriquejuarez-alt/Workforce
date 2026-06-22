@@ -1,10 +1,12 @@
 import * as XLSX from "xlsx";
 import type { MatrizServicio, ServicioKey } from "../domain/types";
 import {
+  getServiciosActivos,
   getServiciosKeys,
   resolverHojaCPRuntime,
   getHojasCPRuntime,
 } from "../config/servicesRuntime";
+import { normalizar, type ServiceDefinition } from "../config/services";
 import {
   esFeriado,
   generarFranjas,
@@ -26,11 +28,13 @@ export interface ParseCPResult {
  */
 function detectarFormatoCP(matriz: number[][]): "hs" | "hc" {
   const sample: number[] = [];
-  for (let f = 0; f < Math.min(matriz.length, 10); f++) {
-    for (let d = 0; d < Math.min(matriz[f].length, 5); d++) {
+  for (let f = 0; f < matriz.length; f++) {
+    for (let d = 0; d < matriz[f].length; d++) {
       const v = matriz[f][d];
       if (v > 0) sample.push(v);
+      if (sample.length >= 200) break;
     }
+    if (sample.length >= 200) break;
   }
   if (sample.length === 0) return "hs";
   const promedio = sample.reduce((a, b) => a + b, 0) / sample.length;
@@ -40,7 +44,14 @@ function detectarFormatoCP(matriz: number[][]): "hs" | "hc" {
   return "hs";
 }
 
-export function parseCP(buffer: ArrayBuffer): ParseCPResult {
+function esFranjaHoraria(value: unknown): boolean {
+  return /^\d{1,2}:\d{2}$/.test(String(value ?? "").trim());
+}
+
+export function parseCPConServicios(
+  buffer: ArrayBuffer,
+  servicios: ServiceDefinition[]
+): ParseCPResult {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wb = XLSX.read(buffer, { type: "array", cellDates: false }) as any;
   const errores: string[] = [];
@@ -50,10 +61,13 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
 
   const hojasPresentes = wb.SheetNames as string[];
 
-  for (const servicio of getServiciosKeys()) {
-    const nombreHoja = resolverHojaCPRuntime(servicio, hojasPresentes);
+  for (const servicioDef of servicios) {
+    const servicio = servicioDef.key;
+    const aliases = Array.isArray(servicioDef.hojaCP) ? servicioDef.hojaCP : [servicioDef.hojaCP];
+    const nombreHoja = hojasPresentes.find((hoja) =>
+      aliases.some((alias) => normalizar(hoja) === normalizar(alias))
+    ) ?? null;
     if (!nombreHoja) {
-      const aliases = getHojasCPRuntime(servicio);
       errores.push(
         `Falta la hoja del servicio '${servicio}' (esperadas: ${aliases.join(", ")})`
       );
@@ -105,12 +119,22 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
     const matriz: number[][] = [];
     const totalDiario: number[] = Array(dias.length).fill(0);
 
-    for (let fila = 2; fila < raw.length; fila++) {
+    const filaInicioMatriz = raw.findIndex((row) => esFranjaHoraria(row?.[0]));
+    if (filaInicioMatriz < 0) {
+      errores.push(`Hoja '${nombreHoja}' no tiene franjas horarias validas`);
+      continue;
+    }
+
+    for (let fila = filaInicioMatriz; fila < raw.length; fila++) {
       const primeraCelda = String(raw[fila][0] ?? "").trim().toLowerCase();
-      if (primeraCelda.includes("total")) {
+      if (primeraCelda.includes("total") || primeraCelda.includes("horas")) {
         for (let i = 0; i < columnasValidas.length; i++) {
           totalDiario[i] = safeNum(raw[fila][columnasValidas[i]]);
         }
+        break;
+      }
+      if (!esFranjaHoraria(primeraCelda)) {
+        if (!primeraCelda) continue;
         break;
       }
 
@@ -136,7 +160,8 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
             (sum, fila) => sum + fila.reduce((s, v) => s + v * 0.5, 0),
             0
           )
-        : totalDiario.reduce((a, b) => a + b, 0);
+        : totalDiario.reduce((a, b) => a + b, 0) ||
+          matriz.reduce((sum, fila) => sum + fila.reduce((s, v) => s + v, 0), 0);
 
     matrices.set(servicio, {
       servicio,
@@ -152,6 +177,10 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
   return { matrices, diasDelMes, mes, errores };
 }
 
+export function parseCP(buffer: ArrayBuffer): ParseCPResult {
+  return parseCPConServicios(buffer, getServiciosActivos());
+}
+
 export function validarHojasCP(sheetNames: string[]): string[] {
   const errores: string[] = [];
   for (const servicio of getServiciosKeys()) {
@@ -162,8 +191,24 @@ export function validarHojasCP(sheetNames: string[]): string[] {
       );
     }
   }
-  if (!sheetNames.includes("Resumen")) {
-    errores.push("Falta la hoja 'Resumen'");
+  return errores;
+}
+
+export function validarHojasCPConServicios(
+  sheetNames: string[],
+  servicios: ServiceDefinition[]
+): string[] {
+  const errores: string[] = [];
+  for (const servicio of servicios) {
+    const aliases = Array.isArray(servicio.hojaCP) ? servicio.hojaCP : [servicio.hojaCP];
+    const encontrada = aliases.some((alias) =>
+      sheetNames.some((hoja) => normalizar(hoja) === normalizar(alias))
+    );
+    if (!encontrada) {
+      errores.push(
+        `Falta la hoja del servicio '${servicio.key}' (esperadas: ${aliases.join(", ")})`
+      );
+    }
   }
   return errores;
 }

@@ -12,8 +12,10 @@ import type {
 import {
   getServiciosKeys,
   resolverServicioPorReductorRuntime,
+  getServiciosActivos,
   getFrancoConfigRuntime,
 } from "../config/servicesRuntime";
+import { normalizar } from "../config/services";
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
 
@@ -140,8 +142,15 @@ export function calcularResultados(
 ): ResultadoGeneral {
   const reductorPorServicio = new Map<ServicioKey, Reductor>();
   for (const r of reductores) {
-    const key = resolverServicioPorReductorRuntime(r.servicioNorm);
-    if (key) reductorPorServicio.set(key, r);
+    const keys = getServiciosActivos()
+      .filter((def) =>
+        def.reductorNombres.some((alias) => normalizar(alias) === normalizar(r.servicioNorm))
+      )
+      .map((def) => def.key);
+    const resolvedKeys = keys.length > 0 ? keys : [resolverServicioPorReductorRuntime(r.servicioNorm)].filter(Boolean);
+    for (const key of resolvedKeys) {
+      reductorPorServicio.set(key as ServicioKey, r);
+    }
   }
 
   const grupos = agruparAgentesPorServicio(agentes);

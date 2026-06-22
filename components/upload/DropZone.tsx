@@ -28,6 +28,8 @@ export function DropZone({
 }: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const primaryText = hasFile && fileName ? fileName : label;
+  const secondaryText = hasFile && fileName ? sublabel ?? label : sublabel;
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -92,9 +94,8 @@ export function DropZone({
         )}
 
         <div>
-          <p className="text-xs font-semibold text-slate-800">{label}</p>
-          {sublabel && <p className="text-[11px] text-slate-400 mt-0.5 font-mono">{sublabel}</p>}
-          {fileName && <p className="text-[11px] text-[#0054A6] mt-0.5 font-mono truncate max-w-[160px]">{fileName}</p>}
+          <p className="text-xs font-semibold text-slate-800">{primaryText}</p>
+          {secondaryText && <p className="text-[11px] text-[#0054A6] mt-0.5 font-mono truncate max-w-[160px]">{secondaryText}</p>}
         </div>
 
         {error && <p className="text-xs text-red-500 max-w-[200px] leading-relaxed">{error}</p>}

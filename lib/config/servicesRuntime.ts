@@ -8,6 +8,7 @@ import { SERVICIOS_RETENCION } from "./servicesRetencion";
 import { SERVICIOS_BO } from "./servicesBo";
 import { SERVICIOS_TECH } from "./servicesTech";
 import { SERVICIOS_INTEGRAL } from "./servicesIntegral";
+import { SERVICIOS_VENTAS } from "./servicesVentas";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 
@@ -32,6 +33,9 @@ export function getServiciosActivos(): ServiceDefinition[] {
   if (selectedServicioKey === "-8") return SERVICIOS_TECH;
   if (selectedServicioKey === "-9") return [SERVICIOS_INTEGRAL[0]];
   if (selectedServicioKey === "-10") return [SERVICIOS_INTEGRAL[1]];
+  if (selectedServicioKey === "-13") return SERVICIOS_VENTAS.filter((s) => s.key === "VENTAS-WA");
+  if (selectedServicioKey === "-14") return SERVICIOS_VENTAS.filter((s) => s.key === "VENTAS-WA-HOGAR");
+  if (selectedServicioKey === "-15") return SERVICIOS_VENTAS.filter((s) => s.key === "VENTAS-MOVIL" || s.key === "VENTAS-OUT-MOVIL");
 
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;
@@ -47,6 +51,14 @@ export function getServiciosActivos(): ServiceDefinition[] {
     if (nombre === "tech" || nombre.includes("tech admin")) return SERVICIOS_TECH;
     if (nombre.includes("integral movil") && nombre.includes("amba")) return [SERVICIOS_INTEGRAL[0]];
     if (nombre.includes("integral movil") && nombre.includes("interior")) return [SERVICIOS_INTEGRAL[1]];
+    if (!selected.planiConfig && nombre.startsWith("ventas")) {
+      const specific = SERVICIOS_VENTAS.find(
+        (s) =>
+          s.segmentosNomina.some((seg) => normalizar(seg) === nombre) ||
+          normalizar(s.key.replace(/-/g, " ")) === nombre
+      );
+      return specific ? [specific] : SERVICIOS_VENTAS;
+    }
   }
 
   const result: ServiceDefinition[] = [];

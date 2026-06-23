@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -39,21 +40,27 @@ import {
   getNominasSheetNames,
   parseNomina,
   aplicarDiasAlMes,
+  parsearHorario,
 } from "@/lib/parsers/parseNomina";
+import { parseCPVentas, validarHojasCPVentas } from "@/lib/parsers/parseCPVentas";
 import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularReductoresDesdeArchivos } from "@/lib/parsers/calcularReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
-import type { Reductor } from "@/lib/domain/types";
+import type { Agente, Reductor } from "@/lib/domain/types";
 import { generarAlertas } from "@/lib/domain/alertEngine";
 import {
   getServiciosActivos,
   resolverServicioPorReductorRuntime,
+  resolverServicioPorSegmentoRuntime,
 } from "@/lib/config/servicesRuntime";
 import { normalizar } from "@/lib/config/services";
 import { SERVICIOS_RETENCION } from "@/lib/config/servicesRetencion";
 import { SERVICIOS_BO } from "@/lib/config/servicesBo";
 import { SERVICIOS_TECH } from "@/lib/config/servicesTech";
 import { SERVICIOS_INTEGRAL } from "@/lib/config/servicesIntegral";
+import { extraerHorasContrato } from "@/lib/utils/excel";
+import { nominasApi } from "@/lib/api";
+import type { NominaMensual, AgenteNominaMensual } from "@/types";
 import {
   Select,
   SelectContent,
@@ -79,6 +86,7 @@ const SERVICIOS_OCULTOS = [
   "cobranzas",
   "soporte conectividad",
   "soporte entretenimiento",
+  "ventas", // replaced by sub-services below
 ];
 
 const SERVICIOS_DEMO: ServicioNominaRef[] = [
@@ -94,6 +102,9 @@ const SERVICIOS_DEMO: ServicioNominaRef[] = [
   { id: -8, nombre: "TECH", planiConfig: null },
   { id: -9, nombre: "Integral Movil AMBA", planiConfig: null },
   { id: -10, nombre: "Integral Movil Interior", planiConfig: null },
+  { id: -13, nombre: "Ventas WA", planiConfig: null },
+  { id: -14, nombre: "Ventas WA Hogar", planiConfig: null },
+  { id: -15, nombre: "Ventas Movil", planiConfig: null },
 ];
 
 const fade = {
@@ -117,7 +128,7 @@ export default function UploadPage() {
     mappingOverrides, pases,
     setResultado, setMatrices, setAgentes, setReductores,
     setDiasDelMes, setAlertas, setProcesando, setErrores,
-    setAgentesExcluidos, clearAgentesDesdeApi,
+    setAgentesExcluidos, clearAgentesDesdeApi, setAgentesDesdeApi,
     errores, agentesExcluidos, segmentosNoReconocidos,
     agentesDesdeApi, mesDesdeApi, anioDesdeApi, clearFilters,
   } = useResultados();
@@ -145,6 +156,7 @@ export default function UploadPage() {
   const [reqAnio, setReqAnio] = useState(new Date().getFullYear());
   const [cargandoNomina, setCargandoNomina] = useState(false);
   const [useArchivoNomina, setUseArchivoNomina] = useState(false);
+  const [cargandoNominaId, setCargandoNominaId] = useState<number | null>(null);
 
   // Derive numeric service ID from the shared selectedServicioKey
   const reqServicioId = selectedServicioKey ? parseInt(selectedServicioKey) : null;
@@ -162,6 +174,15 @@ export default function UploadPage() {
 
   const servicioActivo = serviciosFiltrados.find((s) => s.id === reqServicioId);
   const servicioDemoActivo = !!servicioActivo && servicioActivo.id < 0;
+
+  const { data: nominasDisponibles = [], isLoading: loadingNominas } = useQuery({
+    queryKey: ["plani-nominas", servicioActivo?.id, reqMes, reqAnio],
+    queryFn: () =>
+      nominasApi
+        .list({ servicio_id: servicioActivo!.id, mes: reqMes, anio: reqAnio })
+        .then((r) => r.data),
+    enabled: !!servicioActivo && !servicioDemoActivo && !!serviciosNomina && !useArchivoNomina,
+  });
   const esPersonalPay = reqServicioId === -1 ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("personal pay");
   const esSmb = reqServicioId === -2 ||
@@ -196,6 +217,8 @@ export default function UploadPage() {
   const esIntegralMovilInterior = reqServicioId === -10 ||
     (normalizar(servicioActivo?.nombre ?? "").includes("integral movil") &&
       normalizar(servicioActivo?.nombre ?? "").includes("interior"));
+  const esVentas = reqServicioId === -13 || reqServicioId === -14 || reqServicioId === -15 ||
+    (servicioActivo?.nombre ?? "").toLowerCase().startsWith("ventas");
 
   const reductoresUtilizados = useMemo(() => {
     if (reductoresPreview.length === 0) return [];
@@ -222,6 +245,7 @@ export default function UploadPage() {
       esTech ||
       esIntegralMovilAmba ||
       esIntegralMovilInterior ||
+      esVentas ||
       Boolean(selectedKey);
 
     const keysSeleccionadas = new Set<string>();
@@ -257,7 +281,11 @@ export default function UploadPage() {
           .filter((s) => s.key.toLowerCase().startsWith("migracion"))
           .forEach((s) => keysSeleccionadas.add(s.key));
       }
-    } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("tecnico")) {
+    } else if (label.includes("ventas")) {
+      serviciosActivos
+        .filter((s) => s.key.toLowerCase().startsWith("ventas"))
+        .forEach((s) => keysSeleccionadas.add(s.key));
+    } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("técnico")) {
       serviciosActivos
         .filter((s) => {
           const key = s.key.toLowerCase();
@@ -295,6 +323,7 @@ export default function UploadPage() {
     esTech,
     esIntegralMovilAmba,
     esIntegralMovilInterior,
+    esVentas,
   ]);
 
   const cpDropzoneLabel = esPersonalPay
@@ -321,11 +350,27 @@ export default function UploadPage() {
                     ? "Konecta Integral AMBA Julio.xlsx"
                     : esIntegralMovilInterior
                       ? "Konecta Integral INTERIOR Julio.xlsx"
-                      : "CP_Soporte_MM-AAAA.xlsx";
+                      : reqServicioId === -13
+                        ? "CP_VentasWA_MM-AAAA.xls"
+                        : reqServicioId === -14
+                          ? "CP_VentasWAHogar_MM-AAAA.xls"
+                          : reqServicioId === -15
+                            ? "CP_VentasMovil_MM-AAAA.xlsx"
+                            : esVentas
+                              ? "CP_Ventas_MM-AAAA.xlsx"
+                              : "CP_Soporte_MM-AAAA.xlsx";
 
   useEffect(() => {
     if (agentesDesdeApi) setCargandoNomina(false);
   }, [agentesDesdeApi]);
+
+  // Clear CP file/error when the active service changes — the uploaded file
+  // may not be valid for the new service, so force re-upload.
+  useEffect(() => {
+    setArchivoCP(null);
+    setHojasCP([]);
+    setErrCP("");
+  }, [selectedServicioKey, setArchivoCP]);
 
   useEffect(() => {
     if (!serviciosNomina && typeof window !== "undefined" && window.parent !== window) {
@@ -379,6 +424,8 @@ export default function UploadPage() {
           ? validarHojasCPSmb(hojas)
           : esOnboarding
             ? validarHojasCPOnb(hojas)
+          : esVentas
+            ? validarHojasCPVentas(hojas)
           : validarHojasCP(hojas);
       if (errValidacion.length > 0) { setErrCP(errValidacion.join(" - ")); return; }
       setHojasCP(hojas);
@@ -388,7 +435,7 @@ export default function UploadPage() {
     } finally {
       setLoadingCP(false);
     }
-  }, [esPersonalPay, esSmb, esOnboarding, setArchivoCP]);
+  }, [esPersonalPay, esSmb, esOnboarding, esVentas, setArchivoCP]);
 
   const handleReductores = useCallback(async (file: File, buffer: ArrayBuffer) => {
     setLoadingRed(true);
@@ -466,6 +513,42 @@ export default function UploadPage() {
     setTimeout(() => setCargandoNomina(false), 10000);
   }, [reqServicioId, reqMes, reqAnio]);
 
+  const handleCargarNominaDesdeApi = useCallback(async (nomina: NominaMensual) => {
+    setCargandoNominaId(nomina.id);
+    try {
+      const { data: raw } = await nominasApi.agentes(nomina.id);
+      const agentes: Agente[] = (raw as AgenteNominaMensual[]).map((a) => {
+        const hsSemanal = extraerHorasContrato(a.contrato ?? "");
+        const { entry, exit } = parsearHorario(a.horarios ?? "");
+        const segmentoNorm =
+          resolverServicioPorSegmentoRuntime(a.segmento ?? "") ?? (a.segmento ?? "");
+        return {
+          dni: a.dni,
+          nombre: a.nombre,
+          usuario: a.usuario,
+          segmento: a.segmento ?? "",
+          segmentoNorm,
+          estado: a.estado ?? "ACTIVO",
+          hsSemanal,
+          hsMensualBrutas: 0,
+          entryTime: entry,
+          exitTime: exit,
+          sitio: a.sitio ?? "",
+          modalidad: a.modalidad ?? "",
+          jefe: a.jefe ?? "",
+          superior: a.superior ?? "",
+          fechaInicioAtencion: null,
+          esCapa: false,
+        };
+      });
+      setAgentesDesdeApi(agentes, nomina.mes, nomina.anio);
+    } catch {
+      toast.error("No se pudo cargar la nómina");
+    } finally {
+      setCargandoNominaId(null);
+    }
+  }, [setAgentesDesdeApi]);
+
   const handleProcesar = useCallback(async () => {
     if (!servicioActivo) {
       toast.error("Selecciona un servicio antes de procesar.", { duration: 3500 });
@@ -494,6 +577,8 @@ export default function UploadPage() {
           ? parseCPSmb(bufCP)
           : esOnboarding
             ? parseCPOnb(bufCP)
+          : esVentas
+            ? parseCPVentas(bufCP)
           : parseCP(bufCP);
 
       setPasoActual("Procesando reductores y nomina...");
@@ -564,7 +649,7 @@ export default function UploadPage() {
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases,
     setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
     setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
-    esPersonalPay, esSmb, esOnboarding, servicioActivo,
+    esPersonalPay, esSmb, esOnboarding, esVentas, servicioActivo,
   ]);
   const currentUser = useAuthStore((s) => s.user);
   const readOnly = isReadOnly(currentUser?.rol);
@@ -691,6 +776,7 @@ export default function UploadPage() {
                 fileName={archivoCP?.name}
                 error={errCP}
                 loading={loadingCP}
+                accepted=".xlsx,.xls"
               />
               {archivoCP && (
                 <FilePreview nombre={archivoCP.name} tamanio={archivoCP.size} hojas={hojasCP} />
@@ -782,11 +868,11 @@ export default function UploadPage() {
                     </span>
                   </div>
                   <div className="max-h-40 space-y-1.5 overflow-auto pr-1">
-                    {reductoresUtilizados.map((r) => {
+                    {reductoresUtilizados.map((r, i) => {
                       const total = r.deslogueo + r.ausentismo + r.rotacion;
                       return (
                         <div
-                          key={`reductor-${selectedServicioKey ?? "none"}-${r.servicioKey}`}
+                          key={`${r.servicioKey}-${r.servicio}-${i}`}
                           className="rounded-lg border border-purple-100 bg-white px-2.5 py-2"
                         >
                           <div className="mb-1 flex items-center justify-between gap-2">
@@ -874,17 +960,44 @@ export default function UploadPage() {
                     </p>
                   )}
 
-                  <button
-                    onClick={handleSolicitarNomina}
-                    disabled={!reqServicioId || servicioDemoActivo || cargandoNomina}
-                    className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#0054A6] text-xs font-semibold text-white transition-colors hover:bg-[#00449A] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {cargandoNomina ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin" />Cargando...</>
-                    ) : (
-                      <><Database className="h-3.5 w-3.5" />Cargar desde sistema</>
-                    )}
-                  </button>
+                  {loadingNominas ? (
+                    <div className="flex items-center justify-center py-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    </div>
+                  ) : nominasDisponibles.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {nominasDisponibles.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => handleCargarNominaDesdeApi(n)}
+                          disabled={cargandoNominaId !== null}
+                          className="flex w-full items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition-colors hover:border-[#0054A6]/40 hover:bg-blue-50/40 disabled:opacity-50"
+                        >
+                          {cargandoNominaId === n.id ? (
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#0054A6]" />
+                          ) : (
+                            <Database className="h-3.5 w-3.5 shrink-0 text-[#0054A6]" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-slate-700 truncate">{n.tipo}</p>
+                            <p className="text-[10px] text-slate-400">{n.total_agentes} agentes</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : servicioActivo && !servicioDemoActivo ? (
+                    <button
+                      onClick={handleSolicitarNomina}
+                      disabled={cargandoNomina}
+                      className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[#0054A6] text-xs font-semibold text-white transition-colors hover:bg-[#00449A] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {cargandoNomina ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" />Cargando…</>
+                      ) : (
+                        <><Database className="h-3.5 w-3.5" />Cargar desde sistema</>
+                      )}
+                    </button>
+                  ) : null}
                   <button
                     onClick={() => setUseArchivoNomina(true)}
                     className="w-full text-[11px] text-gray-400 hover:text-gray-600 transition-colors text-center"

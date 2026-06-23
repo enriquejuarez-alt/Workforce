@@ -8,6 +8,7 @@ import {
   LogOut, Activity, History, UserMinus, GraduationCap, Palmtree,
   CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
   PanelLeftClose, PanelLeftOpen, TrendingDown, GitCommitVertical, FilePen,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { useSidebarStore } from '@/store/sidebar'
@@ -15,6 +16,7 @@ import { authApi } from '@/lib/api'
 import toast from 'react-hot-toast'
 import { canAccess, isAdminRole, ROL_LABELS } from '@/lib/utils/roles'
 import type { Rol } from '@/types'
+import { useState, useEffect } from 'react'
 
 const NAV_ITEMS = [
   { to: '/dashboard',        icon: LayoutDashboard,   label: 'Dashboard' },
@@ -52,6 +54,33 @@ const WALT_ITEMS = [
   { to: '/planificacion/contratos',    icon: FilePen,         label: 'Contratos' },
 ]
 
+const SECTION_KEYS = ['principal', 'administracion', 'planificacion', 'programacion'] as const
+type SectionKey = typeof SECTION_KEYS[number]
+
+function loadOpenSections(): Record<SectionKey, boolean> {
+  const defaults: Record<SectionKey, boolean> = {
+    principal: false,
+    administracion: false,
+    planificacion: false,
+    programacion: false,
+  }
+  if (typeof window === 'undefined') return defaults
+  try {
+    const stored = localStorage.getItem('sidebar-sections')
+    return stored ? { ...defaults, ...JSON.parse(stored) } : defaults
+  } catch {
+    return defaults
+  }
+}
+
+function sectionForPath(pathname: string): SectionKey | null {
+  if (NAV_ITEMS.some(({ to }) => pathname === to || pathname.startsWith(to + '/'))) return 'principal'
+  if (ADMIN_ITEMS.some(({ to }) => pathname === to || pathname.startsWith(to + '/'))) return 'administracion'
+  if (WALT_ITEMS.some(({ to }) => pathname === to || pathname.startsWith(to))) return 'planificacion'
+  if (PROGRAMACION_ITEMS.some(({ to }) => pathname === to || pathname.startsWith(to + '/'))) return 'programacion'
+  return null
+}
+
 const navItemBase = (collapsed: boolean) =>
   `flex items-center gap-[11px] rounded-[7px] text-sm font-medium transition-all duration-200 mb-0.5 ${
     collapsed ? 'px-2 py-2 justify-center' : 'px-3 py-2'
@@ -63,17 +92,45 @@ const navActiveStyle = {
   boxShadow: 'inset 2px 0 0 #7AB0FF',
 }
 
-const SectionLabel = ({ children, collapsed }: { children: React.ReactNode; collapsed: boolean }) =>
-  collapsed ? (
-    <div className="h-px mx-2 my-2" style={{ background: 'rgba(255,255,255,0.10)' }} />
-  ) : (
-    <p
-      className="px-3 mb-1.5 mt-1 uppercase"
-      style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.40)' }}
+function SectionHeader({
+  children,
+  sectionKey,
+  collapsed,
+  isOpen,
+  onToggle,
+}: {
+  children: React.ReactNode
+  sectionKey: SectionKey
+  collapsed: boolean
+  isOpen: boolean
+  onToggle: (key: SectionKey) => void
+}) {
+  if (collapsed) {
+    return <div className="h-px mx-2 my-2" style={{ background: 'rgba(255,255,255,0.10)' }} />
+  }
+  return (
+    <button
+      onClick={() => onToggle(sectionKey)}
+      className="w-full flex items-center justify-between px-3 mb-1.5 mt-1 group"
     >
-      {children}
-    </p>
+      <p
+        className="uppercase"
+        style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.40)' }}
+      >
+        {children}
+      </p>
+      <ChevronDown
+        size={10}
+        style={{
+          color: 'rgba(255,255,255,0.35)',
+          transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+          transition: 'transform 0.2s ease',
+          flexShrink: 0,
+        }}
+      />
+    </button>
   )
+}
 
 function NavItem({ to, icon: Icon, label, collapsed }: {
   to: string; icon: React.ElementType; label: string; collapsed: boolean
@@ -121,6 +178,28 @@ export default function HrSidebar() {
   const pathname = usePathname()
   const rol = user?.rol as Rol | undefined
 
+  const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(loadOpenSections)
+
+  useEffect(() => {
+    const active = sectionForPath(pathname)
+    if (active) {
+      setOpenSections((prev) => {
+        if (prev[active]) return prev
+        const next = { ...prev, [active]: true }
+        try { localStorage.setItem('sidebar-sections', JSON.stringify(next)) } catch {}
+        return next
+      })
+    }
+  }, [pathname])
+
+  const toggleSection = (key: SectionKey) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] }
+      try { localStorage.setItem('sidebar-sections', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
   const handleLogout = async () => {
     try { await authApi.logout() } catch {}
     clearAuth()
@@ -131,6 +210,9 @@ export default function HrSidebar() {
   const showProgramacion = PROGRAMACION_ITEMS.some(({ to }) => canAccess(rol, to))
   const showWalt = canAccess(rol, '/planificacion')
   const showAdmin = isAdminRole(rol)
+
+  // When sidebar is icon-only, always show items (collapsed = no labels, but items visible)
+  const showItems = (key: SectionKey) => collapsed || openSections[key]
 
   return (
     <aside
@@ -200,8 +282,10 @@ export default function HrSidebar() {
       <nav className="relative z-10 flex-1 overflow-y-auto py-3 px-2">
         {visibleNav.length > 0 && (
           <div>
-            <SectionLabel collapsed={collapsed}>Principal</SectionLabel>
-            {visibleNav.map(({ to, icon, label }) => (
+            <SectionHeader sectionKey="principal" collapsed={collapsed} isOpen={openSections.principal} onToggle={toggleSection}>
+              Principal
+            </SectionHeader>
+            {showItems('principal') && visibleNav.map(({ to, icon, label }) => (
               <NavItem key={to} to={to} icon={icon} label={label} collapsed={collapsed} />
             ))}
           </div>
@@ -209,8 +293,10 @@ export default function HrSidebar() {
 
         {showAdmin && (
           <div className="mt-2">
-            <SectionLabel collapsed={collapsed}>Administración</SectionLabel>
-            {ADMIN_ITEMS.map(({ to, icon, label }) => (
+            <SectionHeader sectionKey="administracion" collapsed={collapsed} isOpen={openSections.administracion} onToggle={toggleSection}>
+              Administración
+            </SectionHeader>
+            {showItems('administracion') && ADMIN_ITEMS.map(({ to, icon, label }) => (
               <NavItem key={to} to={to} icon={icon} label={label} collapsed={collapsed} />
             ))}
           </div>
@@ -218,8 +304,10 @@ export default function HrSidebar() {
 
         {showWalt && (
           <div className="mt-2">
-            <SectionLabel collapsed={collapsed}>Planificación</SectionLabel>
-            {WALT_ITEMS.map(({ to, icon: Icon, label }) => {
+            <SectionHeader sectionKey="planificacion" collapsed={collapsed} isOpen={openSections.planificacion} onToggle={toggleSection}>
+              Planificación
+            </SectionHeader>
+            {showItems('planificacion') && WALT_ITEMS.map(({ to, icon: Icon, label }) => {
               const isActive = pathname === to || (to !== '/planificacion' && pathname.startsWith(to))
               return (
                 <Link
@@ -257,8 +345,10 @@ export default function HrSidebar() {
 
         {showProgramacion && (
           <div className="mt-2">
-            <SectionLabel collapsed={collapsed}>Programación</SectionLabel>
-            {PROGRAMACION_ITEMS.map(({ to, icon, label }) => (
+            <SectionHeader sectionKey="programacion" collapsed={collapsed} isOpen={openSections.programacion} onToggle={toggleSection}>
+              Programación
+            </SectionHeader>
+            {showItems('programacion') && PROGRAMACION_ITEMS.map(({ to, icon, label }) => (
               <NavItem key={to} to={to} icon={icon} label={label} collapsed={collapsed} />
             ))}
           </div>

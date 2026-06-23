@@ -7,10 +7,12 @@ export const SERVICIOS_MIGRACION: ServiceDefinition[] = [
     key: "MIGRACION-COBRE-AMBA",
     label: "Migracion Cobre AMBA",
     hojaCP: [
+      "Hoja1",
       "MIGRACION COBRE AMBA",
       "Migracion Cobre AMBA",
       "COBRE AMBA",
       "Mig Cobre AMBA",
+      "Konecta Migra Cobre AMBA",
     ],
     segmentosNomina: [
       "MIGRACION COBRE AMBA",
@@ -28,10 +30,12 @@ export const SERVICIOS_MIGRACION: ServiceDefinition[] = [
     key: "MIGRACION-COBRE-INTERIOR",
     label: "Migracion Cobre Interior",
     hojaCP: [
+      "Hoja1",
       "MIGRACION COBRE INTERIOR",
       "Migracion Cobre Interior",
       "COBRE INTERIOR",
       "Mig Cobre Interior",
+      "Konecta Migra Cobre Interior",
     ],
     segmentosNomina: [
       "MIGRACION COBRE INTERIOR",

@@ -51,6 +51,9 @@ import {
 } from "@/lib/config/servicesRuntime";
 import { normalizar } from "@/lib/config/services";
 import { SERVICIOS_RETENCION } from "@/lib/config/servicesRetencion";
+import { SERVICIOS_BO } from "@/lib/config/servicesBo";
+import { SERVICIOS_TECH } from "@/lib/config/servicesTech";
+import { SERVICIOS_INTEGRAL } from "@/lib/config/servicesIntegral";
 import {
   Select,
   SelectContent,
@@ -83,8 +86,14 @@ const SERVICIOS_DEMO: ServicioNominaRef[] = [
   { id: -2, nombre: "SMB", planiConfig: null },
   { id: -3, nombre: "Onboarding", planiConfig: null },
   { id: -4, nombre: "Migracion", planiConfig: null },
+  { id: -11, nombre: "Migracion Cobre AMBA", planiConfig: null },
+  { id: -12, nombre: "Migracion Cobre Interior", planiConfig: null },
   { id: -5, nombre: "Retencion", planiConfig: null },
   { id: -6, nombre: "Retencion Convergente", planiConfig: null },
+  { id: -7, nombre: "BO GC", planiConfig: null },
+  { id: -8, nombre: "TECH", planiConfig: null },
+  { id: -9, nombre: "Integral Movil AMBA", planiConfig: null },
+  { id: -10, nombre: "Integral Movil Interior", planiConfig: null },
 ];
 
 const fade = {
@@ -163,23 +172,69 @@ export default function UploadPage() {
   const esMigracion = reqServicioId === -4 ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("migracion") ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("cobre");
+  const esMigracionCobreAmba = reqServicioId === -11 ||
+    (normalizar(servicioActivo?.nombre ?? "").includes("migracion") &&
+      normalizar(servicioActivo?.nombre ?? "").includes("cobre") &&
+      normalizar(servicioActivo?.nombre ?? "").includes("amba"));
+  const esMigracionCobreInterior = reqServicioId === -12 ||
+    (normalizar(servicioActivo?.nombre ?? "").includes("migracion") &&
+      normalizar(servicioActivo?.nombre ?? "").includes("cobre") &&
+      normalizar(servicioActivo?.nombre ?? "").includes("interior"));
   const esRetencion = reqServicioId === -5 || reqServicioId === -6 ||
     normalizar(servicioActivo?.nombre ?? "").includes("retencion");
   const esRetencionConvergente = reqServicioId === -6 ||
     normalizar(servicioActivo?.nombre ?? "").includes("retencion convergente");
+  const esBoGc = reqServicioId === -7 ||
+    normalizar(servicioActivo?.nombre ?? "") === "bo gc" ||
+    normalizar(servicioActivo?.nombre ?? "").includes("back office");
+  const esTech = reqServicioId === -8 ||
+    normalizar(servicioActivo?.nombre ?? "") === "tech" ||
+    normalizar(servicioActivo?.nombre ?? "").includes("tech admin");
+  const esIntegralMovilAmba = reqServicioId === -9 ||
+    (normalizar(servicioActivo?.nombre ?? "").includes("integral movil") &&
+      normalizar(servicioActivo?.nombre ?? "").includes("amba"));
+  const esIntegralMovilInterior = reqServicioId === -10 ||
+    (normalizar(servicioActivo?.nombre ?? "").includes("integral movil") &&
+      normalizar(servicioActivo?.nombre ?? "").includes("interior"));
 
   const reductoresUtilizados = useMemo(() => {
     if (reductoresPreview.length === 0) return [];
 
     const serviciosActivos = getServiciosActivos();
-    const serviciosParaResolver = [...serviciosActivos, ...SERVICIOS_RETENCION];
+    const serviciosParaResolver = [
+      ...serviciosActivos,
+      ...SERVICIOS_RETENCION,
+      ...SERVICIOS_BO,
+      ...SERVICIOS_TECH,
+      ...SERVICIOS_INTEGRAL,
+    ];
     const label = normalizar(servicioActivo?.planiConfig?.label ?? servicioActivo?.nombre ?? "");
     const selectedKey = servicioActivo?.planiConfig?.key ?? null;
-    const filtroEstricto = esPersonalPay || esSmb || esOnboarding || esMigracion || esRetencion || Boolean(selectedKey);
+    const filtroEstricto =
+      esPersonalPay ||
+      esSmb ||
+      esOnboarding ||
+      esMigracion ||
+      esMigracionCobreAmba ||
+      esMigracionCobreInterior ||
+      esRetencion ||
+      esBoGc ||
+      esTech ||
+      esIntegralMovilAmba ||
+      esIntegralMovilInterior ||
+      Boolean(selectedKey);
 
     const keysSeleccionadas = new Set<string>();
     if (label.includes("retencion")) {
       keysSeleccionadas.add(label.includes("convergente") ? "RETENCION-CONVERGENTE" : "RETENCION-MOVIL");
+    } else if (label === "bo gc" || label.includes("back office")) {
+      keysSeleccionadas.add("BO-GC");
+    } else if (label === "tech" || label.includes("tech admin")) {
+      keysSeleccionadas.add("TECH");
+    } else if (label.includes("integral movil") && label.includes("amba")) {
+      keysSeleccionadas.add("INTEGRAL-MOVIL-AMBA");
+    } else if (label.includes("integral movil") && label.includes("interior")) {
+      keysSeleccionadas.add("INTEGRAL-MOVIL-INTERIOR");
     } else if (selectedKey) {
       keysSeleccionadas.add(selectedKey);
     } else if (label.includes("personal pay") || label.includes("ppay")) {
@@ -193,9 +248,15 @@ export default function UploadPage() {
         .filter((s) => s.key.toLowerCase().startsWith("smb"))
         .forEach((s) => keysSeleccionadas.add(s.key));
     } else if (label.includes("migracion") || label.includes("cobre")) {
-      serviciosActivos
-        .filter((s) => s.key.toLowerCase().startsWith("migracion"))
-        .forEach((s) => keysSeleccionadas.add(s.key));
+      if (label.includes("amba")) {
+        keysSeleccionadas.add("MIGRACION-COBRE-AMBA");
+      } else if (label.includes("interior")) {
+        keysSeleccionadas.add("MIGRACION-COBRE-INTERIOR");
+      } else {
+        serviciosActivos
+          .filter((s) => s.key.toLowerCase().startsWith("migracion"))
+          .forEach((s) => keysSeleccionadas.add(s.key));
+      }
     } else if (label.includes("soporte") || label.includes("tecnico") || label.includes("tecnico")) {
       serviciosActivos
         .filter((s) => {
@@ -220,7 +281,21 @@ export default function UploadPage() {
     const filtrados = reconocidos.filter((r) => keysSeleccionadas.has(r.servicioKey));
     const visibles = filtroEstricto ? filtrados : (filtrados.length > 0 ? filtrados : reconocidos);
     return Array.from(new Map(visibles.map((r) => [r.servicioKey, r])).values());
-  }, [reductoresPreview, servicioActivo, esPersonalPay, esSmb, esOnboarding, esMigracion, esRetencion]);
+  }, [
+    reductoresPreview,
+    servicioActivo,
+    esPersonalPay,
+    esSmb,
+    esOnboarding,
+    esMigracion,
+    esMigracionCobreAmba,
+    esMigracionCobreInterior,
+    esRetencion,
+    esBoGc,
+    esTech,
+    esIntegralMovilAmba,
+    esIntegralMovilInterior,
+  ]);
 
   const cpDropzoneLabel = esPersonalPay
     ? "CP_Personal_Pay_MM-AAAA.xlsx"
@@ -228,13 +303,25 @@ export default function UploadPage() {
       ? "CP_SMB_MM-AAAA.xlsx"
       : esOnboarding
         ? "CP_Onboarding_MM-AAAA.xlsx"
+        : esMigracionCobreAmba
+          ? "Konecta Migra Cobre AMBA Julio.xlsx"
+        : esMigracionCobreInterior
+          ? "Konecta Migra Cobre Interior Julio.xlsx"
         : esMigracion
           ? "CP_Migracion_Cobre_MM-AAAA.xlsx"
           : esRetencionConvergente
             ? "CP Retencion Convergente 07-2026.xlsx"
             : esRetencion
               ? "CP Retencion 07-2026.xlsx"
-            : "CP_Soporte_MM-AAAA.xlsx";
+              : esBoGc
+                ? "Konecta Back Office Julio.xlsx"
+                : esTech
+                  ? "Konecta Tech Admin Julio.xlsx"
+                  : esIntegralMovilAmba
+                    ? "Konecta Integral AMBA Julio.xlsx"
+                    : esIntegralMovilInterior
+                      ? "Konecta Integral INTERIOR Julio.xlsx"
+                      : "CP_Soporte_MM-AAAA.xlsx";
 
   useEffect(() => {
     if (agentesDesdeApi) setCargandoNomina(false);

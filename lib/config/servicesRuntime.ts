@@ -5,6 +5,9 @@ import { SERVICIOS_SMB } from "./servicesSmb";
 import { SERVICIOS_ONB } from "./servicesOnb";
 import { SERVICIOS_MIGRACION } from "./servicesMigracion";
 import { SERVICIOS_RETENCION } from "./servicesRetencion";
+import { SERVICIOS_BO } from "./servicesBo";
+import { SERVICIOS_TECH } from "./servicesTech";
+import { SERVICIOS_INTEGRAL } from "./servicesIntegral";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 
@@ -21,8 +24,14 @@ export function getServiciosActivos(): ServiceDefinition[] {
   if (selectedServicioKey === "-2") return SERVICIOS_SMB;
   if (selectedServicioKey === "-3") return SERVICIOS_ONB;
   if (selectedServicioKey === "-4") return SERVICIOS_MIGRACION;
+  if (selectedServicioKey === "-11") return [SERVICIOS_MIGRACION[0]];
+  if (selectedServicioKey === "-12") return [SERVICIOS_MIGRACION[1]];
   if (selectedServicioKey === "-5") return [SERVICIOS_RETENCION[0]];
   if (selectedServicioKey === "-6") return [SERVICIOS_RETENCION[1]];
+  if (selectedServicioKey === "-7") return SERVICIOS_BO;
+  if (selectedServicioKey === "-8") return SERVICIOS_TECH;
+  if (selectedServicioKey === "-9") return [SERVICIOS_INTEGRAL[0]];
+  if (selectedServicioKey === "-10") return [SERVICIOS_INTEGRAL[1]];
 
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;
@@ -32,6 +41,12 @@ export function getServiciosActivos(): ServiceDefinition[] {
     const nombre = normalizar(selected.nombre);
     if (nombre.includes("retencion") && nombre.includes("convergente")) return [SERVICIOS_RETENCION[1]];
     if (nombre === "retencion" || nombre.includes("retencion")) return [SERVICIOS_RETENCION[0]];
+    if (nombre.includes("migracion") && nombre.includes("cobre") && nombre.includes("amba")) return [SERVICIOS_MIGRACION[0]];
+    if (nombre.includes("migracion") && nombre.includes("cobre") && nombre.includes("interior")) return [SERVICIOS_MIGRACION[1]];
+    if (nombre === "bo gc" || nombre.includes("back office")) return SERVICIOS_BO;
+    if (nombre === "tech" || nombre.includes("tech admin")) return SERVICIOS_TECH;
+    if (nombre.includes("integral movil") && nombre.includes("amba")) return [SERVICIOS_INTEGRAL[0]];
+    if (nombre.includes("integral movil") && nombre.includes("interior")) return [SERVICIOS_INTEGRAL[1]];
   }
 
   const result: ServiceDefinition[] = [];
@@ -47,7 +62,13 @@ export function getServiciosActivos(): ServiceDefinition[] {
       });
     } else {
       // No explicit config — match by nombre against the static list
-      const staticDef = [...SERVICIOS, ...SERVICIOS_RETENCION].find(
+      const staticDef = [
+        ...SERVICIOS,
+        ...SERVICIOS_RETENCION,
+        ...SERVICIOS_BO,
+        ...SERVICIOS_TECH,
+        ...SERVICIOS_INTEGRAL,
+      ].find(
         (def) =>
           normalizar(def.key) === normalizar(s.nombre) ||
           normalizar(def.label) === normalizar(s.nombre)

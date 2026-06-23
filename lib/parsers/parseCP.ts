@@ -45,7 +45,7 @@ function detectarFormatoCP(matriz: number[][]): "hs" | "hc" {
 }
 
 function esFranjaHoraria(value: unknown): boolean {
-  return /^\d{1,2}:\d{2}$/.test(String(value ?? "").trim());
+  return /^\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?$/.test(String(value ?? "").trim());
 }
 
 export function parseCPConServicios(

@@ -82,9 +82,9 @@ function getDatesForConversor(mes: number, anio: number, semana: number): Date[]
   return out
 }
 
-// For each date in `dates`, returns the peak (max) requeridos across all intervals.
-// For dates that fall outside the current month, looks up the adjacent month's
-// programming for the same service and uses its requeridos.
+// Por cada fecha en `dates`, devuelve el pico (máximo) de requeridos entre todos los intervalos.
+// Para fechas que caen fuera del mes actual, busca la programación del mes adyacente
+// para el mismo servicio y usa sus requeridos.
 async function loadPeakReqsByDate(
   servicio_id: number,
   dates: Date[],
@@ -126,15 +126,15 @@ async function loadPeakReqsByDate(
   return peak
 }
 
-// ─── Off-day rotation (exact port of Python assign_off_days) ──────────────────
-// Python weekday: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
-// JS getDay():   Sun=0, Mon=1, Tue=2, Wed=3, Thu=4, Fri=5, Sat=6
-// Conversion: pyDay → jsDay: (pyDay + 1) % 7
+// ─── Rotación de días libres (port directo de assign_off_days en Python) ─────
+// Python weekday: Lun=0, Mar=1, Mié=2, Jue=3, Vie=4, Sáb=5, Dom=6
+// JS getDay():    Dom=0, Lun=1, Mar=2, Mié=3, Jue=4, Vie=5, Sáb=6
+// Conversión: pyDay → jsDay: (pyDay + 1) % 7
 
 function assignOffDows(agents: { nombre: string; contrato: string | null }[]): number[][] {
   const sorted = [...agents].sort((a, b) => a.nombre.localeCompare(b.nombre))
 
-  // Pre-compute indices of 30/35HS agents in the full sorted list
+  // Pre-calcular índices de agentes 30/35HS en la lista ordenada total
   const thirtyIdxs: number[] = []
   sorted.forEach((a, i) => {
     const c = normalizeContrato(a.contrato)
@@ -146,35 +146,35 @@ function assignOffDows(agents: { nombre: string; contrato: string | null }[]): n
     const c = normalizeContrato(a.contrato)
 
     if (c === '24HS') {
-      // Python: [(i+k)%7 for k in range(3)] → convert to JS getDay()
+      // Python: [(i+k)%7 for k in range(3)] → convertido a JS getDay()
       return [0, 1, 2].map(k => ((i + k) % 7 + 1) % 7)
     }
 
     if (c === '30HS' || c === '35HS') {
-      const pyWd = i % 5                                    // 0..4 = Mon..Fri
+      const pyWd = i % 5                                    // 0..4 = Lun..Vie
       const posIn30 = thirtyIdxs.indexOf(i)
-      const pyWe = posIn30 < half ? 5 : 6                  // 5=Sat, 6=Sun
-      return [(pyWd + 1) % 7, pyWe === 5 ? 6 : 0]         // JS: Mon=1..Fri=5, Sat=6, Sun=0
+      const pyWe = posIn30 < half ? 5 : 6                  // 5=Sáb, 6=Dom
+      return [(pyWd + 1) % 7, pyWe === 5 ? 6 : 0]         // JS: Lun=1..Vie=5, Sáb=6, Dom=0
     }
 
     if (c === '36HS') {
-      return [i % 2 === 0 ? 6 : 0]                        // JS: Sat=6, Sun=0
+      return [i % 2 === 0 ? 6 : 0]                        // JS: Sáb=6, Dom=0
     }
 
     return []
   })
 }
 
-// ─── Simulation types ─────────────────────────────────────────────────────────
+// ─── Tipos para la simulación de programación ─────────────────────────────────
 
 interface AgentInfo {
   id: number
   nombre: string
   segmento: string | null
-  ingresoMin: number | null      // INGRESO in minutes
-  egresoMin: number | null       // INGRESO + contrato hours
+  ingresoMin: number | null      // INGRESO en minutos desde medianoche
+  egresoMin: number | null       // INGRESO + duración del contrato en horas
   contratoNorm: string
-  offDows: number[]              // JS getDay() values
+  offDows: number[]              // días libres como JS getDay()
 }
 
 interface SimRow {
@@ -233,7 +233,7 @@ function runSim(
 
       const intMin = parseIntervalo(intervalo)
 
-      // Dynamic tolerance bands
+      // Bandas de tolerancia dinámicas según el volumen de requeridos
       let li: number, up: number
       if (req < 10)       { li = Math.max(req - 1, 0); up = req + 1 }
       else if (req < 20)  { li = Math.max(req - 2, 0); up = req + 2 }
@@ -341,14 +341,14 @@ function proposeMovements(
       const srcIntv = minutesToHHMM(srcMin)
       if (!surplusNet.has(srcIntv)) continue
 
-      // Find agents starting at srcIntv that haven't been moved
+      // Buscar agentes que comienzan en srcIntv y aún no fueron movidos
       const candidates = agentInfos.filter(a =>
         !movedIds.has(a.id) && a.ingresoMin === srcMin
       )
 
       for (const agent of candidates) {
         if (moved >= needed) break
-        // Avoid contradictory pair: don't move if there's already a move from underIntv to srcIntv
+        // Evitar par contradictorio: no mover si ya existe un movimiento de underIntv a srcIntv
         const conflict = movements.some(m =>
           m.de === underIntv && m.hacia === srcIntv
         )
@@ -360,7 +360,7 @@ function proposeMovements(
     }
   }
 
-  // Apply movements and re-simulate
+  // Aplicar movimientos al mapa de ingreso y re-simular
   const overrideIngreso = new Map<number, number>()
   for (const mv of movements) {
     overrideIngreso.set(mv.agente_id, parseIntervalo(mv.hacia))
@@ -368,7 +368,7 @@ function proposeMovements(
 
   const simAfter = runSim(agentInfos, reqsMap, dates, totalReduccion, overrideIngreso)
 
-  // Verify: if UNDER count worsens, discard movements
+  // Verificar: si el conteo de UNDER empeora con los movimientos, descartarlos
   const underBefore = baseline.filter(r => r.estado === 'UNDER').length
   const underAfter = simAfter.filter(r => r.estado === 'UNDER').length
   if (underAfter > underBefore) {
@@ -588,19 +588,19 @@ function parseRequeridosExcel(
     const raw = XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: null })
     if (raw.length < 2) continue
 
-    const r0 = raw[0] as any[]  // Row 0
-    const r1 = raw[1] as any[]  // Row 1
+    const r0 = raw[0] as any[]  // Fila 0
+    const r1 = raw[1] as any[]  // Fila 1
 
-    // Detect CP Soporte / Workforce pivot format:
-    //   Row 0: ["Dia →", "feriado", "sábado", "lunes", ...]
-    //   Row 1: ["Fecha →", 46143, 46144, ...]  (Excel date serials)
+    // Detectar formato pivot CP Soporte / Workforce:
+    //   Fila 0: ["Dia →", "feriado", "sábado", "lunes", ...]
+    //   Fila 1: ["Fecha →", 46143, 46144, ...]  (seriales Excel de fecha)
     const isWorkforce =
       String(r0?.[0] ?? '').toLowerCase().includes('dia') &&
       String(r1?.[0] ?? '').toLowerCase().includes('fecha') &&
       typeof r1?.[1] === 'number'
 
     if (isWorkforce) {
-      // Build column map: col index → { fecha, es_feriado }
+      // Construir mapa de columnas: índice → { fecha, es_feriado }
       const dateCols: { idx: number; fecha: string; es_feriado: boolean }[] = []
       for (let c = 1; c < r1.length; c++) {
         const serial = r1[c]

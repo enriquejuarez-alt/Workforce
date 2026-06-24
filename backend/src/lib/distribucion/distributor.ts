@@ -237,7 +237,7 @@ export function crossFillUsersContracts(
     return out
   })
 
-  // Apply final normalizations
+  // Aplicar normalizaciones finales a los campos clave del resultado
   return {
     result: result.map(r => ({
       ...r,

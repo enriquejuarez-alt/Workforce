@@ -4,10 +4,12 @@ import type {
   ResultadoServicio,
 } from "./types";
 
+// ID único para cada alerta combinando timestamp y sufijo aleatorio
 function nextId() {
   return `alerta-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Genera el listado de alertas a partir del resultado de cálculo, ordenado por severidad
 export function generarAlertas(resultado: ResultadoGeneral): Alerta[] {
   const alertas: Alerta[] = [];
 
@@ -50,6 +52,7 @@ export function generarAlertas(resultado: ResultadoGeneral): Alerta[] {
   return alertas.sort((a, b) => orden[a.severidad] - orden[b.severidad]);
 }
 
+// Evalúa un servicio individual y agrega alertas según sus métricas de cumplimiento y reductores
 function alertasServicio(r: ResultadoServicio, alertas: Alerta[]) {
   if (r.hcActivos === 0 && r.hsRequeridas > 0) {
     alertas.push({

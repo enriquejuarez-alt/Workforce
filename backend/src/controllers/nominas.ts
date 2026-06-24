@@ -131,7 +131,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       if (!permiso?.puede_ver) return res.status(403).json({ error: 'Sin permiso' })
     }
 
-    // Exclude agents with baja or remocion registered for this service up to the nomina's month end
+    // Excluir agentes con baja o remoción registrada en el servicio hasta el fin del mes de la nómina
     const endOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
     const prismaAny = prisma as any
 
@@ -158,7 +158,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       where.dni = { notIn: dnisExcluidos }
     }
 
-    // Allowed segments from permission (non-admin)
+    // Segmentos permitidos según el permiso del usuario (solo para no-admin)
     const allowedSegmentos: string[] | null =
       !adminUser && permiso?.segmentos_permitidos?.length > 0
         ? permiso.segmentos_permitidos
@@ -279,7 +279,7 @@ export const listAgentesNomina = async (req: AuthRequest, res: Response) => {
       result = result.filter((a) => a.agente.cambios_temporales.length > 0)
     }
 
-    // Apply active contract overrides for this nomina period
+    // Aplicar cambios de contrato activos durante el período de la nómina
     const firstOfMonth = new Date(nomina.anio, nomina.mes - 1, 1)
     const lastOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
     const cambiosContrato = await prismaAny.cambioContrato.findMany({
@@ -597,7 +597,7 @@ export const compareNominas = async (req: AuthRequest, res: Response) => {
       prisma.agenteNominaMensual.findMany({ where: { nomina_mensual_id: nomina2.id, presente_en_nomina: true } }),
     ])
 
-    // Fetch licencias activas en el período de cada nómina para calcular estados reales
+    // Obtener licencias activas en el período de cada nómina para calcular estados reales
     const fin1 = new Date(Date.UTC(nomina1.anio, nomina1.mes, 0, 23, 59, 59))
     const ini1 = new Date(Date.UTC(nomina1.anio, nomina1.mes - 1, 1))
     const fin2 = new Date(Date.UTC(nomina2.anio, nomina2.mes, 0, 23, 59, 59))

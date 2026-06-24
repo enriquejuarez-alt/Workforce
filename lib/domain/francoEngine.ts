@@ -36,9 +36,7 @@ function clasificarEstado(disponible: number, requerido: number | null): EstadoF
   return "deficit";
 }
 
-/**
- * Groups agents by service and contract type.
- */
+// Agrupa agentes activos por servicio y tipo de contrato (horas semanales)
 function composicionPorServicio(
   agentes: Agente[]
 ): Map<ServicioKey, Map<number, number>> {
@@ -54,10 +52,8 @@ function composicionPorServicio(
   return mapa;
 }
 
-/**
- * Builds a map of average CP requirement per day of week for a service.
- * Averages the totalDiario values grouped by diaSemana across the month.
- */
+// Calcula el requerido promedio de CP por día de la semana para un servicio,
+// promediando totalDiario agrupado por diaSemana a lo largo del mes
 function requeridoPorDiaSemana(
   matriz: MatrizServicio | undefined
 ): Map<DiaSemana, number> {
@@ -91,7 +87,7 @@ function normalizarDiaSemana(raw: string): DiaSemana | null {
     sabado: "sabado",
     sábado: "sabado",
     domingo: "domingo",
-    // abbreviated
+    // formas abreviadas
     lun: "lunes",
     mar: "martes",
     mie: "miercoles",
@@ -149,7 +145,7 @@ export function calcularFrancoPorServicio(
       return gapActual > gapPeor ? d : peor;
     }, dias[0]).dia;
 
-    // How many total agents needed to cover the worst day
+    // HC total necesario para cubrir el peor día considerando la tasa de ausentismo
     const diasConReq = dias.filter((d) => d.hcRequerido !== null && d.hcRequerido > 0);
     let hcNecesarioTotal = hcActivos;
     for (const d of diasConReq) {

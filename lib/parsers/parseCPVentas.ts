@@ -99,7 +99,7 @@ function parsearHojaMovil(raw: unknown[][]): {
 } | null {
   const DIAS_SEMANA = ["lunes","martes","miércoles","miercoles","jueves","viernes","sábado","sabado","domingo"];
 
-  // Find the first section header: col1 is a label string, col2 is a day name
+  // Buscar la primera fila de sección: col1 es etiqueta de texto, col2 es nombre de día
   let sectionRow = -1;
   for (let r = 0; r < raw.length - 2; r++) {
     const c1 = (raw[r] as unknown[])?.[1];
@@ -185,7 +185,7 @@ export function parseCPVentas(buffer: ArrayBuffer): ParseCPVentasResult {
       continue;
     }
 
-    // Detect format: WA has date serial at row 3 col 3
+    // Detectar formato WA: tiene serial de fecha en fila 3 columna 3
     const isWA = typeof (raw[3] as unknown[])?.[3] === "number" &&
       ((raw[3] as number[])[3] as number) > 44000;
 

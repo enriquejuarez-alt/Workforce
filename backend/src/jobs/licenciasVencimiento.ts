@@ -92,7 +92,7 @@ async function checkLicenciasVencidas() {
 }
 
 export function initLicenciasVencimientoJob() {
-  // Runs daily at 08:00 ART (UTC-3 → 11:00 UTC)
+  // Se ejecuta diariamente a las 08:00 ART (UTC-3 → 11:00 UTC)
   cron.schedule('0 11 * * *', () => {
     checkLicenciasVencidas().catch((err) => {
       console.error('[Cron] Error en checkLicenciasVencidas:', err)

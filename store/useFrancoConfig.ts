@@ -57,7 +57,7 @@ function normalizarDistribucion(distribucion?: DistribucionJornada): Distribucio
   };
 }
 
-// Returns the reglas to mutate based on the active service key
+// Devuelve las reglas a mutar según el servicio activo seleccionado
 function getBaseReglas(
   s: Pick<FrancoConfigState, "selectedServicioKey" | "reglasByServicio" | "reglas">
 ): ReglaFrancoContrato[] {
@@ -67,7 +67,7 @@ function getBaseReglas(
   return s.reglas;
 }
 
-// Applies an update to either the active service or global reglas
+// Aplica una actualización al servicio activo o a las reglas globales
 function applyToActive(
   s: FrancoConfigState,
   updater: (reglas: ReglaFrancoContrato[]) => ReglaFrancoContrato[]

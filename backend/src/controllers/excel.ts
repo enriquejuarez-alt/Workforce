@@ -95,7 +95,7 @@ function parseMeucciRows(data: Record<string, any>[]): { normalizedRows: any[]; 
 
 function normalizeCell(col: string, rawValue: any): string {
   if (rawValue === null || rawValue === undefined) return ''
-  // Excel stores time-formatted cells as a fraction of 24h (e.g. 8:00 → 0.3333)
+  // Excel almacena celdas de tiempo como fracción de 24h (ej.: 8:00 → 0.3333)
   if (col === 'HORARIOS' && typeof rawValue === 'number') {
     const totalSec = Math.round(rawValue * 86400)
     const h = Math.floor(totalSec / 3600) % 24

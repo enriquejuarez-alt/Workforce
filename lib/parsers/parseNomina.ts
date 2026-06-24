@@ -43,6 +43,8 @@ export function getNominasSheetNames(buffer: ArrayBuffer): string[] {
   return wb.SheetNames as string[];
 }
 
+// Lee el Excel de nómina, mapea columnas por nombre normalizado y construye la lista de agentes.
+// Los segmentos sin mapeo configurado se excluyen y se reportan en segmentosNoReconocidos.
 export function parseNomina(
   buffer: ArrayBuffer,
   hoja: string,
@@ -201,6 +203,7 @@ function normalizarFecha(raw: string): string | null {
   return null;
 }
 
+// Calcula hsMensualBrutas para cada agente; los agentes CAPA prorratean según fecha de inicio
 export function aplicarDiasAlMes(agentes: Agente[], diasDelMes: number): Agente[] {
   return agentes.map((a) => {
     if (a.esCapa && a.fechaInicioAtencion) {

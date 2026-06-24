@@ -4,6 +4,8 @@ import { createAuditLog } from '../utils/audit'
 import { getUserPermission } from '../utils/permissions'
 import { AuthRequest } from '../middleware/auth'
 
+// Lista agentes con filtros opcionales. El LIDER solo ve su propio servicio;
+// el ADMINISTRADOR puede ver todos o filtrar por servicio_id
 export const listAgents = async (req: AuthRequest, res: Response) => {
   try {
     const { servicio_id, search, estado, activo } = req.query
@@ -59,6 +61,7 @@ export const listAgents = async (req: AuthRequest, res: Response) => {
   }
 }
 
+// Devuelve un agente por ID con su historial completo de licencias, cambios y snapshots
 export const getAgent = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)
@@ -85,6 +88,7 @@ export const getAgent = async (req: AuthRequest, res: Response) => {
   }
 }
 
+// Crea un nuevo agente; valida duplicados de DNI y usuario antes de insertar
 export const createAgent = async (req: AuthRequest, res: Response) => {
   try {
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
@@ -122,6 +126,7 @@ export const createAgent = async (req: AuthRequest, res: Response) => {
   }
 }
 
+// Actualiza los datos de un agente y registra el cambio en auditoría
 export const updateAgent = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)
@@ -144,6 +149,7 @@ export const updateAgent = async (req: AuthRequest, res: Response) => {
   }
 }
 
+// Activa o desactiva un agente (toggle); requiere permiso puede_desactivar_agente para no-admin
 export const toggleAgent = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)
@@ -175,6 +181,8 @@ export const toggleAgent = async (req: AuthRequest, res: Response) => {
   }
 }
 
+// Construye la línea de tiempo de eventos del agente (licencias, cambios, vacaciones, bajas)
+// ordenada de más reciente a más antigua
 export const getAgenteTimeline = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)

@@ -51,10 +51,10 @@ export const importVacaciones = async (req: AuthRequest, res: Response) => {
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
 
-    // Row 0 is the header row; data starts at row 1
+    // Fila 0 es el encabezado; los datos comienzan en la fila 1
     const dataRows = rows.slice(1).filter((r) => r && r.length > 11)
 
-    // Columns in the WF file (0-indexed):
+    // Columnas del archivo WF (índice base 0):
     // 0: seq, 1: WF Id, 2: Nro Orden, 3: Empleado nombre, 4: DNI,
     // 5: Motivo, 10: Desde, 11: Hasta, 13: Site, 14: Servicio WF
 

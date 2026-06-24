@@ -1,6 +1,7 @@
 import type { ActiveFilters, Agente } from "./types";
 import { normalizar } from "./mapeo";
 
+// Filtra la lista de agentes según los criterios activos del panel de filtros
 export function filtrarAgentes(agentes: Agente[], filtros: ActiveFilters): Agente[] {
   return agentes.filter((a) => {
     if (filtros.isla && normalizar(a.segmentoNorm || a.segmento) !== normalizar(filtros.isla)) return false;
@@ -21,6 +22,7 @@ export interface OpcionesFiltros {
   contratos: string[];
 }
 
+// Extrae los valores únicos disponibles para cada dimensión de filtro
 export function extraerOpciones(agentes: Agente[]): OpcionesFiltros {
   const islas = [...new Set(agentes.map((a) => a.segmentoNorm || a.segmento).filter(Boolean))].sort();
   const sitios = [...new Set(agentes.map((a) => a.sitio).filter(Boolean))].sort();

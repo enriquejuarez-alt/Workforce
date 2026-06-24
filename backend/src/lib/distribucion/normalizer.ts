@@ -61,7 +61,7 @@ export function toTime(val: unknown): string | null {
     }
   }
 
-  // Excel serial number (fraction of a day)
+  // Número serial de Excel (fracción de un día): convierte a HH:MM
   if (typeof val === 'number') {
     const totalMinutes = Math.round((val % 1) * 24 * 60)
     const h = Math.floor(totalMinutes / 60) % 24
@@ -76,7 +76,7 @@ export function toTime(val: unknown): string | null {
   return null
 }
 
-// ── Column header detection ───────────────────────────────────────────────────
+// ── Detección de encabezados de columna ──────────────────────────────────────
 
 const HEADER_EXPECTED = new Set([
   'dni','usuario','nombre','superior','servicio','ingreso','activo','estado','jefe','contrato','modalidad',

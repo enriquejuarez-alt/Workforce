@@ -19,6 +19,7 @@ import { normalizar } from "../config/services";
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
 
+// Convierte las horas semanales del contrato en horas brutas del mes
 export function calcularHsMensualBrutas(
   hsSemanal: number,
   diasDelMes: number
@@ -26,6 +27,8 @@ export function calcularHsMensualBrutas(
   return hsSemanal * (diasDelMes / 7);
 }
 
+// Factor productivo: proporción real de horas trabajadas tras descontar reductores.
+// Modo multiplicativo: (1-d)*(1-a)*(1-r); modo aditivo: 1-(d+a+r)
 export function calcularFactorProductivo(
   deslogueo: number,
   ausentismo: number,
@@ -41,6 +44,7 @@ export function calcularFactorProductivo(
   return Math.max(0, 1 - (d + a + r));
 }
 
+// Porcentaje de cobertura de las horas requeridas por el cliente
 export function calcularCumplimiento(
   hsNetas: number,
   hsRequeridas: number
@@ -49,6 +53,8 @@ export function calcularCumplimiento(
   return (hsNetas / hsRequeridas) * 100;
 }
 
+// Diferencia en HC para alcanzar el objetivo del 103% de facturación.
+// Positivo = faltan agentes, negativo = hay excedente
 export function calcularDeltaHC103(
   hcActivos: number,
   factorProductivo: number,
@@ -95,6 +101,7 @@ export function calcularAgentesEquivalentes(
 
 // ─── Agrupación de agentes ─────────────────────────────────────────────────────
 
+// Totales por servicio: HC activos, LP (licencia/permiso), capacitaciones y horas brutas
 interface GrupoServicio {
   hcActivos: number;
   hcLP: number;
@@ -104,6 +111,7 @@ interface GrupoServicio {
   hsSemanalConteo: number;
 }
 
+// Recorre la nómina y acumula métricas por segmento normalizado (ServicioKey)
 function agruparAgentesPorServicio(
   agentes: Agente[]
 ): Map<ServicioKey, GrupoServicio> {
@@ -132,6 +140,8 @@ function agruparAgentesPorServicio(
 
 // ─── Cálculo principal ─────────────────────────────────────────────────────────
 
+// Función central: cruza nómina, matrices CP y reductores para producir ResultadoGeneral.
+// topeFacturacion (por defecto 103) limita las horas que se pueden facturar al cliente.
 export function calcularResultados(
   agentes: Agente[],
   matrices: Map<ServicioKey, MatrizServicio>,
@@ -266,6 +276,7 @@ export function calcularResultados(
 
 // ─── Coverage helpers (para gráficos) ──────────────────────────────────────────
 
+// Promedio de HC requerido en cada franja horaria según la matriz del CP
 export function calcularHCRequeridoPorFranja(
   matriz: MatrizServicio
 ): number[] {
@@ -274,6 +285,7 @@ export function calcularHCRequeridoPorFranja(
   );
 }
 
+// HC disponible por franja usando distribución plana cuando no hay horarios individuales
 export function calcularHCDisponiblePorFranja(
   hcActivos: number,
   hsSemanalPromedio: number

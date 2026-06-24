@@ -94,7 +94,7 @@ export const exportNomina = async (req: AuthRequest, res: Response) => {
       orderBy: { nombre: 'asc' },
     })
 
-    // Apply active contract overrides for this nomina period
+    // Aplicar cambios de contrato activos durante el período de la nómina
     const firstOfMonth = new Date(nomina.anio, nomina.mes - 1, 1)
     const lastOfMonth = new Date(nomina.anio, nomina.mes, 0, 23, 59, 59)
     const prismaAny = prisma as any

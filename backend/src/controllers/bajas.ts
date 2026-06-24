@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx'
 import fs from 'fs'
 
 function excelDateToISO(serial: number): Date {
-  // Excel date serial to JS Date (handles both 1900 and 1904 systems)
+  // Convierte número serial de Excel a Date JS (compatible con sistemas 1900 y 1904)
   const utc_days = Math.floor(serial - 25569)
   const utc_value = utc_days * 86400
   return new Date(utc_value * 1000)
@@ -109,7 +109,7 @@ export const createBaja = async (req: AuthRequest, res: Response) => {
       if (!permiso) return res.status(403).json({ error: 'Sin permiso para este servicio' })
     }
 
-    // Check if agent exists and deactivate
+    // Verifica si el agente existe y lo desactiva al registrar la baja
     const agente = await prisma.agente.findFirst({ where: { dni: String(dni).trim() } })
 
     const baja = await prisma.historicoBaja.create({
@@ -272,8 +272,8 @@ export const importBajas = async (req: AuthRequest, res: Response) => {
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
 
-    // Headers in row 5 (index 5): Fecha, DNI Asesor, Asesor, Líder, Jefatura, null, Servicio, Observacion
-    // Data starts at row 6 (index 6)
+    // Encabezados en fila 5 (índice 5): Fecha, DNI Asesor, Asesor, Líder, Jefatura, null, Servicio, Observacion
+    // Los datos comienzan en fila 6 (índice 6)
     const dataRows = rows.slice(6).filter((r) => r && r[1] && r[2])
 
     let created = 0
@@ -367,7 +367,7 @@ export const getOpciones = async (req: AuthRequest, res: Response) => {
     const where: any = { presente_en_nomina: true }
     if (servicioId) where.nomina_mensual = { servicio_id: servicioId }
 
-    // Get latest nomina for this service as source of options
+    // Obtiene los valores únicos disponibles de la última nómina del servicio
     const campos = ['segmento', 'estado', 'sitio', 'superior', 'jefe'] as const
     const results = await Promise.all(
       campos.map((campo) =>

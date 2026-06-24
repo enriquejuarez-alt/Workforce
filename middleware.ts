@@ -6,14 +6,13 @@ const PUBLIC_PATHS = ['/login', '/acceso-denegado', '/auth/callback']
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow public paths and static files
+  // Dejar pasar rutas públicas y archivos estáticos sin verificar token
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
     return NextResponse.next()
   }
 
-  // Check token in cookie (if set) or skip (localStorage auth is client-side)
-  // Since we use localStorage for auth, middleware just passes through
-  // and client components handle redirects
+  // La auth usa localStorage; el middleware solo deja pasar.
+  // Los componentes cliente son los que manejan las redirecciones.
   return NextResponse.next()
 }
 

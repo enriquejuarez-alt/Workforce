@@ -242,7 +242,7 @@ export default function HrSidebar() {
         style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}
       >
         <img
-          src="/logo-mark.png"
+          src="/logo.jpg"
           alt="Logo"
           className="shrink-0 object-cover"
           style={{
@@ -251,9 +251,6 @@ export default function HrSidebar() {
             borderRadius: 9,
             boxShadow: '0 6px 16px -4px rgba(0,0,0,0.40)',
             backgroundColor: '#0054A6',
-          }}
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = '/logo.jpg'
           }}
         />
         {!collapsed && (

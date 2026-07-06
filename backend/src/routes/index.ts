@@ -12,6 +12,9 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiados intentos. Esperá 15 minutos.' },
+  // En dev todos los requests vienen de 127.0.0.1 (proxy Next.js) → skip para no bloquear.
+  // En producción trust proxy: 1 resuelve la IP real desde X-Forwarded-For.
+  skip: () => process.env.NODE_ENV !== 'production',
 })
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission, getUserSecciones, setUserSecciones, deleteUserSecciones } from '../controllers/users'
 import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'

@@ -9,6 +9,10 @@ import { initLicenciasVencimientoJob } from './jobs/licenciasVencimiento'
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// El backend siempre está detrás de un proxy (Next.js rewrites).
+// trust proxy: 1 hace que req.ip use X-Forwarded-For en vez de la IP del proxy.
+app.set('trust proxy', 1)
+
 const allowedOrigins: (string | RegExp)[] = [/^http:\/\/localhost:\d+$/]
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL)
 

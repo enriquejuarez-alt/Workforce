@@ -7,8 +7,8 @@ import { createAuditLog } from '../utils/audit'
 import { AuthRequest } from '../middleware/auth'
 
 const loginSchema = z.object({
-  email:    z.string().email('Email inválido').max(254),
-  password: z.string().min(1).max(128),
+  email:    z.string({ error: 'El email es requerido' }).email('Email inválido').max(254),
+  password: z.string({ error: 'La contraseña es requerida' }).min(1, 'La contraseña es requerida').max(128),
 })
 
 export const login = async (req: Request, res: Response) => {

@@ -8,16 +8,16 @@ import { AuthRequest } from '../middleware/auth'
 const ROLES_VALIDOS = ['ADMINISTRADOR', 'WORKFORCE', 'USUARIO', 'LIDER', 'CAPACITADOR'] as const
 
 const createUserSchema = z.object({
-  nombre:   z.string().min(2).max(100).trim(),
-  email:    z.string().email('Email inválido').max(254).toLowerCase(),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+  nombre:   z.string({ error: 'El nombre es requerido' }).min(2, 'El nombre debe tener al menos 2 caracteres').max(100).trim(),
+  email:    z.string({ error: 'El email es requerido' }).email('Email inválido').max(254).toLowerCase(),
+  password: z.string({ error: 'La contraseña es requerida' }).min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
   rol:      z.enum(ROLES_VALIDOS).optional(),
 })
 
 const updateUserSchema = z.object({
-  nombre:   z.string().min(2).max(100).trim().optional(),
+  nombre:   z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).trim().optional(),
   email:    z.string().email('Email inválido').max(254).toLowerCase().optional(),
-  password: z.string().min(8).max(128).optional(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128).optional(),
   rol:      z.enum(ROLES_VALIDOS).optional(),
 })
 

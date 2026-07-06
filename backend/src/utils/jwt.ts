@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken'
 
-const SECRET = process.env.JWT_SECRET || 'konecta-nomina-secret-2024'
+const SECRET = process.env.JWT_SECRET
+if (!SECRET) throw new Error('JWT_SECRET no está definido — revisar variables de entorno')
+
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h'
 
 export interface JWTPayload {

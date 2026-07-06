@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import crypto from 'crypto'
 import prisma from '../prisma'
 import { signToken } from '../utils/jwt'
 import { createAuditLog } from '../utils/audit'
@@ -7,6 +8,19 @@ const CLIENT_ID       = process.env.GOOGLE_CLIENT_ID     ?? ''
 const CLIENT_SECRET   = process.env.GOOGLE_CLIENT_SECRET ?? ''
 const CALLBACK_URL    = process.env.GOOGLE_CALLBACK_URL  ?? 'http://localhost:3001/api/auth/google/callback'
 const FRONTEND_URL    = (process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+
+// Códigos de un solo uso: evita exponer el JWT en la URL
+// Expiración: 30 segundos, un solo uso
+interface PendingCode { token: string; expires: number }
+const pendingCodes = new Map<string, PendingCode>()
+
+// Limpieza periódica de códigos expirados
+setInterval(() => {
+  const now = Date.now()
+  for (const [k, v] of pendingCodes) {
+    if (v.expires < now) pendingCodes.delete(k)
+  }
+}, 60_000)
 
 export function googleAuth(_req: Request, res: Response) {
   if (!CLIENT_ID) {
@@ -32,7 +46,6 @@ export async function googleCallback(req: Request, res: Response) {
   }
 
   try {
-    // 1 — Intercambiar code por access_token
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -51,19 +64,15 @@ export async function googleCallback(req: Request, res: Response) {
       return res.redirect(`${FRONTEND_URL}/login?error=google_token_failed`)
     }
 
-    // 2 — Obtener datos del usuario de Google
     const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     })
-    const googleUser = await userInfoRes.json() as {
-      id: string; email?: string; name?: string
-    }
+    const googleUser = await userInfoRes.json() as { id: string; email?: string; name?: string }
 
     if (!googleUser.email) {
       return res.redirect(`${FRONTEND_URL}/login?error=google_no_email`)
     }
 
-    // 3 — Verificar que el usuario fue dado de alta por un admin
     const user = await prisma.usuario.findUnique({ where: { email: googleUser.email } })
 
     if (!user) {
@@ -79,12 +88,11 @@ export async function googleCallback(req: Request, res: Response) {
       data:  { ultimo_acceso: new Date() },
     })
 
-    const token = signToken({
+    const jwt = signToken({
       userId:    user.id,
       email:     user.email,
       rol:       user.rol,
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore — servicio_id exists at runtime but Prisma types are out of sync
+      // @ts-ignore — servicio_id exists at runtime
       servicioId: user.servicio_id ?? null,
     })
 
@@ -97,9 +105,30 @@ export async function googleCallback(req: Request, res: Response) {
       user_agent: req.headers['user-agent'],
     })
 
-    return res.redirect(`${FRONTEND_URL}/auth/callback?token=${encodeURIComponent(token)}`)
+    // Generar código efímero (30s, un solo uso) — el JWT nunca aparece en la URL
+    const onetimeCode = crypto.randomBytes(32).toString('hex')
+    pendingCodes.set(onetimeCode, { token: jwt, expires: Date.now() + 30_000 })
+
+    return res.redirect(`${FRONTEND_URL}/auth/callback?code=${onetimeCode}`)
   } catch (err) {
     console.error('[Google OAuth] callback error:', err)
     return res.redirect(`${FRONTEND_URL}/login?error=google_server_error`)
   }
+}
+
+// POST /api/auth/exchange — canjea el código efímero por el JWT real
+export function exchangeCode(req: Request, res: Response) {
+  const { code } = req.body as { code?: string }
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'Código requerido' })
+  }
+
+  const entry = pendingCodes.get(code)
+  if (!entry || entry.expires < Date.now()) {
+    pendingCodes.delete(code)
+    return res.status(400).json({ error: 'Código inválido o expirado' })
+  }
+
+  pendingCodes.delete(code) // un solo uso
+  return res.json({ token: entry.token })
 }

@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyToken, JWTPayload } from '../utils/jwt'
+import prisma from '../prisma'
 
 export interface AuthRequest extends Request {
   user?: JWTPayload
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token no proporcionado' })
@@ -14,6 +15,16 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   const token = authHeader.split(' ')[1]
   try {
     const payload = verifyToken(token)
+
+    // Verifica que el usuario siga activo en BD (captura desactivaciones sin esperar expiración del token)
+    const user = await prisma.usuario.findUnique({
+      where: { id: payload.userId },
+      select: { activo: true },
+    })
+    if (!user?.activo) {
+      return res.status(401).json({ error: 'Usuario inactivo o no encontrado' })
+    }
+
     req.user = payload
     return next()
   } catch {

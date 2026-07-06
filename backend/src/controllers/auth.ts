@@ -1,16 +1,23 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
+import { z } from 'zod'
 import prisma from '../prisma'
 import { signToken } from '../utils/jwt'
 import { createAuditLog } from '../utils/audit'
 import { AuthRequest } from '../middleware/auth'
 
+const loginSchema = z.object({
+  email:    z.string().email('Email inválido').max(254),
+  password: z.string().min(1).max(128),
+})
+
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y contraseña son requeridos' })
+    const parsed = loginSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message })
     }
+    const { email, password } = parsed.data
 
     const user = await prisma.usuario.findUnique({ where: { email } })
     if (!user || !user.activo) {

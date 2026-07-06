@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.git/
+*.log
+.env
+.env.*
+!.env.example
+backend/node_modules/
+backend/dist/
+backend/uploads/
+backend/.env
+.vscode/
+.gstack/
+plani/
+frontend/

@@ -26,30 +26,34 @@ export default function AuthCallbackPage() {
   const [firstName, setFirstName] = useState("");
 
   useEffect(() => {
-    const token = searchParams.get("token");
+    const code  = searchParams.get("code");
     const error = searchParams.get("error");
 
-    if (error || !token) {
+    if (error || !code) {
       const msg = encodeURIComponent(ERROR_MESSAGES[error ?? "unknown"] ?? ERROR_MESSAGES.unknown);
       router.replace(`/login?oauth_error=${msg}`);
       return;
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.setItem("token", token);
-    }
-
-    authApi
-      .me()
-      .then((res) => {
-        setAuth(res.data, token);
-        const name = (res.data.nombre ?? "").split(" ")[0];
-        setFirstName(name);
-        setStage("welcome");
-        setTimeout(() => router.replace("/planificacion"), 2200);
+    // Canjear el código efímero por el JWT real (el token nunca estuvo en la URL)
+    fetch("/api/auth/exchange", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ code }),
+    })
+      .then((r) => r.ok ? r.json() : Promise.reject(r))
+      .then(({ token }: { token: string }) => {
+        localStorage.setItem("token", token);
+        return authApi.me().then((res) => {
+          setAuth(res.data, token);
+          const name = (res.data.nombre ?? "").split(" ")[0];
+          setFirstName(name);
+          setStage("welcome");
+          setTimeout(() => router.replace("/planificacion"), 2200);
+        });
       })
       .catch(() => {
-        if (typeof window !== "undefined") localStorage.removeItem("token");
+        localStorage.removeItem("token");
         router.replace("/login?oauth_error=" + encodeURIComponent(ERROR_MESSAGES.unknown));
       });
   }, [searchParams, router, setAuth]);

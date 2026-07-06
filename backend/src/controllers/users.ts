@@ -1,8 +1,25 @@
 import { Response } from 'express'
 import bcrypt from 'bcrypt'
+import { z } from 'zod'
 import prisma from '../prisma'
 import { createAuditLog } from '../utils/audit'
 import { AuthRequest } from '../middleware/auth'
+
+const ROLES_VALIDOS = ['ADMINISTRADOR', 'WORKFORCE', 'USUARIO', 'LIDER', 'CAPACITADOR'] as const
+
+const createUserSchema = z.object({
+  nombre:   z.string().min(2).max(100).trim(),
+  email:    z.string().email('Email inválido').max(254).toLowerCase(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+  rol:      z.enum(ROLES_VALIDOS).optional(),
+})
+
+const updateUserSchema = z.object({
+  nombre:   z.string().min(2).max(100).trim().optional(),
+  email:    z.string().email('Email inválido').max(254).toLowerCase().optional(),
+  password: z.string().min(8).max(128).optional(),
+  rol:      z.enum(ROLES_VALIDOS).optional(),
+})
 
 export const listUsers = async (req: AuthRequest, res: Response) => {
   try {
@@ -22,17 +39,18 @@ export const listUsers = async (req: AuthRequest, res: Response) => {
 
 export const createUser = async (req: AuthRequest, res: Response) => {
   try {
-    const { nombre, email, password, rol } = req.body
-    if (!nombre || !email || !password) {
-      return res.status(400).json({ error: 'Nombre, email y contraseña son requeridos' })
+    const parsed = createUserSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message })
     }
+    const { nombre, email, password, rol } = parsed.data
 
     const existing = await prisma.usuario.findUnique({ where: { email } })
     if (existing) return res.status(409).json({ error: 'El email ya está en uso' })
 
     const hash = await bcrypt.hash(password, 10)
     const user = await prisma.usuario.create({
-      data: { nombre, email, password_hash: hash, rol: rol || 'USUARIO' },
+      data: { nombre, email, password_hash: hash, rol: rol ?? 'USUARIO' },
     })
 
     await createAuditLog({
@@ -53,12 +71,18 @@ export const createUser = async (req: AuthRequest, res: Response) => {
 export const updateUser = async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id)
-    const { nombre, email, password, rol } = req.body
+    if (!id || id < 1) return res.status(400).json({ error: 'ID de usuario inválido' })
+
+    const parsed = updateUserSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0].message })
+    }
+    const { nombre, email, password, rol } = parsed.data
 
     const existing = await prisma.usuario.findUnique({ where: { id } })
     if (!existing) return res.status(404).json({ error: 'Usuario no encontrado' })
 
-    const data: any = {}
+    const data: Record<string, unknown> = {}
     if (nombre) data.nombre = nombre
     if (email && email !== existing.email) {
       const dup = await prisma.usuario.findUnique({ where: { email } })

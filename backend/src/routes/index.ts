@@ -1,9 +1,18 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import { authenticate, requireAdmin, blockRole, requireRole } from '../middleware/auth'
 import { uploadExcel, uploadImagen } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
-import { googleAuth, googleCallback } from '../controllers/authGoogle'
+import { googleAuth, googleCallback, exchangeCode } from '../controllers/authGoogle'
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Esperá 15 minutos.' },
+})
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission, getUserSecciones, setUserSecciones, deleteUserSecciones } from '../controllers/users'
 import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
 import { listAgents, getAgent, createAgent, updateAgent, toggleAgent, getAgenteTimeline } from '../controllers/agents'
@@ -30,9 +39,10 @@ import { analizarNomina, procesarDistribucion, descargarDistribucion, cruzarNomi
 
 const router = Router()
 
-router.post('/auth/login', login)
+router.post('/auth/login', loginLimiter, login)
 router.get('/auth/me', authenticate, getMe)
 router.post('/auth/logout', authenticate, logout)
+router.post('/auth/exchange', exchangeCode)
 router.get('/auth/google', googleAuth)
 router.get('/auth/google/callback', googleCallback)
 

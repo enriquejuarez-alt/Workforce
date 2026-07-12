@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Konecta — Gestión de Nómina",
+  title: "Walt",
   description: "Gestión de nómina y planificación de dotación para equipos de soporte",
 };
 

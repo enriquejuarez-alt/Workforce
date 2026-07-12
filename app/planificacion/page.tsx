@@ -157,6 +157,7 @@ export default function UploadPage() {
   const [cargandoNomina, setCargandoNomina] = useState(false);
   const [useArchivoNomina, setUseArchivoNomina] = useState(false);
   const [cargandoNominaId, setCargandoNominaId] = useState<number | null>(null);
+  const [islaFiltro, setIslaFiltro] = useState<string | null>(null);
 
   // Derive numeric service ID from the shared selectedServicioKey
   const reqServicioId = selectedServicioKey ? parseInt(selectedServicioKey) : null;
@@ -219,6 +220,30 @@ export default function UploadPage() {
       normalizar(servicioActivo?.nombre ?? "").includes("interior"));
   const esVentas = reqServicioId === -13 || reqServicioId === -14 || reqServicioId === -15 ||
     (servicioActivo?.nombre ?? "").toLowerCase().startsWith("ventas");
+
+  // Islas/segmentos detectados dentro de la nomina cargada para el servicio activo
+  // (ej. Soporte Tecnico agrupa varias islas bajo un unico servicio_id en el sistema)
+  const islasDisponibles = useMemo(() => {
+    if (!agentesDesdeApi || agentesDesdeApi.length === 0) return [];
+    const serviciosActivos = getServiciosActivos();
+    if (serviciosActivos.length <= 1) return [];
+
+    const conteos = new Map<string, number>();
+    for (const a of agentesDesdeApi) {
+      const key = a.segmentoNorm || "";
+      conteos.set(key, (conteos.get(key) ?? 0) + 1);
+    }
+
+    return serviciosActivos
+      .map((def) => ({ key: def.key, label: def.label, count: conteos.get(def.key) ?? 0 }))
+      .filter((i) => i.count > 0);
+  }, [agentesDesdeApi]);
+
+  const agentesFiltradosPorIsla = useMemo(() => {
+    if (!agentesDesdeApi) return null;
+    if (!islaFiltro) return agentesDesdeApi;
+    return agentesDesdeApi.filter((a) => a.segmentoNorm === islaFiltro);
+  }, [agentesDesdeApi, islaFiltro]);
 
   const reductoresUtilizados = useMemo(() => {
     if (reductoresPreview.length === 0) return [];
@@ -403,6 +428,7 @@ export default function UploadPage() {
       setReductoresPreview([]);
       // Reset nomina from API when service changes
       clearAgentesDesdeApi();
+      setIslaFiltro(null);
     },
     [selectedServicioKey, setSelectedServicioKey, setArchivoCP, clearAgentesDesdeApi]
   );
@@ -542,6 +568,7 @@ export default function UploadPage() {
         };
       });
       setAgentesDesdeApi(agentes, nomina.mes, nomina.anio);
+      setIslaFiltro(null);
     } catch {
       toast.error("No se pudo cargar la nómina");
     } finally {
@@ -584,7 +611,7 @@ export default function UploadPage() {
       setPasoActual("Procesando reductores y nomina...");
       const { reductores, errores: errRed2 } = parseReductores(bufRed);
 
-      let agentesRaw = agentesDesdeApi ?? [];
+      let agentesRaw = agentesFiltradosPorIsla ?? [];
       let excl = 0;
       let segs: string[] = [];
       const errNom2: string[] = [];
@@ -645,7 +672,7 @@ export default function UploadPage() {
       setPasoActual("");
     }
   }, [
-    agentesDesdeApi, archivoCP, archivoReductores, archivoNomina,
+    agentesDesdeApi, agentesFiltradosPorIsla, archivoCP, archivoReductores, archivoNomina,
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases,
     setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
     setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
@@ -905,22 +932,58 @@ export default function UploadPage() {
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nomina activa</p>
                 </div>
                 {agentesDesdeApi && (
-                  <button onClick={clearAgentesDesdeApi} className="text-gray-300 hover:text-gray-500 transition-colors" title="Quitar y cargar otra">
+                  <button onClick={() => { clearAgentesDesdeApi(); setIslaFiltro(null); }} className="text-gray-300 hover:text-gray-500 transition-colors" title="Quitar y cargar otra">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
 
               {agentesDesdeApi ? (
-                <div className="flex items-center gap-2.5 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-green-800">Cargada desde el sistema</p>
-                    <p className="text-[11px] text-green-600 mt-0.5">
-                      {agentesDesdeApi.length} agentes
-                      {mesDesdeApi && anioDesdeApi ? ` - ${MESES[mesDesdeApi - 1]} ${anioDesdeApi}` : ""}
-                    </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2.5 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-green-800">Cargada desde el sistema</p>
+                      <p className="text-[11px] text-green-600 mt-0.5">
+                        {agentesFiltradosPorIsla?.length ?? agentesDesdeApi.length} agentes
+                        {islaFiltro ? " (isla filtrada)" : ""}
+                        {mesDesdeApi && anioDesdeApi ? ` - ${MESES[mesDesdeApi - 1]} ${anioDesdeApi}` : ""}
+                      </p>
+                    </div>
                   </div>
+
+                  {islasDisponibles.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Elegir isla (opcional)
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => setIslaFiltro(null)}
+                          className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors ${
+                            !islaFiltro
+                              ? "bg-[#0054A6] text-white border-[#0054A6]"
+                              : "bg-white text-slate-600 border-slate-200 hover:border-[#0054A6]/50"
+                          }`}
+                        >
+                          Todas ({agentesDesdeApi.length})
+                        </button>
+                        {islasDisponibles.map((isla) => (
+                          <button
+                            key={isla.key}
+                            onClick={() => setIslaFiltro(isla.key)}
+                            className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors ${
+                              islaFiltro === isla.key
+                                ? "bg-[#0054A6] text-white border-[#0054A6]"
+                                : "bg-white text-slate-600 border-slate-200 hover:border-[#0054A6]/50"
+                            }`}
+                          >
+                            {isla.label} ({isla.count})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : serviciosNomina && !useArchivoNomina ? (
                 <div className="space-y-2.5">

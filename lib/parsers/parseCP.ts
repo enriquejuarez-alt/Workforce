@@ -45,6 +45,9 @@ function detectarFormatoCP(matriz: number[][]): "hs" | "hc" {
 }
 
 function esFranjaHoraria(value: unknown): boolean {
+  // Excel puede exportar la columna de franjas como texto ("0:30") o como
+  // hora nativa (numero serie fraccion de dia, ej 0.0208333 = 00:30).
+  if (typeof value === "number") return value >= 0 && value < 1;
   return /^\d{1,2}:\d{2}(?:\s*-\s*\d{1,2}:\d{2})?$/.test(String(value ?? "").trim());
 }
 
@@ -126,14 +129,15 @@ export function parseCPConServicios(
     }
 
     for (let fila = filaInicioMatriz; fila < raw.length; fila++) {
-      const primeraCelda = String(raw[fila][0] ?? "").trim().toLowerCase();
+      const celdaRaw = raw[fila][0];
+      const primeraCelda = String(celdaRaw ?? "").trim().toLowerCase();
       if (primeraCelda.includes("total") || primeraCelda.includes("horas")) {
         for (let i = 0; i < columnasValidas.length; i++) {
           totalDiario[i] = safeNum(raw[fila][columnasValidas[i]]);
         }
         break;
       }
-      if (!esFranjaHoraria(primeraCelda)) {
+      if (!esFranjaHoraria(celdaRaw)) {
         if (!primeraCelda) continue;
         break;
       }

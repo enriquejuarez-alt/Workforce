@@ -24,8 +24,8 @@ El servidor de desarrollo corre con Next.js. Si el puerto por defecto esta ocupa
 
 1. Seleccionar servicio (requerido antes de procesar).
 2. Cargar matrices CP por servicio.
-3. Cargar reductores o usar la calculadora.
-4. Cargar nomina desde sistema o subir Excel manualmente.
+3. Cargar reductores, usar la calculadora o elegir un set guardado.
+4. Cargar nomina desde sistema (con filtro opcional por isla) o subir Excel manualmente.
 5. Revisar resumen, curvas, francos y simulador.
 6. Exportar escenarios cuando haga falta.
 
@@ -57,6 +57,19 @@ Para cada servicio:
 Hs brutas servicio = suma de hs mensuales brutas de sus agentes activos
 Hs semanal promedio = suma de hs semanales activas / HC activos
 ```
+
+### Nomina por isla
+
+Algunos servicios (ej. Soporte Tecnico) agrupan varias islas bajo un unico
+`servicio_id` del sistema (CBS, Conectividad, Entretenimiento, Movil, RRSS
+mas otros segmentos no relacionados). La distincion real vive en el campo
+`segmento` de cada agente, no en el `servicio_id`.
+
+En el paso "Nomina activa" de Planificacion aparece un selector de isla
+cuando el servicio activo agrupa mas de una (`getServiciosActivos().length > 1`
+en `lib/config/servicesRuntime.ts`). Muestra la cantidad de agentes
+detectados por isla y permite acotar el calculo a una isla puntual en vez
+del agregado completo.
 
 ## Reductores
 
@@ -131,6 +144,30 @@ RESUMEN PONDERADO
 
 Servicio | Deslogueo | Ausentismo | Rotacion
 ```
+
+## Reductores guardados
+
+Ademas de subir un archivo o usar la calculadora, los reductores se pueden
+persistir en la base (pestaña "Guardados" del paso 2 en Planificacion):
+
+- Guardar el set actual (`reductoresPreview`) con mes/anio y un nombre
+  opcional para reutilizarlo despues sin volver a subir el archivo.
+- Se permiten varias versiones guardadas para el mismo mes/anio (no se
+  pisan entre si); se listan por fecha de carga, mas reciente primero.
+- Editar valores individuales por servicio (deslogueo/ausentismo/rotacion)
+  desde la misma lista.
+- Borrar un set completo cuando ya no hace falta.
+
+Al elegir un set guardado, se reconstruye un Excel sintetico con el mismo
+formato `RESUMEN PONDERADO` (reutilizando `buildWorkbook`/`reductoresAFile`
+de `lib/parsers/calcularReductores.ts`), asi el resto del flujo de
+Procesar no distingue si los reductores vinieron de un archivo, la
+calculadora o un set guardado.
+
+Backend: modelos `ReductorImportacion`/`ReductorServicio` (Prisma) y CRUD
+en `backend/src/controllers/reductores.ts` (`GET/POST /reductores`,
+`GET /reductores/:id`, `PATCH /reductores/:id/servicios/:servicioId`,
+`DELETE /reductores/:id`).
 
 ## Formatos de CP soportados
 
@@ -469,12 +506,13 @@ components/tables/SimuladorTable.tsx    UI del constructor de escenarios
 components/charts/CumplimientoBarChart.tsx Grafico de cumplimiento con leyenda de niveles
 lib/domain/calculos.ts                  Matematica principal
 lib/domain/francoEngine.ts              Calculo de francos
-lib/parsers/calcularReductores.ts       Calculadora de reductores (ponderacion 80/90/100)
+lib/parsers/calcularReductores.ts       Calculadora de reductores (ponderacion 80/90/100) + buildWorkbook/reductoresAFile
 lib/parsers/parseCP.ts                  Parser formato Soporte (+ KON)
 lib/parsers/parseCPPpay.ts              Parser formato Personal Pay
 lib/parsers/parseCPSmb.ts               Parser formato SMB
 lib/parsers/parseCPOnb.ts               Parser formato Onboarding
 lib/utils/exportSimulador.ts            Exportacion Excel (5 hojas)
+backend/src/controllers/reductores.ts   CRUD de reductores guardados (ReductorImportacion/ReductorServicio)
 CALCULO_REDUCTORES.md                   Nota corta del calculo de reductores
 ```
 

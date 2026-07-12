@@ -5,6 +5,7 @@ import type {
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, CambioHorario, Capacitacion, Remocion,
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
   ProgramacionMensual, FactorReduccion, SimulacionResponse, CronogramaResponse,
+  ReductorImportacion, ReductorServicioRow,
 } from '@/types'
 
 const api = axios.create({
@@ -282,6 +283,25 @@ export const vacacionesApi = {
   importaciones: () => api.get<VacacionImportacion[]>('/vacaciones/importaciones'),
   delete: (id: number) => api.delete(`/vacaciones/${id}`),
   deleteImportacion: (id: number) => api.delete(`/vacaciones/importaciones/${id}`),
+}
+
+// Reductores guardados (Planificación)
+export const reductorImportacionesApi = {
+  list: () => api.get<ReductorImportacion[]>('/reductores'),
+  get: (id: number) => api.get<ReductorImportacion>(`/reductores/${id}`),
+  create: (data: {
+    mes: number
+    anio: number
+    nombre?: string
+    archivo_nombre?: string
+    servicios: Array<{ servicio: string; servicioNorm: string; deslogueo: number; ausentismo: number; rotacion: number }>
+  }) => api.post<ReductorImportacion>('/reductores', data),
+  updateServicio: (
+    id: number,
+    servicioId: number,
+    data: Partial<Pick<ReductorServicioRow, 'deslogueo' | 'ausentismo' | 'rotacion'>>,
+  ) => api.patch<ReductorServicioRow>(`/reductores/${id}/servicios/${servicioId}`, data),
+  delete: (id: number) => api.delete(`/reductores/${id}`),
 }
 
 // Configuración de roles

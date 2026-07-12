@@ -35,6 +35,13 @@ import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVa
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
+import {
+  listReductorImportaciones,
+  getReductorImportacion,
+  createReductorImportacion,
+  updateReductorServicio,
+  deleteReductorImportacion,
+} from '../controllers/reductores'
 import { getReporteAusentismo, exportReporteAusentismo } from '../controllers/reportes'
 import { getRolConfig, updateRolConfig, resetRolConfig } from '../controllers/configuracion'
 import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, previewRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, exportConversor, getCronograma, setNomina } from '../controllers/programacion'
@@ -161,6 +168,12 @@ router.get('/vacaciones', authenticate, listVacaciones)
 router.get('/vacaciones/importaciones', authenticate, requireAdmin, listImportacionesVacaciones)
 router.delete('/vacaciones/:id', authenticate, requireAdmin, deleteVacacion)
 router.delete('/vacaciones/importaciones/:id', authenticate, requireAdmin, deleteImportacionVacaciones)
+
+router.get('/reductores', authenticate, listReductorImportaciones)
+router.get('/reductores/:id', authenticate, getReductorImportacion)
+router.post('/reductores', authenticate, createReductorImportacion)
+router.patch('/reductores/:id/servicios/:servicioId', authenticate, updateReductorServicio)
+router.delete('/reductores/:id', authenticate, deleteReductorImportacion)
 
 router.get('/reportes/ausentismo/export', authenticate, blockRole('CAPACITADOR'), exportReporteAusentismo)
 router.get('/reportes/ausentismo', authenticate, blockRole('CAPACITADOR'), getReporteAusentismo)

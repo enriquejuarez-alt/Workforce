@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   AlertCircle, ArrowRight, ChevronDown, AlertTriangle,
   Loader2, CheckCircle2, X, FilePen, Calculator, Database, RotateCcw,
+  Save, Trash2, FolderOpen,
 } from "lucide-react";
+import ConfirmDialog from "@/components/hr/ui/ConfirmDialog";
 import { DropZone } from "@/components/upload/DropZone";
 import { FilePreview } from "@/components/upload/FilePreview";
 import { Button } from "@/components/ui/button";
@@ -44,7 +46,7 @@ import {
 } from "@/lib/parsers/parseNomina";
 import { parseCPVentas, validarHojasCPVentas } from "@/lib/parsers/parseCPVentas";
 import { parseReductores } from "@/lib/parsers/parseReductores";
-import { calcularReductoresDesdeArchivos } from "@/lib/parsers/calcularReductores";
+import { calcularReductoresDesdeArchivos, reductoresAFile } from "@/lib/parsers/calcularReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
 import type { Agente, Reductor } from "@/lib/domain/types";
 import { generarAlertas } from "@/lib/domain/alertEngine";
@@ -59,7 +61,7 @@ import { SERVICIOS_BO } from "@/lib/config/servicesBo";
 import { SERVICIOS_TECH } from "@/lib/config/servicesTech";
 import { SERVICIOS_INTEGRAL } from "@/lib/config/servicesIntegral";
 import { extraerHorasContrato } from "@/lib/utils/excel";
-import { nominasApi } from "@/lib/api";
+import { nominasApi, reductorImportacionesApi } from "@/lib/api";
 import type { NominaMensual, AgenteNominaMensual } from "@/types";
 import {
   Select,
@@ -113,11 +115,12 @@ const fade = {
   transition: { duration: 0.3 },
 };
 
-type ModoCargaReductores = "archivo" | "calculadora";
+type ModoCargaReductores = "archivo" | "calculadora" | "guardado";
 type FuenteCalculadora = "deslogueo" | "ausentismo" | "rotacion";
 
 export default function UploadPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const {
     archivoCP, archivoReductores, archivoNomina,
     hojaNomina, hojasNomina, modoReductor, topeFacturacion,
@@ -158,6 +161,10 @@ export default function UploadPage() {
   const [useArchivoNomina, setUseArchivoNomina] = useState(false);
   const [cargandoNominaId, setCargandoNominaId] = useState<number | null>(null);
   const [islaFiltro, setIslaFiltro] = useState<string | null>(null);
+  const [reductorGuardadoId, setReductorGuardadoId] = useState<number | null>(null);
+  const [nombreGuardado, setNombreGuardado] = useState("");
+  const [showGuardarInput, setShowGuardarInput] = useState(false);
+  const [deleteReductorGuardadoId, setDeleteReductorGuardadoId] = useState<number | null>(null);
 
   // Derive numeric service ID from the shared selectedServicioKey
   const reqServicioId = selectedServicioKey ? parseInt(selectedServicioKey) : null;
@@ -184,6 +191,51 @@ export default function UploadPage() {
         .then((r) => r.data),
     enabled: !!servicioActivo && !servicioDemoActivo && !!serviciosNomina && !useArchivoNomina,
   });
+
+  const { data: reductoresGuardados = [], isLoading: loadingReductoresGuardados } = useQuery({
+    queryKey: ["reductores-guardados"],
+    queryFn: () => reductorImportacionesApi.list().then((r) => r.data),
+    enabled: modoCargaReductores === "guardado",
+  });
+
+  const { data: reductorGuardadoDetalle, isLoading: loadingReductorGuardadoDetalle } = useQuery({
+    queryKey: ["reductor-guardado", reductorGuardadoId],
+    queryFn: () => reductorImportacionesApi.get(reductorGuardadoId!).then((r) => r.data),
+    enabled: reductorGuardadoId !== null,
+  });
+
+  const guardarReductoresMut = useMutation({
+    mutationFn: (data: { mes: number; anio: number; nombre?: string; archivo_nombre?: string; servicios: Reductor[] }) =>
+      reductorImportacionesApi.create(data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reductores-guardados"] });
+      toast.success("Reductores guardados");
+      setShowGuardarInput(false);
+      setNombreGuardado("");
+    },
+    onError: () => toast.error("No se pudo guardar el set de reductores"),
+  });
+
+  const actualizarServicioGuardadoMut = useMutation({
+    mutationFn: ({ id, servicioId, data }: { id: number; servicioId: number; data: Partial<Pick<Reductor, "deslogueo" | "ausentismo" | "rotacion">> }) =>
+      reductorImportacionesApi.updateServicio(id, servicioId, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reductor-guardado", reductorGuardadoId] });
+    },
+    onError: () => toast.error("No se pudo actualizar el valor"),
+  });
+
+  const eliminarReductorGuardadoMut = useMutation({
+    mutationFn: (id: number) => reductorImportacionesApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reductores-guardados"] });
+      if (reductorGuardadoId === deleteReductorGuardadoId) setReductorGuardadoId(null);
+      setDeleteReductorGuardadoId(null);
+      toast.success("Set de reductores eliminado");
+    },
+    onError: () => toast.error("No se pudo eliminar"),
+  });
+
   const esPersonalPay = reqServicioId === -1 ||
     (servicioActivo?.nombre ?? "").toLowerCase().includes("personal pay");
   const esSmb = reqServicioId === -2 ||
@@ -514,6 +566,33 @@ export default function UploadPage() {
     }
   }, [fuentesReductores, setArchivoReductores]);
 
+  const handleUsarReductorGuardado = useCallback(() => {
+    if (!reductorGuardadoDetalle?.servicios) return;
+    const reductores: Reductor[] = reductorGuardadoDetalle.servicios.map((s) => ({
+      servicio: s.servicio,
+      servicioNorm: s.servicio_norm,
+      deslogueo: s.deslogueo,
+      ausentismo: s.ausentismo,
+      rotacion: s.rotacion,
+    }));
+    const nombreArchivo = reductorGuardadoDetalle.archivo_nombre || `reductores-${reductorGuardadoDetalle.mes}-${reductorGuardadoDetalle.anio}.xlsx`;
+    const file = reductoresAFile(reductores, nombreArchivo);
+    setArchivoReductores(file);
+    setReductoresPreview(reductores);
+    toast.success("Reductores guardados listos para usar");
+  }, [reductorGuardadoDetalle, setArchivoReductores]);
+
+  const handleGuardarReductoresActuales = useCallback(() => {
+    if (reductoresPreview.length === 0) return;
+    guardarReductoresMut.mutate({
+      mes: reqMes,
+      anio: reqAnio,
+      nombre: nombreGuardado.trim() || undefined,
+      archivo_nombre: archivoReductores?.name,
+      servicios: reductoresPreview,
+    });
+  }, [reductoresPreview, reqMes, reqAnio, nombreGuardado, archivoReductores, guardarReductoresMut]);
+
   const handleNomina = useCallback(async (file: File, buffer: ArrayBuffer) => {
     setLoadingNom(true);
     setErrNom("");
@@ -819,10 +898,11 @@ export default function UploadPage() {
                 <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Reductores operativos</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100/80 p-1">
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100/80 p-1">
                 {([
                   ["archivo", "Cargar reductores"],
                   ["calculadora", "Usar calculadora"],
+                  ["guardado", "Guardados"],
                 ] as const).map(([value, label]) => (
                   <button
                     key={value}
@@ -848,7 +928,7 @@ export default function UploadPage() {
                   error={errRed}
                   loading={loadingRed}
                 />
-              ) : (
+              ) : modoCargaReductores === "calculadora" ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-1 gap-2">
                     <DropZone label="Deslogueo operativo" sublabel="ultimos 3 meses" onFile={handleFuenteReductor("deslogueo")} hasFile={!!fuentesReductores.deslogueo} fileName={fuentesReductores.deslogueo?.file.name} />
@@ -875,6 +955,141 @@ export default function UploadPage() {
                         {reductoresCalculados} servicios calculados
                       </p>
                     </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {loadingReductoresGuardados ? (
+                    <div className="flex items-center justify-center py-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    </div>
+                  ) : reductoresGuardados.length === 0 ? (
+                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+                      Todavía no guardaste ningún set de reductores.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 space-y-1.5 overflow-auto pr-1">
+                      {reductoresGuardados.map((rg) => {
+                        const isActive = reductorGuardadoId === rg.id;
+                        return (
+                          <div
+                            key={rg.id}
+                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${
+                              isActive ? "border-[#0054A6]/50 bg-blue-50/40" : "border-slate-200 bg-white hover:border-[#0054A6]/30"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setReductorGuardadoId(rg.id)}
+                              className="flex flex-1 items-center gap-2.5 text-left min-w-0"
+                            >
+                              <FolderOpen className="h-3.5 w-3.5 shrink-0 text-[#0054A6]" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-slate-700 truncate">
+                                  {rg.nombre || `${MESES[rg.mes - 1]} ${rg.anio}`}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {MESES[rg.mes - 1]} {rg.anio} · {rg._count?.servicios ?? 0} servicios
+                                  {rg.archivo_nombre ? ` · ${rg.archivo_nombre}` : ""}
+                                </p>
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteReductorGuardadoId(rg.id)}
+                              className="shrink-0 text-slate-300 transition-colors hover:text-red-500"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {reductorGuardadoId !== null && (() => {
+                    const impId = reductorGuardadoId;
+                    return (
+                      <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+                        {loadingReductorGuardadoDetalle ? (
+                          <div className="flex items-center justify-center py-3">
+                            <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                          </div>
+                        ) : reductorGuardadoDetalle?.servicios ? (
+                          <>
+                            <div className="max-h-48 space-y-1.5 overflow-auto pr-1">
+                              {reductorGuardadoDetalle.servicios.map((s) => (
+                                <div key={s.id} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                                  <p className="mb-1 truncate text-[11px] font-bold text-slate-700">{s.servicio}</p>
+                                  <div className="grid grid-cols-3 gap-1.5">
+                                    {(["deslogueo", "ausentismo", "rotacion"] as const).map((campo) => (
+                                      <label key={campo} className="flex flex-col gap-0.5">
+                                        <span className="text-[9px] uppercase text-slate-400">{campo.slice(0, 4)}</span>
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          defaultValue={s[campo]}
+                                          onBlur={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            if (!isNaN(val) && val !== s[campo]) {
+                                              actualizarServicioGuardadoMut.mutate({ id: impId, servicioId: s.id, data: { [campo]: val } });
+                                            }
+                                          }}
+                                          className="h-7 rounded border border-slate-200 px-1.5 text-[11px] outline-none focus:border-[#0054A6]"
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleUsarReductorGuardado}
+                              className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-purple-600 text-xs font-semibold text-white transition-colors hover:bg-purple-700"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />Usar estos reductores
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              {modoCargaReductores !== "guardado" && reductoresPreview.length > 0 && (
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+                  {showGuardarInput ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nombre (opcional)"
+                        value={nombreGuardado}
+                        onChange={(e) => setNombreGuardado(e.target.value)}
+                        className="h-8 flex-1 rounded-lg border border-slate-200 px-2.5 text-[11px] outline-none focus:border-[#0054A6]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGuardarReductoresActuales}
+                        disabled={guardarReductoresMut.isPending}
+                        className="flex h-8 items-center gap-1.5 rounded-lg bg-[#0054A6] px-3 text-[11px] font-semibold text-white transition-colors hover:bg-[#00449A] disabled:opacity-50"
+                      >
+                        {guardarReductoresMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                        Guardar
+                      </button>
+                      <button type="button" onClick={() => setShowGuardarInput(false)} className="text-slate-400 hover:text-slate-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowGuardarInput(true)}
+                      className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 text-[11px] font-semibold text-slate-500 transition-colors hover:border-[#0054A6]/50 hover:text-[#0054A6]"
+                    >
+                      <Save className="h-3.5 w-3.5" />Guardar para reutilizar
+                    </button>
                   )}
                 </div>
               )}
@@ -1175,6 +1390,17 @@ export default function UploadPage() {
         </div>
 
       </motion.div>
+
+      <ConfirmDialog
+        isOpen={deleteReductorGuardadoId !== null}
+        onClose={() => setDeleteReductorGuardadoId(null)}
+        onConfirm={() => deleteReductorGuardadoId && eliminarReductorGuardadoMut.mutate(deleteReductorGuardadoId)}
+        title="Eliminar reductores guardados"
+        message="¿Seguro querés eliminar este set de reductores? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+        loading={eliminarReductorGuardadoMut.isPending}
+      />
     </div>
   );
 }

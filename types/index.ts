@@ -346,6 +346,30 @@ export interface Vacacion {
   estado_calculado?: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
 }
 
+export interface ReductorImportacion {
+  id: number
+  mes: number
+  anio: number
+  nombre: string | null
+  archivo_nombre: string | null
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  fecha_actualizacion: string
+  servicios?: ReductorServicioRow[]
+  _count?: { servicios: number }
+}
+
+export interface ReductorServicioRow {
+  id: number
+  importacion_id: number
+  servicio: string
+  servicio_norm: string
+  deslogueo: number
+  ausentismo: number
+  rotacion: number
+}
+
 export interface AuditoriaLog {
   id: number
   usuario_id: number | null

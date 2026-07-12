@@ -320,7 +320,7 @@ function mergeMetrics(metrics: Record<MetricaReductor, MetricRow[]>): Reductor[]
   return [...byServicio.values()].sort((a, b) => a.servicio.localeCompare(b.servicio));
 }
 
-function buildWorkbook(reductores: Reductor[]): ArrayBuffer {
+export function buildWorkbook(reductores: Reductor[]): ArrayBuffer {
   const rows = [
     ["Servicio", "Deslogueo", "Ausentismo", "Rotacion"],
     ...reductores.map((r) => [r.servicio, r.deslogueo, r.ausentismo, r.rotacion]),
@@ -362,4 +362,13 @@ export async function calcularReductoresDesdeArchivos(
   });
 
   return { file, reductores, errores };
+}
+
+/** Construye un File .xlsx sintetico ("RESUMEN PONDERADO") a partir de reductores ya resueltos. */
+export function reductoresAFile(reductores: Reductor[], nombre = "reductores-guardados.xlsx"): File {
+  const buffer = buildWorkbook(reductores);
+  return new File([buffer], nombre, {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    lastModified: Date.now(),
+  });
 }

@@ -5,7 +5,8 @@ import type {
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, CambioHorario, Capacitacion, Remocion,
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
   ProgramacionMensual, FactorReduccion, SimulacionResponse, CronogramaResponse,
-  ReductorImportacion, ReductorServicioRow,
+  ReductorImportacion, ReductorServicioRow, AgenteServicioHistorial,
+  HistorialServicioImportacion,
 } from '@/types'
 
 const api = axios.create({
@@ -74,12 +75,37 @@ export const serviciosApi = {
 
 // Agentes
 export const agentesApi = {
-  list: (params?: Record<string, any>) => api.get<Agente[]>('/agentes', { params }),
+  list: (params?: Record<string, any>) =>
+    api.get<{ total: number; page: number; limit: number; data: Agente[] }>('/agentes', { params }),
   get: (id: number) => api.get<Agente>(`/agentes/${id}`),
   create: (data: Partial<Agente>) => api.post<Agente>('/agentes', data),
-  update: (id: number, data: Partial<Agente>) => api.put<Agente>(`/agentes/${id}`, data),
+  update: (id: number, data: Partial<Agente> & { motivo_cambio?: string }) => api.put<Agente>(`/agentes/${id}`, data),
   toggle: (id: number) => api.patch<{ activo: boolean }>(`/agentes/${id}/estado`),
   timeline: (id: number) => api.get<TimelineEvento[]>(`/agentes/${id}/timeline`),
+  services: (id: number) => api.get<AgenteServicioHistorial[]>(`/agentes/${id}/services`),
+  audit: (id: number, params?: Record<string, any>) =>
+    api.get<{ total: number; page: number; limit: number; data: AuditoriaLog[] }>(`/agentes/${id}/audit`, { params }),
+  exportExcel: (params?: Record<string, any>) => api.get('/agentes/export', { params, responseType: 'blob' }),
+}
+
+// Importacion de historico de servicios (Historial de Agentes)
+export const historialServicioImportApi = {
+  validar: (formData: FormData) =>
+    api.post<{
+      token: string
+      fecha_desde_archivo: string
+      fecha_hasta_archivo: string
+      agentes_en_archivo: number
+      agentes_ya_existentes: number
+      agentes_a_crear: number
+      transiciones_servicio_nuevas: number
+      transiciones_superior_nuevas: number
+      areas_sin_mapeo: string[]
+      muestra_agentes_a_crear: { dni: string; nombre: string }[]
+    }>('/historial-agente/import/validar', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 5 * 60 * 1000 }),
+  confirmar: (token: string) =>
+    api.post<HistorialServicioImportacion>('/historial-agente/import/confirmar', { token }, { timeout: 5 * 60 * 1000 }),
+  list: () => api.get<HistorialServicioImportacion[]>('/historial-agente/import'),
 }
 
 // Nóminas

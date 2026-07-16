@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { authenticate, requireAdmin, blockRole, requireRole } from '../middleware/auth'
-import { uploadExcel, uploadImagen } from '../middleware/upload'
+import { uploadExcel, uploadImagen, uploadCsv } from '../middleware/upload'
 
 import { login, getMe, logout } from '../controllers/auth'
 import { googleAuth, googleCallback, exchangeCode } from '../controllers/authGoogle'
@@ -18,7 +18,12 @@ const loginLimiter = rateLimit({
 })
 import { listUsers, createUser, updateUser, toggleUser, getUserPermissions, setUserPermission, deleteUserPermission, getUserSecciones, setUserSecciones, deleteUserSecciones } from '../controllers/users'
 import { listServices, createService, updateService, toggleService, deleteService, getServiceMetrics, getServiceSegmentos } from '../controllers/services'
-import { listAgents, getAgent, createAgent, updateAgent, toggleAgent, getAgenteTimeline } from '../controllers/agents'
+import { listAgents, getAgent, createAgent, updateAgent, toggleAgent, getAgenteTimeline, getAgenteServicios, getAgenteAudit, exportAgentes } from '../controllers/agents'
+import {
+  validarHistorialServicio,
+  confirmarHistorialServicio,
+  listHistorialServicioImportaciones,
+} from '../controllers/historialServicioImport'
 import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
 import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias, getCalendarioLicencias, exportCalendarioLicencias } from '../controllers/licencias'
@@ -76,11 +81,18 @@ router.get('/servicios/:id/metricas', authenticate, getServiceMetrics)
 router.get('/servicios/:id/segmentos', authenticate, requireAdmin, getServiceSegmentos)
 
 router.get('/agentes', authenticate, blockRole('CAPACITADOR'), listAgents)
+router.get('/agentes/export', authenticate, blockRole('CAPACITADOR'), exportAgentes)
 router.post('/agentes', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE', 'USUARIO'), createAgent)
 router.get('/agentes/:id', authenticate, blockRole('CAPACITADOR'), getAgent)
 router.put('/agentes/:id', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE', 'USUARIO'), updateAgent)
 router.patch('/agentes/:id/estado', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE', 'USUARIO'), toggleAgent)
 router.get('/agentes/:id/timeline', authenticate, blockRole('CAPACITADOR'), getAgenteTimeline)
+router.get('/agentes/:id/services', authenticate, blockRole('CAPACITADOR'), getAgenteServicios)
+router.get('/agentes/:id/audit', authenticate, requireAdmin, getAgenteAudit)
+
+router.post('/historial-agente/import/validar', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE'), uploadCsv.single('file'), validarHistorialServicio)
+router.post('/historial-agente/import/confirmar', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE'), confirmarHistorialServicio)
+router.get('/historial-agente/import', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE'), listHistorialServicioImportaciones)
 
 router.get('/nominas/comparar', authenticate, blockRole('CAPACITADOR', 'LIDER'), compareNominas)
 router.get('/nominas', authenticate, blockRole('CAPACITADOR'), listNominas)

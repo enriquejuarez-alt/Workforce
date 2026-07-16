@@ -10,12 +10,22 @@ function calcularEstado(fechaInicio: Date, fechaFin: Date): string {
   return 'VIGENTE'
 }
 
+export const RESULTADOS_CAPACITACION = [
+  'INSCRIPTO',
+  'EN_CURSO',
+  'APROBADO',
+  'DESAPROBADO',
+  'AUSENTE',
+  'CANCELADO',
+]
+
 export const listCapacitaciones = async (req: AuthRequest, res: Response) => {
   try {
-    const { servicio_id, segmento, estado_cap, tipo_formacion } = req.query
+    const { servicio_id, agente_id, segmento, estado_cap, tipo_formacion } = req.query
     const now = new Date()
     const where: any = {}
     if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
+    if (agente_id) where.agente_id = parseInt(agente_id as string)
     if (segmento) {
       where.segmento = segmento === 'SIN_DEFINIR' ? null : { equals: segmento as string, mode: 'insensitive' }
     }
@@ -41,6 +51,7 @@ export const listCapacitaciones = async (req: AuthRequest, res: Response) => {
       include: {
         servicio: { select: { id: true, nombre: true, color: true } },
         creador: { select: { id: true, nombre: true } },
+        capacitador: { select: { id: true, nombre: true } },
       },
       orderBy: { fecha_fin: 'asc' },
       take: 1000,
@@ -63,6 +74,7 @@ export const createCapacitacion = async (req: AuthRequest, res: Response) => {
       agente_id, agente_dni, agente_nombre, usuario_sistema, superior,
       servicio_id, servicio_nombre, segmento, horarios, estado, contrato,
       sitio, modalidad, jefe, observacion, tipo_formacion, fecha_inicio, fecha_fin,
+      resultado, calificacion, capacitador_id, certificado_url,
     } = req.body
 
     if (!agente_nombre || !fecha_inicio || !fecha_fin) {
@@ -94,10 +106,15 @@ export const createCapacitacion = async (req: AuthRequest, res: Response) => {
         fecha_inicio: new Date(fecha_inicio),
         fecha_fin: new Date(fecha_fin),
         creado_por: req.user!.userId,
+        resultado: resultado || null,
+        calificacion: calificacion || null,
+        capacitador_id: capacitador_id ? parseInt(capacitador_id) : null,
+        certificado_url: certificado_url || null,
       },
       include: {
         servicio: { select: { id: true, nombre: true, color: true } },
         creador: { select: { id: true, nombre: true } },
+        capacitador: { select: { id: true, nombre: true } },
       },
     })
 
@@ -107,6 +124,7 @@ export const createCapacitacion = async (req: AuthRequest, res: Response) => {
       entidad: 'Capacitacion',
       entidad_id: String(cap.id),
       servicio_id: cap.servicio_id ?? undefined,
+      agente_id: cap.agente_id ?? undefined,
       valor_nuevo: `${agente_nombre} — ${fecha_inicio} al ${fecha_fin}`,
     })
 
@@ -130,6 +148,7 @@ export const updateCapacitacion = async (req: AuthRequest, res: Response) => {
     const fields = [
       'agente_nombre', 'usuario_sistema', 'superior', 'servicio_nombre',
       'horarios', 'estado', 'contrato', 'sitio', 'modalidad', 'jefe', 'observacion', 'tipo_formacion',
+      'resultado', 'calificacion', 'certificado_url',
     ]
     const data: any = {}
     for (const f of fields) {
@@ -137,6 +156,9 @@ export const updateCapacitacion = async (req: AuthRequest, res: Response) => {
     }
     if (req.body.segmento !== undefined) {
       data.segmento = req.body.segmento === 'SIN_DEFINIR' ? null : req.body.segmento || null
+    }
+    if (req.body.capacitador_id !== undefined) {
+      data.capacitador_id = req.body.capacitador_id ? parseInt(req.body.capacitador_id) : null
     }
     if (req.body.fecha_inicio) data.fecha_inicio = new Date(req.body.fecha_inicio)
     if (req.body.fecha_fin) data.fecha_fin = new Date(req.body.fecha_fin)
@@ -147,8 +169,22 @@ export const updateCapacitacion = async (req: AuthRequest, res: Response) => {
       include: {
         servicio: { select: { id: true, nombre: true, color: true } },
         creador: { select: { id: true, nombre: true } },
+        capacitador: { select: { id: true, nombre: true } },
       },
     })
+
+    if (req.body.resultado !== undefined && req.body.resultado !== existing.resultado) {
+      await createAuditLog({
+        usuario_id: req.user!.userId,
+        accion: 'ACTUALIZAR_RESULTADO_CAPACITACION',
+        entidad: 'Capacitacion',
+        entidad_id: String(id),
+        servicio_id: cap.servicio_id ?? undefined,
+        agente_id: cap.agente_id ?? undefined,
+        valor_anterior: existing.resultado ?? undefined,
+        valor_nuevo: req.body.resultado ?? undefined,
+      })
+    }
 
     return res.json({
       ...cap,
@@ -259,6 +295,7 @@ export const darDeAlta = async (req: AuthRequest, res: Response) => {
         entidad: 'Capacitacion',
         entidad_id: String(id),
         servicio_id: cap.servicio_id ?? undefined,
+        agente_id: agenteId ?? undefined,
         nomina_mensual_id: nomina.id,
         valor_nuevo: `${cap.agente_nombre} → Nómina ${mes}/${anio}`,
       })
@@ -278,6 +315,7 @@ export const darDeAlta = async (req: AuthRequest, res: Response) => {
       include: {
         servicio: { select: { id: true, nombre: true, color: true } },
         creador: { select: { id: true, nombre: true } },
+        capacitador: { select: { id: true, nombre: true } },
       },
     })
 

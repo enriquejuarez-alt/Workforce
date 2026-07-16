@@ -1,295 +1,439 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Search, X, ChevronLeft, ChevronRight, Download, SlidersHorizontal, GitCommitVertical,
+  Upload, AlertTriangle, CheckCircle2, Loader2,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import Header from '@/components/hr/layout/Header'
+import Modal from '@/components/hr/ui/Modal'
+import { agentesApi, serviciosApi, historialServicioImportApi } from '@/lib/api'
+import { EstadoAgenteBadge } from '@/components/hr/ui/Badge'
+import EmptyState from '@/components/hr/ui/EmptyState'
+import { SkeletonTable } from '@/components/hr/ui/Skeleton'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import { useAuthStore } from '@/store/auth'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import {
-  Search, X, Stethoscope, RefreshCw, ScrollText,
-  GraduationCap, DoorOpen, Palmtree, UserX, GitCommitVertical,
-} from 'lucide-react'
-import Header from '@/components/hr/layout/Header'
-import { agentesApi } from '@/lib/api'
-import type { Agente, TimelineEvento } from '@/types'
-import type { LucideIcon } from 'lucide-react'
 
-type TipoFiltro = TimelineEvento['tipo'] | 'TODOS'
+const LIMIT = 50
 
-const TIPO_CFG: Record<TimelineEvento['tipo'], {
-  label: string; Icon: LucideIcon
-  iconColor: string; bg: string; badge: string; filtro: string
-}> = {
-  LICENCIA:        { label: 'Licencia',         Icon: Stethoscope,  iconColor: 'text-red-400',     bg: 'bg-red-50',     badge: 'bg-red-100 text-red-700',     filtro: 'bg-red-100 text-red-700 border-red-200' },
-  CAMBIO_TEMPORAL: { label: 'Cambio de servicio',Icon: RefreshCw,    iconColor: 'text-blue-400',    bg: 'bg-blue-50',    badge: 'bg-blue-100 text-blue-700',   filtro: 'bg-blue-100 text-blue-700 border-blue-200' },
-  CAMBIO_CONTRATO: { label: 'Cambio de contrato',Icon: ScrollText,   iconColor: 'text-purple-400',  bg: 'bg-purple-50',  badge: 'bg-purple-100 text-purple-700',filtro: 'bg-purple-100 text-purple-700 border-purple-200' },
-  CAPACITACION:    { label: 'Capacitación',      Icon: GraduationCap,iconColor: 'text-emerald-500', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700',filtro: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  REMOCION:        { label: 'Remoción',          Icon: DoorOpen,     iconColor: 'text-orange-400',  bg: 'bg-orange-50',  badge: 'bg-orange-100 text-orange-700', filtro: 'bg-orange-100 text-orange-700 border-orange-200' },
-  VACACION:        { label: 'Vacaciones',        Icon: Palmtree,     iconColor: 'text-sky-400',     bg: 'bg-sky-50',     badge: 'bg-sky-100 text-sky-700',     filtro: 'bg-sky-100 text-sky-700 border-sky-200' },
-  BAJA:            { label: 'Baja',              Icon: UserX,        iconColor: 'text-gray-500',    bg: 'bg-gray-100',   badge: 'bg-gray-200 text-gray-700',   filtro: 'bg-gray-200 text-gray-700 border-gray-300' },
-}
+export default function HistorialAgentesListado() {
+  const router = useRouter()
+  const qc = useQueryClient()
+  const rol = useAuthStore((s) => s.user?.rol)
+  const puedeImportar = rol === 'ADMINISTRADOR' || rol === 'WORKFORCE'
+  const [showImport, setShowImport] = useState(false)
 
-const FILTROS: { tipo: TipoFiltro; label: string }[] = [
-  { tipo: 'TODOS', label: 'Todos' },
-  { tipo: 'LICENCIA', label: 'Licencias' },
-  { tipo: 'VACACION', label: 'Vacaciones' },
-  { tipo: 'CAMBIO_CONTRATO', label: 'Cambio contrato' },
-  { tipo: 'CAMBIO_TEMPORAL', label: 'Cambio servicio' },
-  { tipo: 'CAPACITACION', label: 'Capacitaciones' },
-  { tipo: 'REMOCION', label: 'Remociones' },
-  { tipo: 'BAJA', label: 'Bajas' },
-]
+  const [searchInput, setSearchInput] = useState('')
+  const search = useDebouncedValue(searchInput, 350)
+  const [servicioId, setServicioId] = useState('')
+  const [servicioAnteriorId, setServicioAnteriorId] = useState('')
+  const [estado, setEstado] = useState('')
+  const [modalidad, setModalidad] = useState('')
+  const [activo, setActivo] = useState('')
+  const [tieneCapacitaciones, setTieneCapacitaciones] = useState(false)
+  const [tieneRemociones, setTieneRemociones] = useState(false)
+  const [edadMin, setEdadMin] = useState('')
+  const [edadMax, setEdadMax] = useState('')
+  const [fechaIngresoDesde, setFechaIngresoDesde] = useState('')
+  const [fechaIngresoHasta, setFechaIngresoHasta] = useState('')
+  const [page, setPage] = useState(1)
+  const [exporting, setExporting] = useState(false)
 
-function fmtFecha(iso: string) {
-  return format(new Date(iso + 'T12:00:00'), 'dd/MM/yyyy', { locale: es })
-}
+  const params: Record<string, any> = { page, limit: LIMIT }
+  if (search) params.search = search
+  if (servicioId) params.servicio_id = servicioId
+  if (servicioAnteriorId) params.servicio_anterior_id = servicioAnteriorId
+  if (estado) params.estado = estado
+  if (modalidad) params.modalidad = modalidad
+  if (activo) params.activo = activo
+  if (tieneCapacitaciones) params.tiene_capacitaciones = 'true'
+  if (tieneRemociones) params.tiene_remociones = 'true'
+  if (edadMin) params.edad_min = edadMin
+  if (edadMax) params.edad_max = edadMax
+  if (fechaIngresoDesde) params.fecha_ingreso_desde = fechaIngresoDesde
+  if (fechaIngresoHasta) params.fecha_ingreso_hasta = fechaIngresoHasta
 
-export default function HistorialAgente() {
-  const [query, setQuery] = useState('')
-  const [showResults, setShowResults] = useState(false)
-  const [agente, setAgente] = useState<Agente | null>(null)
-  const [filtro, setFiltro] = useState<TipoFiltro>('TODOS')
-  const searchRef = useRef<HTMLDivElement>(null)
+  const { data, isLoading } = useQuery({
+    queryKey: ['historial-agentes', params],
+    queryFn: () => agentesApi.list(params).then((r) => r.data),
+  })
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setShowResults(false)
-      }
+  const { data: servicios = [] } = useQuery({
+    queryKey: ['servicios'],
+    queryFn: () => serviciosApi.list().then((r) => r.data),
+  })
+
+  const agentes = data?.data ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT))
+
+  const hayFiltros = !!(search || servicioId || servicioAnteriorId || estado || modalidad || activo ||
+    tieneCapacitaciones || tieneRemociones || edadMin || edadMax || fechaIngresoDesde || fechaIngresoHasta)
+
+  function limpiarFiltros() {
+    setSearchInput('')
+    setServicioId('')
+    setServicioAnteriorId('')
+    setEstado('')
+    setModalidad('')
+    setActivo('')
+    setTieneCapacitaciones(false)
+    setTieneRemociones(false)
+    setEdadMin('')
+    setEdadMax('')
+    setFechaIngresoDesde('')
+    setFechaIngresoHasta('')
+    setPage(1)
+  }
+
+  function updateFiltro<T>(setter: (v: T) => void) {
+    return (v: T) => { setter(v); setPage(1) }
+  }
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const res = await agentesApi.exportExcel(params)
+      const url = URL.createObjectURL(new Blob([res.data as any]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'historial_agentes.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Error al exportar')
+    } finally {
+      setExporting(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const { data: resultados = [] } = useQuery({
-    queryKey: ['agentes-historial-search', query],
-    queryFn: () => agentesApi.list({ search: query }).then((r) => r.data.slice(0, 8)),
-    enabled: query.length >= 2,
-    staleTime: 10_000,
-  })
-
-  const { data: timeline = [], isLoading: loadingTimeline } = useQuery<TimelineEvento[]>({
-    queryKey: ['agente-timeline', agente?.id],
-    queryFn: () => agentesApi.timeline(agente!.id).then((r) => r.data),
-    enabled: !!agente,
-  })
-
-  function seleccionar(a: Agente) {
-    setAgente(a)
-    setQuery(a.nombre)
-    setShowResults(false)
-    setFiltro('TODOS')
   }
-
-  function limpiar() {
-    setAgente(null)
-    setQuery('')
-    setFiltro('TODOS')
-  }
-
-  const eventosFiltrados = filtro === 'TODOS'
-    ? timeline
-    : timeline.filter((e) => e.tipo === filtro)
-
-  // Agrupar por año para los separadores
-  const eventosConAño = eventosFiltrados.map((e, i) => {
-    const año = e.fecha_inicio.substring(0, 4)
-    const añoAnterior = i > 0 ? eventosFiltrados[i - 1].fecha_inicio.substring(0, 4) : null
-    return { ...e, año, esNuevoAño: año !== añoAnterior }
-  })
-
-  const conteosPorTipo = (tipo: TimelineEvento['tipo']) =>
-    timeline.filter((e) => e.tipo === tipo).length
 
   return (
     <div className="flex flex-col h-full">
       <Header
-        title="Historial de Agente"
-        subtitle="Línea de tiempo unificada por agente"
+        title="Historial de Agentes"
+        subtitle="Ficha histórica centralizada por agente"
+        actions={
+          <div className="flex items-center gap-2">
+            {puedeImportar && (
+              <button className="btn-secondary" onClick={() => setShowImport(true)}>
+                <Upload size={14} /> Importar histórico
+              </button>
+            )}
+            <button className="btn-secondary" onClick={handleExport} disabled={exporting}>
+              <Download size={14} /> {exporting ? 'Exportando...' : 'Exportar Excel'}
+            </button>
+          </div>
+        }
       />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Buscador */}
-        <div className="card p-5">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Buscar agente
-          </label>
-          <div ref={searchRef} className="relative max-w-lg">
-            {agente ? (
-              <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">{agente.nombre}</p>
-                  <p className="text-xs text-blue-600">
-                    DNI {agente.dni}
-                    {agente.servicio ? ` · ${agente.servicio.nombre}` : ''}
-                    {agente.contrato ? ` · ${agente.contrato} hs` : ''}
-                  </p>
-                </div>
-                <button
-                  onClick={limpiar}
-                  className="text-blue-400 hover:text-blue-600 p-1 rounded"
-                >
-                  <X size={16} />
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Buscador + filtros */}
+        <div className="card p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                className="input-base pl-8"
+                placeholder="Buscar por nombre o DNI..."
+                value={searchInput}
+                onChange={(e) => { setSearchInput(e.target.value); setPage(1) }}
+              />
+              {searchInput && (
+                <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => { setSearchInput(''); setPage(1) }}>
+                  <X size={12} />
                 </button>
-              </div>
-            ) : (
-              <>
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); setShowResults(true) }}
-                  onFocus={() => query.length >= 2 && setShowResults(true)}
-                  placeholder="Nombre o DNI del agente..."
-                  className="input-field pl-9 text-sm w-full"
-                  autoFocus
-                />
-                {showResults && query.length >= 2 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {resultados.length === 0 ? (
-                      <p className="px-4 py-3 text-sm text-gray-500">Sin resultados</p>
-                    ) : (
-                      resultados.map((a) => (
-                        <button
-                          key={a.id}
-                          type="button"
-                          onClick={() => seleccionar(a)}
-                          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                        >
-                          <p className="text-sm font-medium text-gray-900">{a.nombre}</p>
-                          <p className="text-xs text-gray-500">
-                            DNI: {a.dni}
-                            {a.contrato ? ` · ${a.contrato} hs` : ''}
-                            {a.servicio ? ` · ${a.servicio.nombre}` : ''}
-                          </p>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </>
+              )}
+            </div>
+            <select className="input-base w-44" value={servicioId} onChange={(e) => updateFiltro(setServicioId)(e.target.value)}>
+              <option value="">Servicio actual</option>
+              {servicios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+            <select className="input-base w-44" value={servicioAnteriorId} onChange={(e) => updateFiltro(setServicioAnteriorId)(e.target.value)}>
+              <option value="">Servicio anterior</option>
+              {servicios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+            <select className="input-base w-36" value={estado} onChange={(e) => updateFiltro(setEstado)(e.target.value)}>
+              <option value="">Estado</option>
+              <option value="ACTIVO">Activo</option>
+              <option value="LP">Licencia</option>
+              <option value="INACTIVO">Inactivo</option>
+            </select>
+            <select className="input-base w-36" value={modalidad} onChange={(e) => updateFiltro(setModalidad)(e.target.value)}>
+              <option value="">Modalidad</option>
+              <option value="PRESENCIAL">Presencial</option>
+              <option value="REMOTO">Remoto</option>
+              <option value="HIBRIDO">Híbrido</option>
+            </select>
+            <select className="input-base w-36" value={activo} onChange={(e) => updateFiltro(setActivo)(e.target.value)}>
+              <option value="">Activos e inactivos</option>
+              <option value="true">Solo activos</option>
+              <option value="false">Solo inactivos</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
+            <label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <input type="checkbox" checked={tieneCapacitaciones} onChange={(e) => updateFiltro(setTieneCapacitaciones)(e.target.checked)} />
+              Con capacitaciones
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <input type="checkbox" checked={tieneRemociones} onChange={(e) => updateFiltro(setTieneRemociones)(e.target.checked)} />
+              Con remociones
+            </label>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <SlidersHorizontal size={12} /> Edad
+              <input type="number" className="input-base w-16 py-1" placeholder="Min" value={edadMin} onChange={(e) => updateFiltro(setEdadMin)(e.target.value)} />
+              <span>-</span>
+              <input type="number" className="input-base w-16 py-1" placeholder="Max" value={edadMax} onChange={(e) => updateFiltro(setEdadMax)(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              Ingreso
+              <input type="date" className="input-base w-36 py-1" value={fechaIngresoDesde} onChange={(e) => updateFiltro(setFechaIngresoDesde)(e.target.value)} />
+              <span>-</span>
+              <input type="date" className="input-base w-36 py-1" value={fechaIngresoHasta} onChange={(e) => updateFiltro(setFechaIngresoHasta)(e.target.value)} />
+            </div>
+            {hayFiltros && (
+              <button className="text-xs font-semibold text-gray-400 hover:text-gray-600 ml-auto" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </button>
             )}
           </div>
         </div>
 
-        {/* Timeline */}
-        {agente && (
-          <>
-            {/* Filtros */}
-            <div className="flex flex-wrap gap-2">
-              {FILTROS.map(({ tipo, label }) => {
-                const count = tipo === 'TODOS' ? timeline.length : conteosPorTipo(tipo as TimelineEvento['tipo'])
-                if (tipo !== 'TODOS' && count === 0) return null
-                const active = filtro === tipo
-                return (
-                  <button
-                    key={tipo}
-                    onClick={() => setFiltro(tipo)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                      active
-                        ? tipo === 'TODOS'
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : TIPO_CFG[tipo as TimelineEvento['tipo']].filtro + ' border'
-                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                    }`}
+        {/* Tabla */}
+        {isLoading ? (
+          <SkeletonTable rows={10} cols={9} />
+        ) : agentes.length === 0 ? (
+          <EmptyState
+            icon={GitCommitVertical}
+            title="Sin agentes"
+            description={hayFiltros ? 'No hay resultados con los filtros aplicados.' : 'Todavía no hay agentes cargados.'}
+          />
+        ) : (
+          <div className="card overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="table-th">DNI</th>
+                  <th className="table-th">Nombre completo</th>
+                  <th className="table-th">Edad</th>
+                  <th className="table-th">Servicio actual</th>
+                  <th className="table-th">Modalidad</th>
+                  <th className="table-th">Superior</th>
+                  <th className="table-th">Estado</th>
+                  <th className="table-th">Fecha de ingreso</th>
+                  <th className="table-th">Última actualización</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agentes.map((a) => (
+                  <tr
+                    key={a.id}
+                    className="table-tr cursor-pointer"
+                    onClick={() => router.push(`/historial-agente/${a.id}`)}
                   >
-                    {label}
-                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
-                      active ? 'bg-white/30' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                )
-              })}
+                    <td className="table-td text-xs text-gray-600">{a.dni}</td>
+                    <td className="table-td font-semibold text-gray-800 text-sm">{a.nombre}</td>
+                    <td className="table-td text-xs">{a.edad ?? '—'}</td>
+                    <td className="table-td text-xs">{a.servicio?.nombre || '—'}</td>
+                    <td className="table-td text-xs">{a.modalidad || '—'}</td>
+                    <td className="table-td text-xs">{a.superior || '—'}</td>
+                    <td className="table-td"><EstadoAgenteBadge estado={a.estado} /></td>
+                    <td className="table-td text-xs">{format(new Date(a.fecha_creacion), 'dd/MM/yyyy', { locale: es })}</td>
+                    <td className="table-td text-xs">{format(new Date(a.fecha_actualizacion), 'dd/MM/yyyy', { locale: es })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+              <p className="text-sm text-gray-500">{total} registros · Página {page} de {totalPages}</p>
+              <div className="flex gap-2">
+                <button className="btn-secondary py-1 px-3 flex items-center gap-1" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+                  <ChevronLeft size={14} /> Anterior
+                </button>
+                <button className="btn-secondary py-1 px-3 flex items-center gap-1" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                  Siguiente <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
-
-            {/* Lista de eventos */}
-            {loadingTimeline ? (
-              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-                Cargando historial...
-              </div>
-            ) : eventosFiltrados.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-                <GitCommitVertical size={36} className="mb-2 opacity-30" />
-                <p className="text-sm">Sin eventos para el filtro seleccionado</p>
-              </div>
-            ) : (
-              <div className="card p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <GitCommitVertical size={16} className="text-gray-400" />
-                  <p className="text-sm font-semibold text-gray-700">
-                    {eventosFiltrados.length} evento{eventosFiltrados.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-
-                <div className="relative">
-                  <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gray-100" />
-
-                  <div className="space-y-0">
-                    {eventosConAño.map((ev, i) => {
-                      const cfg = TIPO_CFG[ev.tipo]
-                      return (
-                        <div key={i}>
-                          {ev.esNuevoAño && (
-                            <div className="flex items-center gap-3 mb-3 mt-2 first:mt-0">
-                              <div className="w-10 flex justify-center z-10 relative">
-                                <span className="text-[10px] font-bold text-gray-400 bg-white px-1">{ev.año}</span>
-                              </div>
-                              <div className="flex-1 h-px bg-gray-100" />
-                            </div>
-                          )}
-
-                          <div className="flex gap-4 group pb-4">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 z-10 border-2 border-white shadow-sm ${cfg.bg}`}>
-                              <cfg.Icon size={15} className={cfg.iconColor} />
-                            </div>
-
-                            <div className="flex-1 min-w-0 pt-1">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${cfg.badge}`}>
-                                      {cfg.label}
-                                    </span>
-                                    <p className="text-sm font-medium text-gray-800 leading-snug">
-                                      {ev.descripcion}
-                                    </p>
-                                  </div>
-                                  {ev.detalle && (
-                                    <p className="text-xs text-gray-400 mt-0.5">{ev.detalle}</p>
-                                  )}
-                                </div>
-
-                                <div className="text-right shrink-0">
-                                  <p className="text-xs font-semibold text-gray-600 tabular-nums">
-                                    {fmtFecha(ev.fecha_inicio)}
-                                  </p>
-                                  {ev.fecha_fin && ev.fecha_fin !== ev.fecha_inicio && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5 tabular-nums">
-                                      → {fmtFecha(ev.fecha_fin)}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {!agente && (
-          <div className="flex flex-col items-center justify-center h-48 text-gray-300">
-            <GitCommitVertical size={48} className="mb-3" />
-            <p className="text-sm text-gray-400">Buscá un agente para ver su historial</p>
           </div>
         )}
       </div>
+
+      {showImport && (
+        <ImportHistorialModal
+          onClose={() => setShowImport(false)}
+          onDone={() => {
+            setShowImport(false)
+            qc.invalidateQueries({ queryKey: ['historial-agentes'] })
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+function ImportHistorialModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<Awaited<ReturnType<typeof historialServicioImportApi.validar>>['data'] | null>(null)
+  const [resultado, setResultado] = useState<{ agentes_creados: number; transiciones_servicio_creadas: number; transiciones_superior_creadas: number } | null>(null)
+
+  const validarMut = useMutation({
+    mutationFn: (f: File) => {
+      const fd = new FormData()
+      fd.append('file', f)
+      return historialServicioImportApi.validar(fd).then((r) => r.data)
+    },
+    onSuccess: (data) => setPreview(data),
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Error al procesar el archivo'),
+  })
+
+  const confirmarMut = useMutation({
+    mutationFn: (token: string) => historialServicioImportApi.confirmar(token).then((r) => r.data),
+    onSuccess: (data) => {
+      setResultado({
+        agentes_creados: data.agentes_creados,
+        transiciones_servicio_creadas: data.transiciones_servicio_creadas,
+        transiciones_superior_creadas: data.transiciones_superior_creadas,
+      })
+      toast.success('Importación confirmada')
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Error al confirmar la importación'),
+  })
+
+  function handleFile(f: File) {
+    setFile(f)
+    setPreview(null)
+    validarMut.mutate(f)
+  }
+
+  return (
+    <Modal
+      isOpen
+      title="Importar histórico de servicios"
+      onClose={onClose}
+      size="lg"
+      footer={
+        resultado ? (
+          <button className="btn-primary" onClick={onDone}>Cerrar</button>
+        ) : preview ? (
+          <>
+            <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+            <button className="btn-primary" onClick={() => confirmarMut.mutate(preview.token)} disabled={confirmarMut.isPending}>
+              {confirmarMut.isPending ? 'Confirmando...' : 'Confirmar importación'}
+            </button>
+          </>
+        ) : (
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+        )
+      }
+    >
+      {resultado ? (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-green-700">Importación completada</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{resultado.agentes_creados}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Agentes creados</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{resultado.transiciones_servicio_creadas}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Transiciones de servicio</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{resultado.transiciones_superior_creadas}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Transiciones de superior</p>
+            </div>
+          </div>
+        </div>
+      ) : preview ? (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+            Archivo desde {preview.fecha_desde_archivo} hasta {preview.fecha_hasta_archivo} · {preview.agentes_en_archivo} agentes.
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{preview.agentes_ya_existentes}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Agentes ya existentes</p>
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-yellow-700">{preview.agentes_a_crear}</p>
+              <p className="text-xs text-yellow-600 mt-0.5">Agentes nuevos a crear</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{preview.transiciones_servicio_nuevas}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Transiciones de servicio nuevas</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-gray-800">{preview.transiciones_superior_nuevas}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Transiciones de superior nuevas</p>
+            </div>
+          </div>
+          {preview.areas_sin_mapeo.length > 0 && (
+            <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-700">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <p>Áreas sin mapeo a un servicio (quedarán sin servicio asignado): {preview.areas_sin_mapeo.join(', ')}</p>
+            </div>
+          )}
+          {preview.agentes_a_crear > 0 && (
+            <div className="text-xs text-gray-500">
+              <p className="font-semibold text-gray-600 mb-1">Muestra de agentes que se crearán:</p>
+              <ul className="space-y-0.5 max-h-32 overflow-auto">
+                {preview.muestra_agentes_a_crear.map((a) => (
+                  <li key={a.dni}>{a.nombre} — DNI {a.dni}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+            El archivo debe ser el export de histórico de servicios (CSV separado por “;”, con columnas
+            fecha_maestro/documento/area_nombre/servicio_nombre/Superior_Nivel_1). Puede pesar varios cientos
+            de MB — el análisis puede tardar un rato.
+          </div>
+          <div>
+            <label className="label-base">Archivo CSV</label>
+            <div
+              className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-konecta transition-colors"
+              onClick={() => fileRef.current?.click()}
+            >
+              {validarMut.isPending ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin text-konecta" />
+                  <span className="text-sm font-medium text-gray-700">Analizando archivo...</span>
+                </div>
+              ) : file ? (
+                <div className="flex items-center justify-center gap-2">
+                  <CheckCircle2 size={16} className="text-konecta" />
+                  <span className="text-sm font-medium text-gray-700">{file.name}</span>
+                </div>
+              ) : (
+                <>
+                  <Upload size={20} className="mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-500">Clic para seleccionar archivo</p>
+                  <p className="text-xs text-gray-400 mt-1">.csv</p>
+                </>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+            />
+          </div>
+        </div>
+      )}
+    </Modal>
   )
 }

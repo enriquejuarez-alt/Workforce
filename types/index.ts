@@ -72,12 +72,66 @@ export interface Agente {
   activo: boolean
   presente_ultima_carga: boolean
   observaciones: string | null
+  fecha_nacimiento: string | null
+  edad?: number | null
   fecha_creacion: string
   fecha_actualizacion: string
   licencias?: Licencia[]
   cambios_temporales?: CambioServicioTemporal[]
+  cambios_horario?: CambioHorario[]
+  capacitaciones?: Capacitacion[]
+  remociones?: Remocion[]
   vacaciones?: Pick<Vacacion, 'id' | 'fecha_desde' | 'fecha_hasta'>[]
   snapshots?: AgenteNominaMensual[]
+  servicio_historial?: AgenteServicioHistorial[]
+  modalidad_historial?: AgenteModalidadHistorial[]
+  superior_historial?: AgenteSuperiorHistorial[]
+}
+
+export interface AgenteServicioHistorial {
+  id: number
+  agente_id: number
+  servicio_id: number | null
+  servicio?: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  modalidad: string | null
+  superior: string | null
+  jefe: string | null
+  segmento: string | null
+  sitio: string | null
+  contrato: string | null
+  horarios: string | null
+  fecha_desde: string
+  fecha_hasta: string | null
+  motivo: string | null
+  observaciones: string | null
+  creado_por: number
+  creador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_creacion: string
+}
+
+export interface AgenteModalidadHistorial {
+  id: number
+  agente_id: number
+  modalidad_anterior: string | null
+  modalidad_nueva: string
+  fecha_efectiva: string
+  motivo: string | null
+  observaciones: string | null
+  creado_por: number
+  fecha_creacion: string
+}
+
+export interface AgenteSuperiorHistorial {
+  id: number
+  agente_id: number
+  servicio_id: number | null
+  superior_anterior: string | null
+  superior_nuevo: string | null
+  fecha_efectiva: string
+  motivo: string | null
+  observaciones: string | null
+  creado_por: number
+  fecha_creacion: string
 }
 
 export interface NominaMensual {
@@ -195,6 +249,22 @@ export interface ImportacionNomina {
   estado: string
 }
 
+export interface HistorialServicioImportacion {
+  id: number
+  archivo_nombre: string
+  fecha_desde_archivo: string
+  fecha_hasta_archivo: string
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  agentes_en_archivo: number
+  agentes_creados: number
+  agentes_no_encontrados: number
+  transiciones_servicio_creadas: number
+  transiciones_superior_creadas: number
+  areas_sin_mapeo: string[]
+}
+
 export interface HistoricoBaja {
   id: number
   fecha: string
@@ -249,6 +319,11 @@ export interface Capacitacion {
   creador?: Pick<Usuario, 'id' | 'nombre'>
   fecha_creacion: string
   estado_calculado?: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
+  resultado: 'INSCRIPTO' | 'EN_CURSO' | 'APROBADO' | 'DESAPROBADO' | 'AUSENTE' | 'CANCELADO' | null
+  calificacion: string | null
+  capacitador_id: number | null
+  capacitador?: Pick<Usuario, 'id' | 'nombre'>
+  certificado_url: string | null
 }
 
 export interface Remocion {
@@ -275,6 +350,11 @@ export interface Remocion {
   creado_por: number
   creador?: Pick<Usuario, 'id' | 'nombre'>
   fecha_creacion: string
+  tipo: string | null
+  estado_remocion: 'PENDIENTE_REASIGNACION' | 'REASIGNADO' | 'TEMPORAL' | 'FINALIZADO' | 'CANCELADO' | null
+  servicio_destino_id: number | null
+  servicio_destino?: Pick<Servicio, 'id' | 'nombre' | 'color'>
+  fecha_incorporacion_destino: string | null
 }
 
 export interface CambioContrato {
@@ -422,7 +502,7 @@ export interface DashboardData {
 }
 
 export interface TimelineEvento {
-  tipo: 'LICENCIA' | 'CAMBIO_TEMPORAL' | 'CAMBIO_CONTRATO' | 'CAPACITACION' | 'REMOCION' | 'VACACION' | 'BAJA'
+  tipo: 'LICENCIA' | 'CAMBIO_SERVICIO' | 'CAMBIO_TEMPORAL' | 'CAMBIO_CONTRATO' | 'CAMBIO_HORARIO' | 'CAMBIO_MODALIDAD' | 'CAMBIO_SUPERIOR' | 'CAPACITACION' | 'REMOCION' | 'VACACION' | 'BAJA'
   fecha_inicio: string
   fecha_fin: string | null
   descripcion: string

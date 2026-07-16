@@ -47,9 +47,14 @@ model Usuario {
   cambios_contrato_creados     CambioContrato[]
   cambios_horario_creados      CambioHorario[]
   capacitaciones_creadas       Capacitacion[]
+  capacitaciones_a_cargo       Capacitacion[]           @relation("CapacitacionCapacitador")
   vacacion_importaciones       VacacionImportacion[]
   programaciones_creadas       ProgramacionMensual[]
   reductor_importaciones       ReductorImportacion[]
+  agente_servicio_historial_creados  AgenteServicioHistorial[]
+  agente_modalidad_historial_creados AgenteModalidadHistorial[]
+  agente_superior_historial_creados  AgenteSuperiorHistorial[]
+  historial_servicio_importaciones   HistorialServicioImportacion[]
 
   @@map("usuarios")
 }
@@ -72,11 +77,14 @@ model Servicio {
   cambios_como_temporal   CambioServicioTemporal[] @relation("ServicioTemporal")
   snapshots               AgenteNominaMensual[]
   bajas                   HistoricoBaja[]
-  remociones              Remocion[]
+  remociones              Remocion[]               @relation("RemocionServicio")
+  remociones_destino      Remocion[]               @relation("RemocionDestino")
   cambios_contrato        CambioContrato[]
   cambios_horario         CambioHorario[]
   capacitaciones          Capacitacion[]
   programaciones          ProgramacionMensual[]
+  agente_servicio_historial AgenteServicioHistorial[]
+  agente_superior_historial AgenteSuperiorHistorial[]
 
   @@map("servicios")
 }
@@ -98,6 +106,11 @@ model UsuarioServicioPermiso {
   puede_crear_agente                 Boolean  @default(false)
   puede_desactivar_agente            Boolean  @default(false)
   puede_comparar_nominas_mensuales   Boolean  @default(false)
+  puede_ver_historial_agente         Boolean  @default(false)
+  puede_editar_historial_agente      Boolean  @default(false)
+  puede_ver_motivos_sensibles        Boolean  @default(false)
+  puede_registrar_remocion           Boolean  @default(false)
+  puede_corregir_historial           Boolean  @default(false)
   campos_editables                   String[] @default([])
   segmentos_permitidos               String[] @default([])
   fecha_creacion                     DateTime @default(now())
@@ -128,6 +141,7 @@ model Agente {
   activo              Boolean  @default(true)
   presente_ultima_carga Boolean @default(true)
   observaciones       String?
+  fecha_nacimiento    DateTime? @db.Date
   fecha_creacion      DateTime @default(now())
   fecha_actualizacion DateTime @updatedAt
 
@@ -141,8 +155,96 @@ model Agente {
   bajas              HistoricoBaja[]
   remociones         Remocion[]
   vacaciones         Vacacion[]
+  servicio_historial  AgenteServicioHistorial[]
+  modalidad_historial AgenteModalidadHistorial[]
+  superior_historial  AgenteSuperiorHistorial[]
+  auditorias          Auditoria[]
 
   @@map("agentes")
+}
+
+model AgenteServicioHistorial {
+  id             Int       @id @default(autoincrement())
+  agente_id      Int
+  servicio_id    Int?
+  modalidad      String?
+  superior       String?
+  jefe           String?
+  segmento       String?
+  sitio          String?
+  contrato       String?
+  horarios       String?
+  fecha_desde    DateTime  @db.Date
+  fecha_hasta    DateTime? @db.Date
+  motivo         String?
+  observaciones  String?
+  creado_por     Int
+  fecha_creacion DateTime  @default(now())
+
+  agente   Agente    @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@index([servicio_id])
+  @@map("agente_servicio_historial")
+}
+
+model AgenteModalidadHistorial {
+  id                 Int      @id @default(autoincrement())
+  agente_id          Int
+  modalidad_anterior String?
+  modalidad_nueva    String
+  fecha_efectiva     DateTime @db.Date
+  motivo             String?
+  observaciones      String?
+  creado_por         Int
+  fecha_creacion     DateTime @default(now())
+
+  agente  Agente  @relation(fields: [agente_id], references: [id])
+  creador Usuario @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@map("agente_modalidad_historial")
+}
+
+model AgenteSuperiorHistorial {
+  id                Int      @id @default(autoincrement())
+  agente_id         Int
+  servicio_id       Int?
+  superior_anterior String?
+  superior_nuevo    String?
+  fecha_efectiva    DateTime @db.Date
+  motivo            String?
+  observaciones     String?
+  creado_por        Int
+  fecha_creacion    DateTime @default(now())
+
+  agente   Agente    @relation(fields: [agente_id], references: [id])
+  servicio Servicio? @relation(fields: [servicio_id], references: [id])
+  creador  Usuario   @relation(fields: [creado_por], references: [id])
+
+  @@index([agente_id])
+  @@map("agente_superior_historial")
+}
+
+model HistorialServicioImportacion {
+  id                            Int      @id @default(autoincrement())
+  archivo_nombre                String
+  fecha_desde_archivo           DateTime @db.Date
+  fecha_hasta_archivo           DateTime @db.Date
+  importado_por                 Int
+  fecha_importacion             DateTime @default(now())
+  agentes_en_archivo            Int      @default(0)
+  agentes_creados               Int      @default(0)
+  agentes_no_encontrados        Int      @default(0)
+  transiciones_servicio_creadas  Int     @default(0)
+  transiciones_superior_creadas  Int     @default(0)
+  areas_sin_mapeo               String[] @default([])
+
+  importador Usuario @relation(fields: [importado_por], references: [id])
+
+  @@map("historial_servicio_importaciones")
 }
 
 model NominaMensual {
@@ -336,9 +438,16 @@ model Remocion {
   fecha_creacion      DateTime @default(now())
   fecha_actualizacion DateTime @updatedAt
 
-  servicio Servicio? @relation(fields: [servicio_id], references: [id])
-  agente   Agente?   @relation(fields: [agente_id], references: [id])
-  creador  Usuario   @relation("RemocionCreador", fields: [creado_por], references: [id])
+  // Workflow de remocion (Historial de Agentes)
+  tipo                        String?
+  estado_remocion             String?   @default("PENDIENTE_REASIGNACION")
+  servicio_destino_id         Int?
+  fecha_incorporacion_destino DateTime? @db.Date
+
+  servicio         Servicio? @relation("RemocionServicio", fields: [servicio_id], references: [id])
+  servicio_destino Servicio? @relation("RemocionDestino", fields: [servicio_destino_id], references: [id])
+  agente           Agente?   @relation(fields: [agente_id], references: [id])
+  creador          Usuario   @relation("RemocionCreador", fields: [creado_por], references: [id])
 
   @@index([dni])
   @@index([servicio_id])
@@ -425,9 +534,16 @@ model Capacitacion {
   fecha_creacion      DateTime @default(now())
   fecha_actualizacion DateTime @updatedAt
 
-  agente   Agente?   @relation(fields: [agente_id], references: [id])
-  servicio Servicio? @relation(fields: [servicio_id], references: [id])
-  creador  Usuario   @relation(fields: [creado_por], references: [id])
+  // Resultado (Historial de Agentes)
+  resultado        String?
+  calificacion     String?
+  capacitador_id   Int?
+  certificado_url  String?
+
+  agente      Agente?   @relation(fields: [agente_id], references: [id])
+  servicio    Servicio? @relation(fields: [servicio_id], references: [id])
+  creador     Usuario   @relation(fields: [creado_por], references: [id])
+  capacitador Usuario?  @relation("CapacitacionCapacitador", fields: [capacitador_id], references: [id])
 
   @@index([agente_id])
   @@index([servicio_id])
@@ -564,11 +680,14 @@ model Auditoria {
   fecha_hora        DateTime @default(now())
   ip                String?
   user_agent        String?
+  agente_id         Int?
 
   usuario        Usuario?       @relation(fields: [usuario_id], references: [id])
   servicio       Servicio?      @relation(fields: [servicio_id], references: [id])
   nomina_mensual NominaMensual? @relation(fields: [nomina_mensual_id], references: [id])
+  agente         Agente?        @relation(fields: [agente_id], references: [id])
 
+  @@index([agente_id])
   @@map("auditorias")
 }
 

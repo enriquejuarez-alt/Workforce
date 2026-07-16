@@ -119,7 +119,7 @@ export default function Capacitaciones() {
 
   const { data: agentResults = [] } = useQuery({
     queryKey: ['agentes-search-cap', agentQuery],
-    queryFn: () => agentesApi.list({ search: agentQuery }).then((r) => r.data),
+    queryFn: () => agentesApi.list({ search: agentQuery }).then((r) => r.data.data),
     enabled: agentQuery.length >= 2,
   })
 

@@ -1,28 +1,18 @@
 "use client"
 
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical, Stethoscope, RefreshCw, ScrollText, GraduationCap, DoorOpen, Palmtree, UserX } from 'lucide-react'
+import { ArrowLeft, User, FileText, ArrowLeftRight, History, GitCommitVertical } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { agentesApi } from '@/lib/api'
 import Header from '@/components/hr/layout/Header'
 import { PageLoading } from '@/components/hr/ui/LoadingSpinner'
 import { EstadoAgenteBadge, LicenciaBadge, NominaEstadoBadge } from '@/components/hr/ui/Badge'
+import AgentTimeline from '@/components/hr/ui/AgentTimeline'
 import { MESES } from '@/types'
 import type { TimelineEvento } from '@/types'
-
-import type { LucideIcon } from 'lucide-react'
-
-const TIMELINE_CFG: Record<TimelineEvento['tipo'], { label: string; Icon: LucideIcon; iconColor: string; bg: string; badge: string }> = {
-  LICENCIA:        { label: 'Licencia',        Icon: Stethoscope,      iconColor: 'text-red-400',     bg: 'bg-red-50',     badge: 'bg-red-100 text-red-600' },
-  CAMBIO_TEMPORAL: { label: 'Cambio temporal', Icon: RefreshCw,        iconColor: 'text-blue-400',    bg: 'bg-blue-50',    badge: 'bg-blue-100 text-blue-600' },
-  CAMBIO_CONTRATO: { label: 'Cambio contrato', Icon: ScrollText,       iconColor: 'text-purple-400',  bg: 'bg-purple-50',  badge: 'bg-purple-100 text-purple-600' },
-  CAPACITACION:    { label: 'Capacitación',    Icon: GraduationCap,    iconColor: 'text-emerald-400', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-600' },
-  REMOCION:        { label: 'Remoción',        Icon: DoorOpen,         iconColor: 'text-orange-400',  bg: 'bg-orange-50',  badge: 'bg-orange-100 text-orange-600' },
-  VACACION:        { label: 'Vacaciones',      Icon: Palmtree,         iconColor: 'text-sky-400',     bg: 'bg-sky-50',     badge: 'bg-sky-100 text-sky-600' },
-  BAJA:            { label: 'Baja',            Icon: UserX,            iconColor: 'text-gray-500',    bg: 'bg-gray-100',   badge: 'bg-gray-200 text-gray-700' },
-}
 
 export default function AgenteDetalle() {
   const params = useParams()
@@ -73,9 +63,14 @@ export default function AgenteDetalle() {
         title={agente.nombre}
         subtitle={`${agente.usuario} · DNI ${agente.dni}`}
         actions={
-          <button className="btn-secondary" onClick={() => router.back()}>
-            <ArrowLeft size={14} /> Volver
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href={`/historial-agente/${agente.id}`} className="btn-secondary">
+              <GitCommitVertical size={14} /> Ver historial completo
+            </Link>
+            <button className="btn-secondary" onClick={() => router.back()}>
+              <ArrowLeft size={14} /> Volver
+            </button>
+          </div>
         }
       />
 
@@ -192,57 +187,7 @@ export default function AgenteDetalle() {
         )}
 
         {/* Timeline consolidado */}
-        {timeline.length > 0 && (
-          <div className="card p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <GitCommitVertical size={16} className="text-konecta" />
-              <h3 className="text-sm font-bold text-gray-800">Historial de eventos</h3>
-              <span className="ml-auto text-xs text-gray-400">{timeline.length} eventos</span>
-            </div>
-            <div className="relative">
-              {/* Vertical line */}
-              <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gray-100" />
-              <div className="space-y-1">
-                {timeline.map((ev, i) => {
-                  const cfg = TIMELINE_CFG[ev.tipo]
-                  return (
-                    <div key={i} className="flex gap-4 group">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 z-10 border-2 border-white ${cfg.bg}`}>
-                        <cfg.Icon size={15} className={cfg.iconColor} />
-                      </div>
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 pb-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${cfg.badge}`}>
-                                {cfg.label}
-                              </span>
-                              <p className="text-sm font-semibold text-gray-800 truncate">{ev.descripcion}</p>
-                            </div>
-                            {ev.detalle && (
-                              <p className="text-xs text-gray-400 mt-0.5 truncate">{ev.detalle}</p>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xs font-semibold text-gray-600">
-                              {format(new Date(ev.fecha_inicio + 'T12:00:00'), 'dd/MM/yyyy')}
-                            </p>
-                            {ev.fecha_fin && ev.fecha_fin !== ev.fecha_inicio && (
-                              <p className="text-[10px] text-gray-400 mt-0.5">
-                                → {format(new Date(ev.fecha_fin + 'T12:00:00'), 'dd/MM/yyyy')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        <AgentTimeline eventos={timeline} />
 
         {/* Historial de nóminas */}
         {agente.snapshots && agente.snapshots.length > 0 && (

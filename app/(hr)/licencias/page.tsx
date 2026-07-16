@@ -328,7 +328,7 @@ function CreateLicenciaModal({ onClose, onSaved }: { onClose: () => void; onSave
 
   const { data: agentes = [] } = useQuery({
     queryKey: ['agentes-activos'],
-    queryFn: () => agentesApi.list({ activo: 'true' }).then((r) => r.data),
+    queryFn: () => agentesApi.list({ activo: 'true', limit: 1000 }).then((r) => r.data.data),
   })
 
   const mutation = useMutation({

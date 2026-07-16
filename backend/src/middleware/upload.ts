@@ -31,6 +31,21 @@ export const uploadExcel = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 })
 
+const csvFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const ext = path.extname(file.originalname).toLowerCase()
+  if (ext === '.csv') {
+    cb(null, true)
+  } else {
+    cb(new Error('Solo se permiten archivos CSV (.csv)'))
+  }
+}
+
+export const uploadCsv = multer({
+  storage,
+  fileFilter: csvFilter,
+  limits: { fileSize: 200 * 1024 * 1024 },
+})
+
 const imageFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf']
   const ext = path.extname(file.originalname).toLowerCase()

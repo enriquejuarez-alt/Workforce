@@ -7,6 +7,7 @@ interface AuditParams {
   entidad_id?: string
   servicio_id?: number
   nomina_mensual_id?: number
+  agente_id?: number
   campo_modificado?: string
   valor_anterior?: string
   valor_nuevo?: string

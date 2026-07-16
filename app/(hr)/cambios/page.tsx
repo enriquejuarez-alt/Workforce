@@ -53,7 +53,7 @@ function useAgentSearch() {
 
   const { data: results = [] } = useQuery({
     queryKey: ['agent-search-cambios', query],
-    queryFn: () => agentesApi.list({ search: query }).then((r) => r.data.slice(0, 8)),
+    queryFn: () => agentesApi.list({ search: query }).then((r) => r.data.data.slice(0, 8)),
     enabled: query.length >= 2,
     staleTime: 10_000,
   })
@@ -86,7 +86,7 @@ function TabServicio({ isAdmin }: { isAdmin: boolean }) {
 
   const { data: agentes = [] } = useQuery({
     queryKey: ['agentes-activos'],
-    queryFn: () => agentesApi.list({ activo: 'true' }).then((r) => r.data),
+    queryFn: () => agentesApi.list({ activo: 'true', limit: 1000 }).then((r) => r.data.data),
     enabled: showCreate,
   })
 

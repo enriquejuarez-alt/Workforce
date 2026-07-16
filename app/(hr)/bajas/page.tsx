@@ -174,7 +174,7 @@ export default function Bajas() {
 
   const { data: agentResults } = useQuery({
     queryKey: ['agent-search-baja', agentQuery],
-    queryFn: () => agentesApi.list({ search: agentQuery }).then((r) => r.data.slice(0, 8)),
+    queryFn: () => agentesApi.list({ search: agentQuery }).then((r) => r.data.data.slice(0, 8)),
     enabled: agentQuery.length >= 2,
     staleTime: 10_000,
   })

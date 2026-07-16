@@ -14,6 +14,11 @@ export interface PermisoCompleto {
   puede_crear_agente: boolean
   puede_desactivar_agente: boolean
   puede_comparar_nominas_mensuales: boolean
+  puede_ver_historial_agente: boolean
+  puede_editar_historial_agente: boolean
+  puede_ver_motivos_sensibles: boolean
+  puede_registrar_remocion: boolean
+  puede_corregir_historial: boolean
   campos_editables: string[] | null
   segmentos_permitidos: string[]
 }
@@ -32,6 +37,11 @@ const ADMIN_PERMISSIONS: PermisoCompleto = {
   puede_crear_agente: true,
   puede_desactivar_agente: true,
   puede_comparar_nominas_mensuales: true,
+  puede_ver_historial_agente: true,
+  puede_editar_historial_agente: true,
+  puede_ver_motivos_sensibles: true,
+  puede_registrar_remocion: true,
+  puede_corregir_historial: true,
   campos_editables: null,
   segmentos_permitidos: [],
 }

@@ -540,6 +540,11 @@
   <tr><td><code>puede_crear_agente</code></td><td>Agregar nuevos agentes al sistema</td></tr>
   <tr><td><code>puede_desactivar_agente</code></td><td>Desactivar agentes (baja)</td></tr>
   <tr><td><code>puede_comparar_nominas_mensuales</code></td><td>Acceder a la pantalla de comparación</td></tr>
+  <tr><td><code>puede_ver_historial_agente</code></td><td>Ver la ficha de Historial de Agentes</td></tr>
+  <tr><td><code>puede_editar_historial_agente</code></td><td>Editar datos y registrar cambios de servicio/modalidad/superior</td></tr>
+  <tr><td><code>puede_ver_motivos_sensibles</code></td><td>Ver motivos de remoción y otros datos sensibles</td></tr>
+  <tr><td><code>puede_registrar_remocion</code></td><td>Registrar remociones (con o sin reasignación)</td></tr>
+  <tr><td><code>puede_corregir_historial</code></td><td>Corregir registros históricos ya creados</td></tr>
   <tr><td><code>campos_editables[]</code></td><td>Lista de campos que puede modificar en el snapshot</td></tr>
   <tr><td><code>segmentos_permitidos[]</code></td><td>Segmentos/sub-equipos visibles para este usuario</td></tr>
 </table>
@@ -605,6 +610,7 @@ enum EstadoNomina {
   servicio_id           Int?
   activo                Boolean
   presente_ultima_carga Boolean   (detectado en la última importación Excel)
+  fecha_nacimiento      DateTime? (la edad se calcula al vuelo, nunca se guarda)
 }</code></pre>
 
 <h4>NominaMensual</h4>
@@ -661,6 +667,72 @@ enum EstadoNomina {
   motivo            String?
 }</code></pre>
 
+<h4>AgenteServicioHistorial (Historial de Agentes)</h4>
+<p>
+  A diferencia de <code>CambioServicioTemporal</code> (ventanas acotadas, ambas fechas obligatorias),
+  este modelo registra <strong>toda</strong> asignación permanente de servicio que tuvo el agente.
+  Solo puede existir una fila con <code>fecha_hasta = null</code> (vigente) por agente: cambiar de
+  servicio cierra la vigente y crea una nueva, dentro de una transacción.
+</p>
+<pre><code>model AgenteServicioHistorial {
+  agente_id      Int
+  servicio_id    Int?
+  modalidad      String?
+  superior       String?
+  jefe           String?
+  segmento       String?
+  sitio          String?
+  contrato       String?
+  horarios       String?
+  fecha_desde    DateTime
+  fecha_hasta    DateTime?   (null = vigente)
+  motivo         String?
+  creado_por     Int
+}</code></pre>
+
+<h4>AgenteModalidadHistorial / AgenteSuperiorHistorial</h4>
+<p>
+  Registro puntual (sin ventana, solo <code>fecha_efectiva</code>) de cambios de modalidad y de
+  superior que no necesariamente coinciden con un cambio de servicio.
+</p>
+<pre><code>model AgenteModalidadHistorial {
+  agente_id          Int
+  modalidad_anterior String?
+  modalidad_nueva    String
+  fecha_efectiva     DateTime
+  motivo             String?
+  creado_por         Int
+}
+
+model AgenteSuperiorHistorial {
+  agente_id         Int
+  servicio_id       Int?
+  superior_anterior String?
+  superior_nuevo    String?
+  fecha_efectiva    DateTime
+  motivo            String?
+  creado_por        Int
+}</code></pre>
+
+<h4>HistorialServicioImportacion</h4>
+<p>
+  Trackea cada corrida del importador de histórico de servicios (ver sección 7). No guarda el
+  detalle fila por fila — solo los contadores de la corrida.
+</p>
+<pre><code>model HistorialServicioImportacion {
+  archivo_nombre                String
+  fecha_desde_archivo           DateTime
+  fecha_hasta_archivo           DateTime
+  importado_por                 Int
+  fecha_importacion             DateTime
+  agentes_en_archivo            Int
+  agentes_creados                Int
+  agentes_no_encontrados         Int
+  transiciones_servicio_creadas  Int
+  transiciones_superior_creadas  Int
+  areas_sin_mapeo                String[]
+}</code></pre>
+
 <h4>CambioContrato</h4>
 <pre><code>model CambioContrato {
   agente_id        Int
@@ -705,6 +777,7 @@ enum EstadoNomina {
   accion           String    (ej: "CREATE", "UPDATE", "DELETE")
   entidad          String    (ej: "Agente", "Licencia")
   entidad_id       String
+  agente_id        Int?      (para filtrar la auditoria de un agente puntual)
   campo_modificado String?
   valor_anterior   String?
   valor_nuevo      String?
@@ -758,11 +831,14 @@ enum EstadoNomina {
 <h3>Agentes y Nóminas</h3>
 <div class="tbl-wrap"><table>
   <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
-  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes</code></td><td>Sí</td><td>Listar agentes (máx. 500, excluye Capacitador)</td></tr>
-  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/agentes</code></td><td>Sí</td><td>Crear agente</td></tr>
-  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id</code></td><td>Sí</td><td>Detalle del agente</td></tr>
-  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/agentes/:id</code></td><td>Sí</td><td>Actualizar agente</td></tr>
-  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id/timeline</code></td><td>Sí</td><td>Timeline de eventos (licencias, cambios, bajas, etc.)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes</code></td><td>Sí</td><td>Listar agentes, paginado (<code>page</code>/<code>limit</code>) con filtros (servicio actual/anterior, modalidad, superior, edad, fecha de ingreso, capacitaciones, remociones); excluye Capacitador</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/export</code></td><td>Sí</td><td>Exportar el listado a Excel respetando los mismos filtros</td></tr>
+  <tr><td><span class="tag tag-post">POST</span></td><td><code>/api/agentes</code></td><td>Sí</td><td>Crear agente (crea también la primera fila de historial de servicio)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id</code></td><td>Sí</td><td>Detalle del agente (incluye historial de servicio/modalidad/superior)</td></tr>
+  <tr><td><span class="tag tag-put">PUT</span></td><td><code>/api/agentes/:id</code></td><td>Sí</td><td>Actualizar agente — si cambia servicio/modalidad/superior, cierra el historial vigente y crea el nuevo en una transacción, auditando cada cambio</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id/timeline</code></td><td>Sí</td><td>Timeline unificado (licencias, cambios de servicio/contrato/horario/modalidad/superior, capacitaciones, remociones, vacaciones, bajas)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id/services</code></td><td>Sí</td><td>Historial de servicio del agente (fichas cronológicas)</td></tr>
+  <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/agentes/:id/audit</code></td><td>Admin</td><td>Auditoría filtrada por agente</td></tr>
   <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/nominas</code></td><td>Sí</td><td>Listar nóminas mensuales</td></tr>
   <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/nominas/comparar</code></td><td>Sí</td><td>Comparar dos nóminas (diferencias)</td></tr>
   <tr><td><span class="tag tag-get">GET</span></td><td><code>/api/nominas/:id</code></td><td>Sí</td><td>Detalle de una nómina</td></tr>
@@ -781,10 +857,31 @@ enum EstadoNomina {
   <tr><td>Cambios de contrato</td><td>CRUD + bulk create + tipo TEMPORAL|DEFINITIVO</td></tr>
   <tr><td>Cambios de horario</td><td>CRUD + tipo TEMPORAL|DEFINITIVO</td></tr>
   <tr><td>Bajas</td><td>CRUD + import masivo Excel + tipos de baja</td></tr>
-  <tr><td>Capacitaciones</td><td>CRUD + <code>dar-de-alta</code> (activa al agente)</td></tr>
-  <tr><td>Remociones</td><td>CRUD</td></tr>
+  <tr><td>Capacitaciones</td><td>CRUD + <code>dar-de-alta</code> (activa al agente) + filtro por agente + resultado/calificación/capacitador/certificado</td></tr>
+  <tr><td>Remociones</td><td>CRUD + filtro por agente + reasignación (<code>servicio_destino_id</code>) que cierra y abre historial de servicio en transacción</td></tr>
   <tr><td>Vacaciones</td><td>Import masivo Excel + historial + delete</td></tr>
+  <tr><td>Historial de Agentes — importador de histórico</td><td><code>POST /historial-agente/import/validar</code> (CSV, preview) + <code>POST /historial-agente/import/confirmar</code> (aplica) + <code>GET /historial-agente/import</code> (corridas previas). Ver detalle abajo.</td></tr>
 </table></div>
+
+<h3>Historial de Agentes — importador de histórico de servicios</h3>
+<p>
+  Importa un CSV de snapshot diario de dotación (una fila por agente por día, exportado desde el
+  sistema origen) y reconstruye el historial real de servicio y superior por agente, de forma
+  incremental: cada corrida solo agrega las transiciones que todavía no estaban registradas
+  (comparando contra <code>AgenteServicioHistorial</code>/<code>AgenteSuperiorHistorial</code>
+  existentes), así que importar el mismo archivo dos veces no duplica nada.
+</p>
+<ul>
+  <li>Parseo en streaming (<code>readline</code>) — soporta archivos de cientos de MB sin cargarlos
+    enteros en memoria.</li>
+  <li>El <code>area_nombre</code> del archivo (agrupador intermedio del sistema origen) se mapea a
+    las filas reales de <code>Servicio</code> mediante una tabla fija en
+    <code>backend/src/controllers/historialServicioImport.ts</code>.</li>
+  <li>Si un DNI del archivo no matchea ningún <code>Agente</code> existente, se crea.</li>
+  <li>Flujo de dos pasos (mismo patrón que <code>/api/excel/validar</code>+<code>confirmar</code>):
+    <code>validar</code> devuelve un resumen y un <code>token</code>; <code>confirmar</code> aplica
+    los cambios cacheados bajo ese token.</li>
+</ul>
 
 <h3>Reportes y Exportaciones</h3>
 <div class="tbl-wrap"><table>
@@ -837,7 +934,8 @@ enum EstadoNomina {
   <tr><td><code>/vacaciones</code></td><td>Vacaciones</td><td>Importación masiva de vacaciones WF con historial</td></tr>
   <tr><td><code>/comparacion</code></td><td>Comparar Nóminas</td><td>Diferencias entre dos nóminas (altas, bajas, modificaciones)</td></tr>
   <tr><td><code>/ausentismo</code></td><td>Ausentismo</td><td>Reporte de ausentismo con filtros por servicio, período, motivo</td></tr>
-  <tr><td><code>/historial-agente</code></td><td>Historial Agente</td><td>Búsqueda de agente por DNI/nombre y visualización de su historial completo</td></tr>
+  <tr><td><code>/historial-agente</code></td><td>Historial de Agentes</td><td>Listado paginado con búsqueda (debounce), filtros (servicio actual/anterior, edad, fecha de ingreso, capacitaciones, remociones, etc.) y export a Excel. Importador de histórico de servicios (CSV) para admin/workforce.</td></tr>
+  <tr><td><code>/historial-agente/:id</code></td><td>Ficha de Agente</td><td>Ficha con tabs: Resumen, Servicios, Capacitaciones, Remociones, Línea de tiempo, Auditoría (solo admin)</td></tr>
   <tr><td><code>/programacion</code></td><td>Programación</td><td>Lista de programaciones mensuales por servicio/semana</td></tr>
   <tr><td><code>/programacion/:id</code></td><td>Detalle Programación</td><td>Grilla de requeridos por horario, factor de reducción, simulación HC, exportaciones</td></tr>
   <tr><td><code>/distribucion</code></td><td>Distribución</td><td>Herramienta para cruzar y distribuir nóminas entre servicios</td></tr>

@@ -10,6 +10,7 @@ import {
   TrendingUp,
   FilePen,
   BarChart2,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -26,6 +27,7 @@ const NAV_GROUPS = [
       { href: "/planificacion/simulador", label: "Simulador", icon: Sliders },
       { href: "/planificacion/contratos", label: "Contratos", icon: FilePen },
       { href: "/planificacion/franco", label: "Franco", icon: CalendarOff },
+      { href: "/planificacion/guardadas", label: "Guardadas", icon: FolderOpen },
     ],
   },
   {

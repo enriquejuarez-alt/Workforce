@@ -49,13 +49,13 @@ export const SERVICIOS_VENTAS: ServiceDefinition[] = [
   {
     key: "VENTAS-OUT-MOVIL",
     label: "Ventas Out Móvil",
-    hojaCP: ["Ventas Out Móvil", "Ventas Out Movil"],
+    hojaCP: ["Ventas Out Móvil", "Ventas Out Movil", "Ventas Out convergente"],
     segmentosNomina: [
       "VENTAS OUT MOVIL", "VENTAS OUT MÓVIL",
       "VENTAS OUT FIJOS", "VENTAS OUT", "VENTAS OUT BLENDING",
     ],
     reductorNombres: [
-      "VENTAS OUT MOVIL", "VENTAS OUT MÓVIL", "VENTAS OUT FIJOS",
+      "VENTAS OUT MOVIL", "VENTAS OUT MÓVIL", "VENTAS OUT FIJOS", "VENTAS OUT",
     ],
   },
 ];

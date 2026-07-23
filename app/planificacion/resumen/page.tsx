@@ -1,7 +1,9 @@
 ﻿"use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 import { useResultados } from "@/store/useResultados";
 import { useUploads } from "@/store/useUploads";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
@@ -17,7 +19,9 @@ import { calcularResultados } from "@/lib/domain/calculos";
 import { calcularFrancoPorServicio } from "@/lib/domain/francoEngine";
 import { getServiciosKeys } from "@/lib/config/servicesRuntime";
 import { exportarSimulacion } from "@/lib/utils/exportSimulador";
-import { Activity, Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { serializarMatrices } from "@/lib/domain/serializacion";
+import { planificacionesGuardadasApi } from "@/lib/api";
+import { Activity, Download, TrendingUp, TrendingDown, Minus, Save, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
 import type { MatrizServicio, ServicioKey } from "@/lib/domain/types";
@@ -43,9 +47,43 @@ export default function DashboardPage() {
     activeFilters,
     historial,
     setFilter,
+    servicioKey,
+    servicioNombre,
   } = useResultados();
   const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
   const { reglas } = useFrancoConfig();
+
+  const [showGuardarInput, setShowGuardarInput] = useState(false);
+  const [nombreGuardado, setNombreGuardado] = useState("");
+
+  const guardarPlanificacionMut = useMutation({
+    mutationFn: () => {
+      if (!resultado || !servicioKey || !servicioNombre) {
+        throw new Error("Falta procesar una planificación antes de guardar");
+      }
+      return planificacionesGuardadasApi.create({
+        servicio_key: servicioKey,
+        servicio_nombre: servicioNombre,
+        mes: resultado.mesNum,
+        anio: resultado.anioNum,
+        nombre: nombreGuardado.trim() || undefined,
+        dias_del_mes: resultado.diasDelMes,
+        tope_facturacion: topeFacturacion,
+        modo_reductor: modoReductor,
+        resultado,
+        matrices: serializarMatrices(matrices),
+        agentes,
+        reductores,
+        alertas,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Planificación guardada");
+      setShowGuardarInput(false);
+      setNombreGuardado("");
+    },
+    onError: () => toast.error("No se pudo guardar la planificación"),
+  });
 
   const francoMap = useMemo(() => {
     if (agentes.length === 0) return new Map<string, number>();
@@ -135,6 +173,49 @@ export default function DashboardPage() {
               />
               <span className="text-xs text-gray-500">%</span>
             </div>
+            {/* Guardar planificación */}
+            {showGuardarInput ? (
+              <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Nombre (opcional)"
+                  value={nombreGuardado}
+                  onChange={(e) => setNombreGuardado(e.target.value)}
+                  className="h-7 w-36 bg-transparent px-1 text-xs text-gray-700 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => guardarPlanificacionMut.mutate()}
+                  disabled={guardarPlanificacionMut.isPending}
+                  className="flex h-7 items-center gap-1 rounded-md bg-[#0054A6] px-2 text-xs font-semibold text-white transition-colors hover:bg-[#00449A] disabled:opacity-50"
+                >
+                  {guardarPlanificacionMut.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Save className="h-3 w-3" />
+                  )}
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowGuardarInput(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowGuardarInput(true)}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Guardar planificación
+              </Button>
+            )}
             {/* Export */}
             <Button
               variant="outline"

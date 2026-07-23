@@ -14,6 +14,8 @@ interface DropZoneProps {
   fileName?: string;
   error?: string;
   loading?: boolean;
+  disabled?: boolean;
+  disabledMessage?: string;
 }
 
 export function DropZone({
@@ -25,6 +27,8 @@ export function DropZone({
   fileName,
   error,
   loading,
+  disabled,
+  disabledMessage,
 }: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -60,25 +64,34 @@ export function DropZone({
   return (
     <div
       className={cn(
-        "group rounded-xl border border-dashed transition-all cursor-pointer select-none shadow-sm",
-        dragging
-          ? "border-[#0054A6] bg-blue-50 shadow-blue-100"
-          : hasFile
-          ? "border-green-300 bg-green-50/70 shadow-green-100/70"
-          : error
-          ? "border-red-300 bg-red-50 shadow-red-100/70"
-          : "border-slate-200 bg-slate-50/70 hover:border-[#0054A6]/40 hover:bg-blue-50/30 hover:shadow-blue-100/50"
+        "group rounded-xl border border-dashed transition-all select-none shadow-sm",
+        disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-50/40 opacity-60"
+          : cn(
+              "cursor-pointer",
+              dragging
+                ? "border-[#0054A6] bg-blue-50 shadow-blue-100"
+                : hasFile
+                ? "border-green-300 bg-green-50/70 shadow-green-100/70"
+                : error
+                ? "border-red-300 bg-red-50 shadow-red-100/70"
+                : "border-slate-200 bg-slate-50/70 hover:border-[#0054A6]/40 hover:bg-blue-50/30 hover:shadow-blue-100/50"
+            )
       )}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true); }}
       onDragLeave={() => setDragging(false)}
-      onDrop={onDrop}
-      onClick={() => !loading && inputRef.current?.click()}
+      onDrop={(e) => { if (disabled) { e.preventDefault(); return; } onDrop(e); }}
+      onClick={() => !disabled && !loading && inputRef.current?.click()}
     >
-      <input ref={inputRef} type="file" accept={accepted} className="hidden" onChange={onInputChange} />
+      <input ref={inputRef} type="file" accept={accepted} className="hidden" disabled={disabled} onChange={onInputChange} />
 
       <div className="flex min-h-[118px] flex-col items-center justify-center gap-2.5 p-5 text-center">
         {loading ? (
           <div className="h-8 w-8 rounded-full border-2 border-[#0054A6]/30 border-t-[#0054A6] animate-spin" />
+        ) : disabled ? (
+          <div className="h-9 w-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+            <UploadCloud className="h-4 w-4 text-slate-300" />
+          </div>
         ) : hasFile ? (
           <div className="h-9 w-9 rounded-full bg-green-100 flex items-center justify-center shadow-sm">
             <FileCheck className="h-[18px] w-[18px] text-green-600" />
@@ -94,13 +107,13 @@ export function DropZone({
         )}
 
         <div>
-          <p className="text-xs font-semibold text-slate-800">{primaryText}</p>
-          {secondaryText && <p className="text-[11px] text-[#0054A6] mt-0.5 font-mono truncate max-w-[160px]">{secondaryText}</p>}
+          <p className="text-xs font-semibold text-slate-800">{disabled ? disabledMessage ?? label : primaryText}</p>
+          {!disabled && secondaryText && <p className="text-[11px] text-[#0054A6] mt-0.5 font-mono truncate max-w-[160px]">{secondaryText}</p>}
         </div>
 
-        {error && <p className="text-xs text-red-500 max-w-[200px] leading-relaxed">{error}</p>}
+        {!disabled && error && <p className="text-xs text-red-500 max-w-[200px] leading-relaxed">{error}</p>}
 
-        {!hasFile && !error && !loading && (
+        {!disabled && !hasFile && !error && !loading && (
           <p className="text-[11px] text-gray-400">Arrastrá o hacé clic</p>
         )}
       </div>

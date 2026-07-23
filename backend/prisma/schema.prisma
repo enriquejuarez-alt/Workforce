@@ -51,6 +51,7 @@ model Usuario {
   vacacion_importaciones       VacacionImportacion[]
   programaciones_creadas       ProgramacionMensual[]
   reductor_importaciones       ReductorImportacion[]
+  planificaciones_guardadas    PlanificacionGuardada[]
   agente_servicio_historial_creados  AgenteServicioHistorial[]
   agente_modalidad_historial_creados AgenteModalidadHistorial[]
   agente_superior_historial_creados  AgenteSuperiorHistorial[]
@@ -664,6 +665,36 @@ model ReductorServicio {
 
   @@index([importacion_id])
   @@map("reductor_servicios")
+}
+
+model PlanificacionGuardada {
+  id                  Int      @id @default(autoincrement())
+  servicio_key        String
+  servicio_nombre     String
+  mes                 Int
+  anio                Int
+  nombre              String?
+  dias_del_mes        Int
+  tope_facturacion    Int      @default(103)
+  modo_reductor       String   @default("multiplicativo")
+
+  cumplimiento_total  Float
+  personas_activas    Int
+  hs_requeridas       Float
+
+  resultado           Json
+  matrices            Json
+  agentes             Json
+  reductores          Json
+  alertas             Json
+
+  guardado_por        Int
+  guardador           Usuario  @relation(fields: [guardado_por], references: [id])
+  fecha_guardado      DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  @@index([mes, anio])
+  @@map("planificaciones_guardadas")
 }
 
 model Auditoria {

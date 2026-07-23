@@ -8,7 +8,8 @@ import { motion } from "framer-motion";
 import {
   AlertCircle, ArrowRight, ChevronDown, AlertTriangle,
   Loader2, CheckCircle2, X, FilePen, Calculator, Database, RotateCcw,
-  Save, Trash2, FolderOpen,
+  Save, Trash2, FolderOpen, UserPlus, Plus,
+  Layers, ClipboardList, SlidersHorizontal, Users2, Settings2,
 } from "lucide-react";
 import ConfirmDialog from "@/components/hr/ui/ConfirmDialog";
 import { DropZone } from "@/components/upload/DropZone";
@@ -49,6 +50,11 @@ import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularReductoresDesdeArchivos, reductoresAFile } from "@/lib/parsers/calcularReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
 import type { Agente, Reductor } from "@/lib/domain/types";
+import {
+  expandirAgentesHipoteticos,
+  contarAgentesHipoteticos,
+  type AgenteHipoteticoRow,
+} from "@/lib/domain/agentesHipoteticos";
 import { generarAlertas } from "@/lib/domain/alertEngine";
 import {
   getServiciosActivos,
@@ -107,6 +113,10 @@ const SERVICIOS_DEMO: ServicioNominaRef[] = [
   { id: -13, nombre: "Ventas WA", planiConfig: null },
   { id: -14, nombre: "Ventas WA Hogar", planiConfig: null },
   { id: -15, nombre: "Ventas Movil", planiConfig: null },
+  { id: -16, nombre: "Soporte Tecnico", planiConfig: null },
+  { id: -17, nombre: "Movil", planiConfig: null },
+  { id: -18, nombre: "Hogares Convergentes", planiConfig: null },
+  { id: -19, nombre: "Hogares No Convergentes", planiConfig: null },
 ];
 
 const fade = {
@@ -134,6 +144,7 @@ export default function UploadPage() {
     setAgentesExcluidos, clearAgentesDesdeApi, setAgentesDesdeApi,
     errores, agentesExcluidos, segmentosNoReconocidos,
     agentesDesdeApi, mesDesdeApi, anioDesdeApi, clearFilters,
+    setServicioActivo,
   } = useResultados();
 
   const { serviciosNomina } = usePlaniConfig();
@@ -161,6 +172,14 @@ export default function UploadPage() {
   const [useArchivoNomina, setUseArchivoNomina] = useState(false);
   const [cargandoNominaId, setCargandoNominaId] = useState<number | null>(null);
   const [islaFiltro, setIslaFiltro] = useState<string | null>(null);
+  const [agentesHipoteticos, setAgentesHipoteticos] = useState<AgenteHipoteticoRow[]>([]);
+  const [showFormHipotetico, setShowFormHipotetico] = useState(false);
+  const [nuevoHipServicio, setNuevoHipServicio] = useState("");
+  const [nuevoHipCantidad, setNuevoHipCantidad] = useState("");
+  const [nuevoHipContrato, setNuevoHipContrato] = useState("36");
+  const [nuevoHipContratoCustom, setNuevoHipContratoCustom] = useState("");
+  const [nuevoHipDesde, setNuevoHipDesde] = useState("");
+  const [nuevoHipHasta, setNuevoHipHasta] = useState("");
   const [reductorGuardadoId, setReductorGuardadoId] = useState<number | null>(null);
   const [nombreGuardado, setNombreGuardado] = useState("");
   const [showGuardarInput, setShowGuardarInput] = useState(false);
@@ -296,6 +315,40 @@ export default function UploadPage() {
     if (!islaFiltro) return agentesDesdeApi;
     return agentesDesdeApi.filter((a) => a.segmentoNorm === islaFiltro);
   }, [agentesDesdeApi, islaFiltro]);
+
+  const serviciosParaHipoteticos = useMemo(() => getServiciosActivos(), [reqServicioId]);
+  const totalHipoteticos = useMemo(() => contarAgentesHipoteticos(agentesHipoteticos), [agentesHipoteticos]);
+
+  function agregarAgenteHipotetico() {
+    const cantidad = parseInt(nuevoHipCantidad, 10);
+    const contrato = nuevoHipContrato === "otro" ? nuevoHipContratoCustom.trim() : nuevoHipContrato;
+    if (!nuevoHipServicio || !cantidad || cantidad <= 0 || !contrato) {
+      toast.error("Completa servicio, cantidad y contrato.");
+      return;
+    }
+    const servicioDef = serviciosParaHipoteticos.find((s) => s.key === nuevoHipServicio);
+    setAgentesHipoteticos((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        servicio: nuevoHipServicio,
+        servicioLabel: servicioDef?.label ?? nuevoHipServicio,
+        cantidad,
+        contrato,
+        horarioDesde: nuevoHipDesde || undefined,
+        horarioHasta: nuevoHipHasta || undefined,
+      },
+    ]);
+    setNuevoHipCantidad("");
+    setNuevoHipDesde("");
+    setNuevoHipHasta("");
+    setNuevoHipContratoCustom("");
+    setShowFormHipotetico(false);
+  }
+
+  function quitarAgenteHipotetico(id: string) {
+    setAgentesHipoteticos((prev) => prev.filter((r) => r.id !== id));
+  }
 
   const reductoresUtilizados = useMemo(() => {
     if (reductoresPreview.length === 0) return [];
@@ -505,7 +558,12 @@ export default function UploadPage() {
           : esVentas
             ? validarHojasCPVentas(hojas)
           : validarHojasCP(hojas);
-      if (errValidacion.length > 0) { setErrCP(errValidacion.join(" - ")); return; }
+      // Hoja de isla faltante: no bloquea la carga del archivo, se avisa recién
+      // al procesar (mismo criterio que en handleProcesar).
+      const errValidacionBloqueantes = errValidacion.filter(
+        (e) => !e.startsWith("Falta la hoja del servicio")
+      );
+      if (errValidacionBloqueantes.length > 0) { setErrCP(errValidacionBloqueantes.join(" - ")); return; }
       setHojasCP(hojas);
       setArchivoCP(file);
     } catch (e) {
@@ -703,7 +761,13 @@ export default function UploadPage() {
         errNom2.push(...result.errores);
       }
 
-      const todosErrores = [...errCP2, ...errRed2, ...errNom2];
+      // Hoja de isla faltante en el CP: no bloquea el procesamiento, esa isla
+      // queda con 0 hs requeridas y se avisa por toast (a diferencia de otros
+      // errores del CP, que sí indican un archivo mal formado).
+      const avisosCPIslaFaltante = errCP2.filter((e) => e.startsWith("Falta la hoja del servicio"));
+      const errCP2Bloqueantes = errCP2.filter((e) => !e.startsWith("Falta la hoja del servicio"));
+
+      const todosErrores = [...errCP2Bloqueantes, ...errRed2, ...errNom2];
       if (todosErrores.length > 0) { setErrores(todosErrores); return; }
 
       setPasoActual("Calculando cumplimiento...");
@@ -712,7 +776,8 @@ export default function UploadPage() {
         const dest = paseMap.get(a.dni.trim().toLowerCase());
         return dest ? { ...a, segmentoNorm: dest } : a;
       });
-      const agentes = aplicarDiasAlMes(agentesConPases, diasDelMes);
+      const hipoteticos = expandirAgentesHipoteticos(agentesHipoteticos);
+      const agentes = aplicarDiasAlMes([...agentesConPases, ...hipoteticos], diasDelMes);
       const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion);
 
       setPasoActual("Generando alertas...");
@@ -725,6 +790,7 @@ export default function UploadPage() {
       setResultado(resultado);
       setAlertas(alertas);
       setAgentesExcluidos(excl, segs);
+      setServicioActivo(selectedServicioKey, servicioActivo.nombre);
       clearFilters();
 
       const nIslas = resultado.resultados.filter((r) => r.hcActivos > 0).length;
@@ -736,6 +802,13 @@ export default function UploadPage() {
         toast(`${segs.length} segmento${segs.length > 1 ? "s" : ""} sin mapear - revisa el mapeo`, {
           icon: "!",
           duration: 6000,
+        });
+      }
+      if (avisosCPIslaFaltante.length > 0) {
+        const islas = avisosCPIslaFaltante.map((e) => e.match(/servicio '([^']+)'/)?.[1] ?? e);
+        toast(`Sin requerido este mes para: ${islas.join(", ")} (se procesó igual, con 0 hs requeridas)`, {
+          icon: "!",
+          duration: 8000,
         });
       }
 
@@ -752,10 +825,11 @@ export default function UploadPage() {
     }
   }, [
     agentesDesdeApi, agentesFiltradosPorIsla, archivoCP, archivoReductores, archivoNomina,
-    hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases,
+    hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases, agentesHipoteticos,
     setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
     setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
     esPersonalPay, esSmb, esOnboarding, esVentas, servicioActivo,
+    setServicioActivo, selectedServicioKey,
   ]);
   const currentUser = useAuthStore((s) => s.user);
   const readOnly = isReadOnly(currentUser?.rol);
@@ -770,17 +844,41 @@ export default function UploadPage() {
     </div>
   );
 
+  const cardHeader = (
+    icon: React.ReactNode,
+    title: string,
+    done: boolean,
+    n: number,
+    iconBg: string,
+    dotColor: string
+  ) => (
+    <div className="flex items-center justify-between gap-2 pt-1">
+      <div className="flex items-center gap-2.5">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconBg}`}>
+          {icon}
+        </div>
+        <p className="text-sm font-bold text-slate-800 leading-tight">{title}</p>
+      </div>
+      {stepDot(done, dotColor, n)}
+    </div>
+  );
+
   const fmtReductorPct = (value: number) => `${(value * 100).toFixed(1)}%`;
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-slate-50 to-white px-4 py-5 sm:px-6">
+    <div className="min-h-full bg-slate-50 px-4 py-5 sm:px-6">
       <motion.div {...fade} className="mx-auto max-w-6xl space-y-5">
 
         {/* Header */}
-        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-950 leading-tight">Carga de archivos</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Procesamiento local - los datos no salen del navegador</p>
+        <div className="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white/95 px-5 py-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0054A6]/10">
+              <Layers className="h-5 w-5 text-[#0054A6]" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 leading-tight">Carga de archivos</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Procesamiento local · los datos no salen del navegador</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link
@@ -795,60 +893,64 @@ export default function UploadPage() {
                 </span>
               )}
             </Link>
-          </div>
-          {/* Mini stepper */}
-          <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:flex">
-            {stepDot(cpListo, "bg-blue-500", 1)}
-            <div className="h-px w-6 bg-slate-200" />
-            {stepDot(!!archivoReductores, "bg-purple-500", 2)}
-            <div className="h-px w-6 bg-slate-200" />
-            {stepDot(nominaLista, "bg-green-500", 3)}
-            <div className="h-px w-6 bg-slate-200" />
-            <div className={`flex h-6 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold transition-colors ${listo ? "bg-[#0054A6] text-white shadow-sm" : "bg-white text-slate-400"}`}>
-              <ArrowRight className="h-2.5 w-2.5" /> Procesar
+            {/* Mini stepper */}
+            <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1.5 sm:flex">
+              {stepDot(cpListo, "bg-blue-500", 1)}
+              <div className="h-px w-6 bg-slate-200" />
+              {stepDot(!!archivoReductores, "bg-purple-500", 2)}
+              <div className="h-px w-6 bg-slate-200" />
+              {stepDot(nominaLista, "bg-green-500", 3)}
+              <div className="h-px w-6 bg-slate-200" />
+              <div className={`flex h-6 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold transition-colors ${listo ? "bg-[#0054A6] text-white shadow-sm" : "bg-white text-slate-400"}`}>
+                <ArrowRight className="h-2.5 w-2.5" /> Procesar
+              </div>
             </div>
           </div>
         </div>
 
         {/* Selector de servicio */}
         {serviciosNomina && (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/60">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
-              <div>
-                <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Servicio</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  {servicioActivo
-                    ? `Editando: ${servicioActivo.nombre}`
-                    : "Selecciona el servicio antes de cargar los archivos"}
-                </p>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/60">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white border border-slate-200 shadow-sm">
+                  <Settings2 className="h-4 w-4 text-slate-500" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Servicio</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {servicioActivo
+                      ? `Editando: ${servicioActivo.nombre}`
+                      : "Selecciona el servicio antes de cargar los archivos"}
+                  </p>
+                </div>
               </div>
               {servicioActivo && (
                 <button
                   onClick={() => setSelectedServicioKey(null)}
-                  className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-700"
+                  className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-700"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Limpiar
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 p-3.5">
-              {serviciosFiltrados.map((s) => {
-                const isActive = reqServicioId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => handleServicioSelect(s.id)}
-                    className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-all ${
-                      isActive
-                        ? "bg-[#0054A6] text-white border-[#0054A6] shadow-sm"
-                        : "bg-white text-slate-600 border-slate-200 hover:border-[#0054A6]/50 hover:bg-blue-50/40 hover:text-[#0054A6]"
-                    }`}
-                  >
-                    {s.nombre}
-                  </button>
-                );
-              })}
+            <div className="p-4">
+              <Select
+                value={reqServicioId !== null ? String(reqServicioId) : ""}
+                onValueChange={(v) => handleServicioSelect(Number(v))}
+              >
+                <SelectTrigger className="h-10 w-full text-xs font-semibold sm:w-80">
+                  <SelectValue placeholder="Selecciona un servicio..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {serviciosFiltrados.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
@@ -868,13 +970,17 @@ export default function UploadPage() {
         <div className={`grid grid-cols-1 gap-4 md:grid-cols-3 ${readOnly ? "pointer-events-none opacity-50 select-none" : ""}`}>
 
           {/* Card 1 - CP */}
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/70">
             <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
-            <div className="flex min-h-[300px] flex-col gap-3 p-4">
-              <div className="flex items-center gap-2.5 pt-1">
-                {stepDot(cpListo, "bg-blue-500", 1)}
-                <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Requerido del cliente</p>
-              </div>
+            <div className="flex min-h-[300px] flex-col gap-3.5 p-4">
+              {cardHeader(
+                <ClipboardList className="h-4 w-4 text-blue-600" />,
+                "Requerido del cliente",
+                cpListo,
+                1,
+                "bg-blue-50",
+                "bg-blue-500"
+              )}
               <DropZone
                 label={cpDropzoneLabel}
                 onFile={handleCP}
@@ -883,6 +989,8 @@ export default function UploadPage() {
                 error={errCP}
                 loading={loadingCP}
                 accepted=".xlsx,.xls"
+                disabled={!servicioActivo}
+                disabledMessage="Elegí un servicio arriba primero"
               />
               {archivoCP && (
                 <FilePreview nombre={archivoCP.name} tamanio={archivoCP.size} hojas={hojasCP} />
@@ -890,13 +998,17 @@ export default function UploadPage() {
             </div>
           </div>
           {/* Card 2 - Reductores */}
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/70">
             <div className="absolute top-0 left-0 right-0 h-1 bg-purple-500" />
-            <div className="flex min-h-[300px] flex-col gap-3 p-4">
-              <div className="flex items-center gap-2.5 pt-1">
-                {stepDot(!!archivoReductores, "bg-purple-500", 2)}
-                <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Reductores operativos</p>
-              </div>
+            <div className="flex min-h-[300px] flex-col gap-3.5 p-4">
+              {cardHeader(
+                <SlidersHorizontal className="h-4 w-4 text-purple-600" />,
+                "Reductores operativos",
+                !!archivoReductores,
+                2,
+                "bg-purple-50",
+                "bg-purple-500"
+              )}
 
               <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100/80 p-1">
                 {([
@@ -1138,19 +1250,24 @@ export default function UploadPage() {
           </div>
 
           {/* Card 3 - Nomina */}
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm shadow-slate-200/70">
             <div className={`absolute top-0 left-0 right-0 h-1 ${nominaLista ? "bg-green-500" : "bg-orange-400"}`} />
-            <div className="flex min-h-[300px] flex-col gap-3 p-4">
-              <div className="flex items-center justify-between pt-1">
+            <div className="flex min-h-[300px] flex-col gap-3.5 p-4">
+              <div className="flex items-center justify-between gap-2 pt-1">
                 <div className="flex items-center gap-2.5">
-                  {stepDot(nominaLista, "bg-green-500", 3)}
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nomina activa</p>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50">
+                    <Users2 className="h-4 w-4 text-green-600" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 leading-tight">Nómina activa</p>
                 </div>
-                {agentesDesdeApi && (
-                  <button onClick={() => { clearAgentesDesdeApi(); setIslaFiltro(null); }} className="text-gray-300 hover:text-gray-500 transition-colors" title="Quitar y cargar otra">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {agentesDesdeApi && (
+                    <button onClick={() => { clearAgentesDesdeApi(); setIslaFiltro(null); }} className="text-gray-300 hover:text-gray-500 transition-colors" title="Quitar y cargar otra">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {stepDot(nominaLista, "bg-green-500", 3)}
+                </div>
               </div>
 
               {agentesDesdeApi ? (
@@ -1325,6 +1442,131 @@ export default function UploadPage() {
                   )}
                 </div>
               )}
+
+              {nominaLista && (
+                <div className="mt-1 space-y-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <UserPlus className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Agentes hipoteticos (opcional)
+                    </p>
+                  </div>
+                  <p className="text-[10.5px] text-slate-400 leading-snug">
+                    Para simular gente que todavia no tiene datos reales (contrataciones, traslados). Cuentan en todo el calculo: curvas, francos y exportaciones.
+                  </p>
+
+                  {agentesHipoteticos.length > 0 && (
+                    <ul className="space-y-1">
+                      {agentesHipoteticos.map((row) => (
+                        <li
+                          key={row.id}
+                          className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5"
+                        >
+                          <span className="text-[11px] font-medium text-slate-600 truncate">
+                            {row.servicioLabel} · {row.cantidad} × {row.contrato}hs
+                            {row.horarioDesde && row.horarioHasta ? ` · ${row.horarioDesde}-${row.horarioHasta}` : ""}
+                          </span>
+                          <button
+                            onClick={() => quitarAgenteHipotetico(row.id)}
+                            className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                            title="Quitar"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {showFormHipotetico ? (
+                    <div className="space-y-2 rounded-md border border-slate-200 bg-white p-2.5">
+                      <Select value={nuevoHipServicio} onValueChange={setNuevoHipServicio}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Servicio" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {serviciosParaHipoteticos.map((s) => (
+                            <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Cantidad"
+                          value={nuevoHipCantidad}
+                          onChange={(e) => setNuevoHipCantidad(e.target.value)}
+                          className="h-8 flex-1 rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-[#0054A6]"
+                        />
+                        <Select value={nuevoHipContrato} onValueChange={setNuevoHipContrato}>
+                          <SelectTrigger className="h-8 w-24 text-xs">
+                            <SelectValue placeholder="Hs" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="30">30hs</SelectItem>
+                            <SelectItem value="35">35hs</SelectItem>
+                            <SelectItem value="36">36hs</SelectItem>
+                            <SelectItem value="40">40hs</SelectItem>
+                            <SelectItem value="otro">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {nuevoHipContrato === "otro" && (
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="Hs semanales"
+                          value={nuevoHipContratoCustom}
+                          onChange={(e) => setNuevoHipContratoCustom(e.target.value)}
+                          className="h-8 w-full rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-[#0054A6]"
+                        />
+                      )}
+
+                      <div className="flex gap-2">
+                        <input
+                          type="time"
+                          value={nuevoHipDesde}
+                          onChange={(e) => setNuevoHipDesde(e.target.value)}
+                          className="h-8 flex-1 rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-[#0054A6]"
+                          title="Horario desde (opcional)"
+                        />
+                        <input
+                          type="time"
+                          value={nuevoHipHasta}
+                          onChange={(e) => setNuevoHipHasta(e.target.value)}
+                          className="h-8 flex-1 rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-[#0054A6]"
+                          title="Horario hasta (opcional)"
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-0.5">
+                        <button
+                          onClick={agregarAgenteHipotetico}
+                          className="h-8 flex-1 rounded-md bg-[#0054A6] text-[11px] font-semibold text-white transition-colors hover:bg-[#00449A]"
+                        >
+                          Agregar
+                        </button>
+                        <button
+                          onClick={() => setShowFormHipotetico(false)}
+                          className="h-8 rounded-md border border-slate-200 px-3 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowFormHipotetico(true)}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1.5 text-[11px] font-semibold text-slate-500 transition-colors hover:border-[#0054A6]/50 hover:text-[#0054A6]"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Agregar agentes hipoteticos
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1366,16 +1608,32 @@ export default function UploadPage() {
 
         {/* Action bar */}
         <div className="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg shadow-slate-200/80 backdrop-blur">
-          <div className="hidden flex-col gap-0.5 sm:flex">
+          <div className="hidden flex-col gap-1 sm:flex">
             {servicioActivo && (
               <span className="text-[11px] font-bold text-[#0054A6]">{servicioActivo.nombre}</span>
             )}
-            <p className="text-[11px] font-medium text-slate-500">
-              {[cpListo && "OK CP", archivoReductores && "OK Reductores", nominaLista && "OK Nomina"]
-                .filter(Boolean).join("  -  ") || (servicioActivo ? "Completa los 3 pasos para continuar" : "Selecciona un servicio para empezar")}
-            </p>
+            {servicioActivo ? (
+              <div className="flex items-center gap-3 text-[11px] font-medium">
+                <span className={`flex items-center gap-1.5 ${cpListo ? "text-blue-600" : "text-slate-300"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${cpListo ? "bg-blue-500" : "bg-slate-300"}`} />CP
+                </span>
+                <span className={`flex items-center gap-1.5 ${archivoReductores ? "text-purple-600" : "text-slate-300"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${archivoReductores ? "bg-purple-500" : "bg-slate-300"}`} />Reductores
+                </span>
+                <span className={`flex items-center gap-1.5 ${nominaLista ? "text-green-600" : "text-slate-300"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${nominaLista ? "bg-green-500" : "bg-slate-300"}`} />Nómina
+                </span>
+              </div>
+            ) : (
+              <p className="text-[11px] font-medium text-slate-400">Selecciona un servicio para empezar</p>
+            )}
           </div>
           <div className="ml-auto flex items-center gap-3">
+            {totalHipoteticos > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-blue-50 border border-blue-100 px-2.5 py-1 text-[11px] font-semibold text-[#0054A6]">
+                <UserPlus className="h-3 w-3" /> +{totalHipoteticos} agente{totalHipoteticos !== 1 ? "s" : ""} hipotetico{totalHipoteticos !== 1 ? "s" : ""} incluido{totalHipoteticos !== 1 ? "s" : ""}
+              </span>
+            )}
             {procesandoLocal && pasoActual && (
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

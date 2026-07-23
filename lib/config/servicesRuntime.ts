@@ -9,6 +9,9 @@ import { SERVICIOS_BO } from "./servicesBo";
 import { SERVICIOS_TECH } from "./servicesTech";
 import { SERVICIOS_INTEGRAL } from "./servicesIntegral";
 import { SERVICIOS_VENTAS } from "./servicesVentas";
+import { SERVICIOS_MOVIL } from "./servicesMovil";
+import { SERVICIOS_HOGAR_CONVERGENTE } from "./servicesHogarConvergente";
+import { SERVICIOS_HOGAR_NOCONVERGENTE } from "./servicesHogarNoConvergente";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 
@@ -36,6 +39,10 @@ export function getServiciosActivos(): ServiceDefinition[] {
   if (selectedServicioKey === "-13") return SERVICIOS_VENTAS.filter((s) => s.key === "VENTAS-WA");
   if (selectedServicioKey === "-14") return SERVICIOS_VENTAS.filter((s) => s.key === "VENTAS-WA-HOGAR");
   if (selectedServicioKey === "-15") return SERVICIOS_VENTAS.filter((s) => s.key === "VENTAS-MOVIL" || s.key === "VENTAS-OUT-MOVIL");
+  if (selectedServicioKey === "-16") return SERVICIOS;
+  if (selectedServicioKey === "-17") return SERVICIOS_MOVIL;
+  if (selectedServicioKey === "-18") return SERVICIOS_HOGAR_CONVERGENTE;
+  if (selectedServicioKey === "-19") return SERVICIOS_HOGAR_NOCONVERGENTE;
 
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;
@@ -47,6 +54,10 @@ export function getServiciosActivos(): ServiceDefinition[] {
     if (nombre === "retencion" || nombre.includes("retencion")) return [SERVICIOS_RETENCION[0]];
     if (nombre.includes("migracion") && nombre.includes("cobre") && nombre.includes("amba")) return [SERVICIOS_MIGRACION[0]];
     if (nombre.includes("migracion") && nombre.includes("cobre") && nombre.includes("interior")) return [SERVICIOS_MIGRACION[1]];
+    if (nombre.includes("soporte") && nombre.includes("tecnico")) return SERVICIOS;
+    if (nombre === "movil") return SERVICIOS_MOVIL;
+    if (nombre.includes("hogares") && nombre.includes("no") && nombre.includes("convergente")) return SERVICIOS_HOGAR_NOCONVERGENTE;
+    if (nombre.includes("hogares") && nombre.includes("convergente")) return SERVICIOS_HOGAR_CONVERGENTE;
     if (nombre === "bo gc" || nombre.includes("back office")) return SERVICIOS_BO;
     if (nombre === "tech" || nombre.includes("tech admin")) return SERVICIOS_TECH;
     if (nombre.includes("integral movil") && nombre.includes("amba")) return [SERVICIOS_INTEGRAL[0]];

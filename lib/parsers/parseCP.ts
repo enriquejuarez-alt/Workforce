@@ -122,7 +122,18 @@ export function parseCPConServicios(
     const matriz: number[][] = [];
     const totalDiario: number[] = Array(dias.length).fill(0);
 
-    const filaInicioMatriz = raw.findIndex((row) => esFranjaHoraria(row?.[0]));
+    // Empieza a buscar desde la fila 2: las filas 0 (dia de semana) y 1 (fechas)
+    // son siempre encabezado fijo (ya extraidas arriba). Si se busca desde la
+    // fila 0, una celda vacia en la esquina de la fila de fechas se lee como
+    // 0 (por el defval:0 de sheet_to_json) y matchea falsamente como franja
+    // "00:00", corriendo toda la matriz una fila y arruinando el total.
+    let filaInicioMatriz = -1;
+    for (let i = 2; i < raw.length; i++) {
+      if (esFranjaHoraria(raw[i]?.[0])) {
+        filaInicioMatriz = i;
+        break;
+      }
+    }
     if (filaInicioMatriz < 0) {
       errores.push(`Hoja '${nombreHoja}' no tiene franjas horarias validas`);
       continue;

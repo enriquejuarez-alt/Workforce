@@ -44,7 +44,7 @@ export const SERVICIOS_SMB: ServiceDefinition[] = [
   {
     key: "SMB-RETENCION",
     label: "SMB Retencion",
-    hojaCP: "RETEN",
+    hojaCP: ["RETEN", "SMB Retencion Crecimiento", "SMB RETENCION CRECIMIENTO"],
     segmentosNomina: ["SMB RETENCION CRECIMIENTO"],
     reductorNombres: [
       "SMB RETENCION",

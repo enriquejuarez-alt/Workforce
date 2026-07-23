@@ -450,6 +450,37 @@ export interface ReductorServicioRow {
   rotacion: number
 }
 
+export interface PlanificacionGuardadaListItem {
+  id: number
+  servicio_key: string
+  servicio_nombre: string
+  mes: number
+  anio: number
+  nombre: string | null
+  cumplimiento_total: number
+  personas_activas: number
+  hs_requeridas: number
+  fecha_guardado: string
+  guardador?: Pick<Usuario, 'id' | 'nombre'>
+}
+
+export interface PlanificacionGuardadaDetalle extends PlanificacionGuardadaListItem {
+  dias_del_mes: number
+  tope_facturacion: number
+  modo_reductor: string
+  fecha_actualizacion: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  resultado: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  matrices: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  agentes: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  reductores: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  alertas: any
+}
+
 export interface AuditoriaLog {
   id: number
   usuario_id: number | null

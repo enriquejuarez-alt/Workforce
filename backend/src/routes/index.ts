@@ -47,6 +47,12 @@ import {
   updateReductorServicio,
   deleteReductorImportacion,
 } from '../controllers/reductores'
+import {
+  listPlanificacionesGuardadas,
+  getPlanificacionGuardada,
+  createPlanificacionGuardada,
+  deletePlanificacionGuardada,
+} from '../controllers/planificacionesGuardadas'
 import { getReporteAusentismo, exportReporteAusentismo } from '../controllers/reportes'
 import { getRolConfig, updateRolConfig, resetRolConfig } from '../controllers/configuracion'
 import { listProgramaciones, createProgramacion, getProgramacion, deleteProgramacion, upsertRequeridos, previewRequeridos, uploadRequeridos, upsertFactor, simularProgramacion, exportProgramacion, exportFrancos, exportConversor, getCronograma, setNomina } from '../controllers/programacion'
@@ -186,6 +192,11 @@ router.get('/reductores/:id', authenticate, getReductorImportacion)
 router.post('/reductores', authenticate, createReductorImportacion)
 router.patch('/reductores/:id/servicios/:servicioId', authenticate, updateReductorServicio)
 router.delete('/reductores/:id', authenticate, deleteReductorImportacion)
+
+router.get('/planificaciones-guardadas', authenticate, listPlanificacionesGuardadas)
+router.get('/planificaciones-guardadas/:id', authenticate, getPlanificacionGuardada)
+router.post('/planificaciones-guardadas', authenticate, createPlanificacionGuardada)
+router.delete('/planificaciones-guardadas/:id', authenticate, deletePlanificacionGuardada)
 
 router.get('/reportes/ausentismo/export', authenticate, blockRole('CAPACITADOR'), exportReporteAusentismo)
 router.get('/reportes/ausentismo', authenticate, blockRole('CAPACITADOR'), getReporteAusentismo)

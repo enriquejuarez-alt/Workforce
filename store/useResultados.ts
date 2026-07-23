@@ -33,8 +33,11 @@ interface ResultadosState {
   mesDesdeApi: number | null;
   anioDesdeApi: number | null;
   historial: HistorialSnapshot[];
+  servicioKey: string | null;
+  servicioNombre: string | null;
 
   setResultado: (r: ResultadoGeneral) => void;
+  setServicioActivo: (key: string | null, nombre: string | null) => void;
   setMatrices: (m: Map<ServicioKey, MatrizServicio>) => void;
   setAgentes: (a: Agente[]) => void;
   setReductores: (r: Reductor[]) => void;
@@ -142,7 +145,10 @@ export const useResultados = create<ResultadosState>()(
       mesDesdeApi: null,
       anioDesdeApi: null,
       historial: [],
+      servicioKey: null,
+      servicioNombre: null,
 
+      setServicioActivo: (key, nombre) => set({ servicioKey: key, servicioNombre: nombre }),
       setResultado: (r) =>
         set((state) => {
           const snap: HistorialSnapshot = {
@@ -220,6 +226,8 @@ export const useResultados = create<ResultadosState>()(
           mesDesdeApi: null,
           anioDesdeApi: null,
           historial: [],
+          servicioKey: null,
+          servicioNombre: null,
         }),
     }),
     {
@@ -242,6 +250,8 @@ export const useResultados = create<ResultadosState>()(
         mesDesdeApi: state.mesDesdeApi,
         anioDesdeApi: state.anioDesdeApi,
         historial: state.historial,
+        servicioKey: state.servicioKey,
+        servicioNombre: state.servicioNombre,
       }),
     }
   )

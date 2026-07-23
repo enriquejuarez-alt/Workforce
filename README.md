@@ -71,6 +71,29 @@ en `lib/config/servicesRuntime.ts`). Muestra la cantidad de agentes
 detectados por isla y permite acotar el calculo a una isla puntual en vez
 del agregado completo.
 
+Servicios agrupados disponibles: Soporte Tecnico (CBS, Conectividad,
+Entretenimiento, Movil, RRSS), Movil (Abonos, Prepago, WhatsApp, Degradados,
+Madrugada), Hogares Convergentes (WhatsApp Factura Unificada, FTU, Flow Plus)
+y Hogares No Convergentes. Los tres ultimos (`lib/config/servicesMovil.ts`,
+`servicesHogarConvergente.ts`, `servicesHogarNoConvergente.ts`) todavia usan
+`segmentosNomina` estimados porque no hay un archivo de Nomina real para
+esos servicios: ajustar apenas se cargue uno.
+
+## Agentes hipoteticos
+
+En la card "Nomina activa" de Planificacion, una vez cargada la nomina, se
+pueden agregar agentes que todavia no existen en el sistema (contrataciones
+o traslados en curso) para simular su impacto: servicio destino, cantidad,
+contrato (30/35/36/40 hs o uno libre) y horario opcional (sin horario usan
+distribucion plana en el motor de curvas).
+
+No tienen DNI/usuario real (`HIP-<id>-<n>`) y no se persisten en la nomina;
+viven solo en el estado del formulario de carga. Al procesar, se expanden a
+`Agente[]` (`lib/domain/agentesHipoteticos.ts::expandirAgentesHipoteticos`)
+y se concatenan a los agentes reales antes de `aplicarDiasAlMes`, asi que
+cuentan en todo el calculo: cumplimiento, curvas, francos y exportaciones.
+La action bar muestra cuantos hay incluidos en la corrida actual.
+
 ## Reductores
 
 Los reductores representan perdida esperada de productividad:
@@ -169,6 +192,36 @@ en `backend/src/controllers/reductores.ts` (`GET/POST /reductores`,
 `GET /reductores/:id`, `PATCH /reductores/:id/servicios/:servicioId`,
 `DELETE /reductores/:id`).
 
+## Planificaciones guardadas
+
+Distinto de "Reductores guardados" (que solo persiste el set de
+deslogueo/ausentismo/rotacion): esto guarda la foto completa de una
+corrida ya procesada — CP, reductores, nomina, resultado y alertas — para
+poder volver a abrirla despues sin repetir la carga de archivos.
+
+- Boton "Guardar planificacion" en `/planificacion/resumen`, con nombre
+  opcional. Guarda el estado vigente del store (`resultado`, `matrices`,
+  `agentes`, `reductores`, `alertas`, `diasDelMes`, `topeFacturacion`,
+  `modoReductor`) junto al servicio activo (`servicioKey`/`servicioNombre`,
+  seteados por `setServicioActivo` al terminar de procesar en
+  `app/planificacion/page.tsx`).
+- Listado en `/planificacion/guardadas` con filtro por servicio y por
+  mes/anio, y borrado individual.
+- Ficha en `/planificacion/guardadas/:id` con los KPIs, alertas, grafico de
+  cumplimiento y tabla resumen de esa corrida puntual, mas un boton
+  "Cargar en sesion activa" que rehidrata todos los stores (Resultados,
+  Uploads, FrancoConfig) para habilitar Curvas/Francos/Simulador sobre esa
+  planificacion.
+- Las matrices se guardan como JSON via `lib/domain/serializacion.ts`
+  (`serializarMatrices`/`deserializarMatrices`), que convierte el `Map` a
+  entries y las fechas de cada dia a ISO string (y de vuelta a `Date` al
+  leer).
+
+Backend: modelo `PlanificacionGuardada` (Prisma) y CRUD en
+`backend/src/controllers/planificacionesGuardadas.ts`
+(`GET/POST /planificaciones-guardadas`, `GET /planificaciones-guardadas/:id`,
+`DELETE /planificaciones-guardadas/:id`), con auditoria de creacion/borrado.
+
 ## Formatos de CP soportados
 
 ### Soporte (default)
@@ -201,6 +254,12 @@ En curvas por dia:
 ```text
 Hs requeridas dia = total diario de la matriz CP
 ```
+
+Si al archivo CP le falta la hoja de alguna isla del servicio agrupado, esa
+isla no bloquea la carga ni el procesamiento: queda con 0 hs requeridas y se
+avisa por toast ("Sin requerido este mes para: ..."). El resto de errores
+del CP (formato invalido, hoja sin franjas horarias validas) si siguen
+bloqueando.
 
 ## Cumplimiento
 
@@ -495,7 +554,9 @@ Al filtrar, se recalculan HC, horas brutas, horas netas, cumplimiento y deltas s
 
 ```text
 app/planificacion/page.tsx              Carga de archivos, seleccion de servicio y proceso principal
-app/planificacion/resumen/page.tsx      Resumen y filtros
+app/planificacion/resumen/page.tsx      Resumen, filtros y guardar planificacion
+app/planificacion/guardadas/page.tsx    Listado de planificaciones guardadas
+app/planificacion/guardadas/[id]/page.tsx Ficha de una planificacion guardada + cargar en sesion
 app/planificacion/curvas/page.tsx       Curvas por servicio
 app/planificacion/franco/page.tsx       Planificacion de francos
 app/planificacion/contratos/page.tsx    Configuracion de contratos y francos por servicio
@@ -506,6 +567,11 @@ components/tables/SimuladorTable.tsx    UI del constructor de escenarios
 components/charts/CumplimientoBarChart.tsx Grafico de cumplimiento con leyenda de niveles
 lib/domain/calculos.ts                  Matematica principal
 lib/domain/francoEngine.ts              Calculo de francos
+lib/domain/agentesHipoteticos.ts        Expande filas de agentes hipoteticos a Agente[]
+lib/domain/serializacion.ts             Serializa/deserializa el Map de matrices CP para guardar como JSON
+lib/config/servicesMovil.ts             Definicion de servicio Movil (segmentos estimados)
+lib/config/servicesHogarConvergente.ts  Definicion de servicio Hogares Convergentes (segmentos estimados)
+lib/config/servicesHogarNoConvergente.ts Definicion de servicio Hogares No Convergentes (segmentos estimados)
 lib/parsers/calcularReductores.ts       Calculadora de reductores (ponderacion 80/90/100) + buildWorkbook/reductoresAFile
 lib/parsers/parseCP.ts                  Parser formato Soporte (+ KON)
 lib/parsers/parseCPPpay.ts              Parser formato Personal Pay
@@ -513,6 +579,7 @@ lib/parsers/parseCPSmb.ts               Parser formato SMB
 lib/parsers/parseCPOnb.ts               Parser formato Onboarding
 lib/utils/exportSimulador.ts            Exportacion Excel (5 hojas)
 backend/src/controllers/reductores.ts   CRUD de reductores guardados (ReductorImportacion/ReductorServicio)
+backend/src/controllers/planificacionesGuardadas.ts CRUD de planificaciones guardadas (PlanificacionGuardada)
 CALCULO_REDUCTORES.md                   Nota corta del calculo de reductores
 ```
 

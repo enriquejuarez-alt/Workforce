@@ -7,6 +7,7 @@ import type {
   ProgramacionMensual, FactorReduccion, SimulacionResponse, CronogramaResponse,
   ReductorImportacion, ReductorServicioRow, AgenteServicioHistorial,
   HistorialServicioImportacion,
+  PlanificacionGuardadaListItem, PlanificacionGuardadaDetalle,
 } from '@/types'
 
 const api = axios.create({
@@ -328,6 +329,33 @@ export const reductorImportacionesApi = {
     data: Partial<Pick<ReductorServicioRow, 'deslogueo' | 'ausentismo' | 'rotacion'>>,
   ) => api.patch<ReductorServicioRow>(`/reductores/${id}/servicios/${servicioId}`, data),
   delete: (id: number) => api.delete(`/reductores/${id}`),
+}
+
+// Planificaciones guardadas (Planificación)
+export const planificacionesGuardadasApi = {
+  list: () => api.get<PlanificacionGuardadaListItem[]>('/planificaciones-guardadas'),
+  get: (id: number) => api.get<PlanificacionGuardadaDetalle>(`/planificaciones-guardadas/${id}`),
+  create: (data: {
+    servicio_key: string
+    servicio_nombre: string
+    mes: number
+    anio: number
+    nombre?: string
+    dias_del_mes: number
+    tope_facturacion: number
+    modo_reductor: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resultado: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    matrices: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    agentes: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    reductores: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    alertas: any
+  }) => api.post<PlanificacionGuardadaDetalle>('/planificaciones-guardadas', data),
+  delete: (id: number) => api.delete(`/planificaciones-guardadas/${id}`),
 }
 
 // Configuración de roles

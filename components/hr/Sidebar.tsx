@@ -8,7 +8,7 @@ import {
   LogOut, Activity, History, UserMinus, GraduationCap, Palmtree,
   CalendarDays, Sliders, TrendingUp, UploadCloud, CalendarClock, Shuffle,
   PanelLeftClose, PanelLeftOpen, TrendingDown, GitCommitVertical, FilePen,
-  ChevronDown,
+  ChevronDown, CalendarOff, BarChart2, FolderOpen,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { useSidebarStore } from '@/store/sidebar'
@@ -49,9 +49,12 @@ const ADMIN_ITEMS = [
 const WALT_ITEMS = [
   { to: '/planificacion',             icon: UploadCloud,     label: 'Carga de archivos' },
   { to: '/planificacion/resumen',     icon: LayoutDashboard, label: 'Resumen' },
+  { to: '/planificacion/analisis',    icon: BarChart2,       label: 'Análisis' },
   { to: '/planificacion/curvas',      icon: TrendingUp,      label: 'Curvas' },
   { to: '/planificacion/simulador',   icon: Sliders,         label: 'Simulador' },
-  { to: '/planificacion/contratos',    icon: FilePen,         label: 'Contratos' },
+  { to: '/planificacion/contratos',   icon: FilePen,         label: 'Contratos' },
+  { to: '/planificacion/franco',      icon: CalendarOff,     label: 'Franco' },
+  { to: '/planificacion/guardadas',   icon: FolderOpen,      label: 'Guardadas' },
 ]
 
 const SECTION_KEYS = ['principal', 'administracion', 'planificacion', 'programacion'] as const

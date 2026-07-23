@@ -73,7 +73,7 @@ export const SERVICIOS: ServiceDefinition[] = [
       "CBS TECNICA",
       "CBS TÉCNICA",
     ],
-    reductorNombres: ["SMB-TEC-IN", "SMB TEC IN"],
+    reductorNombres: ["SMB-TEC-IN", "SMB TEC IN", "Tecnica"],
     francoConfig: FRANCO_36HS,
   },
   {
@@ -86,7 +86,7 @@ export const SERVICIOS: ServiceDefinition[] = [
       "TECNICA MOVIL",
       "TÉCNICA MOVIL",
     ],
-    reductorNombres: ["SMB-TEC-MOVIL", "SMB TEC MOVIL", "SMB Tec Movil"],
+    reductorNombres: ["SMB-TEC-MOVIL", "SMB TEC MOVIL", "SMB Tec Movil", "Tecnica Movil"],
     francoConfig: FRANCO_36HS,
   },
   {
@@ -99,7 +99,7 @@ export const SERVICIOS: ServiceDefinition[] = [
       "TECNICA RRSS",
       "TÉCNICA RRSS",
     ],
-    reductorNombres: ["SMB-DIGITAL", "SMB DIGITAL"],
+    reductorNombres: ["SMB-DIGITAL", "SMB DIGITAL", "Tecnica RRSS"],
     francoConfig: FRANCO_36HS,
   },
   {
@@ -116,7 +116,7 @@ export const SERVICIOS: ServiceDefinition[] = [
       "PTF TECNICA",
       "PTF TÉCNICA",
     ],
-    reductorNombres: ["SMB-PTF", "SMB PTF"],
+    reductorNombres: ["SMB-PTF", "SMB PTF", "Tecnica Power To Front", "Implementacion Tecnica"],
     francoConfig: FRANCO_36HS,
   },
 ];

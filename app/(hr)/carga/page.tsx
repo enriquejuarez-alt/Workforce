@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { Upload, CheckCircle, AlertTriangle, X } from 'lucide-react'
@@ -14,7 +14,7 @@ import { MESES } from '@/types'
 const currentYear = new Date().getFullYear()
 const currentMonth = new Date().getMonth() + 1
 
-export default function CargaExcel() {
+function CargaExcelInner() {
   const searchParams = useSearchParams()
   const [file, setFile] = useState<File | null>(null)
   const [servicioId, setServicioId] = useState(searchParams.get('servicio_id') || '')
@@ -346,5 +346,13 @@ export default function CargaExcel() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CargaExcel() {
+  return (
+    <Suspense fallback={null}>
+      <CargaExcelInner />
+    </Suspense>
   )
 }

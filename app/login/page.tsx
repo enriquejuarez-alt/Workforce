@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
 
@@ -21,7 +21,7 @@ const LOADING_STEPS = [
   "Preparando tu sesión...",
 ]
 
-export default function LoginPage() {
+function LoginPageInner() {
   const searchParams = useSearchParams()
   const oauthError = searchParams.get('oauth_error')
   const [startingLogin, setStartingLogin] = useState(false)
@@ -234,5 +234,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   )
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { authApi } from "@/lib/api";
@@ -18,7 +18,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 type Stage = "loading" | "welcome";
 
-export default function AuthCallbackPage() {
+function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setAuth } = useAuthStore();
@@ -152,5 +152,25 @@ export default function AuthCallbackPage() {
         <p className="text-sm text-white/40 font-medium">Verificando tu cuenta de Google…</p>
       </div>
     </div>
+  );
+}
+
+const authCallbackFallback = (
+  <div
+    className="min-h-screen flex items-center justify-center"
+    style={{ background: "linear-gradient(150deg, #020818 0%, #050f24 40%, #071530 100%)" }}
+  >
+    <div className="flex flex-col items-center gap-4 text-center">
+      <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
+      <p className="text-sm text-white/40 font-medium">Verificando tu cuenta de Google…</p>
+    </div>
+  </div>
+);
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={authCallbackFallback}>
+      <AuthCallbackInner />
+    </Suspense>
   );
 }

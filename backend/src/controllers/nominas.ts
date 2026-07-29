@@ -1,8 +1,15 @@
 import { Response } from 'express'
+import fs from 'fs'
+import * as XLSX from 'xlsx'
 import prisma from '../prisma'
 import { createAuditLog } from '../utils/audit'
 import { getUserPermission, isCurrentMonth, isAdmin } from '../utils/permissions'
 import { AuthRequest } from '../middleware/auth'
+
+// Nombre fijo del Servicio "paraguas" bajo el que vive la nómina unificada de Planificación.
+// Se crea una sola vez (upsert en importNominaServicios); todas las importaciones de
+// "Nomina de servicios" cuelgan de él y son visibles desde cualquier isla.
+const SERVICIO_GENERAL_NOMBRE = 'Nómina General'
 
 export const listNominas = async (req: AuthRequest, res: Response) => {
   try {
@@ -10,21 +17,30 @@ export const listNominas = async (req: AuthRequest, res: Response) => {
     const adminUser = req.user?.rol === 'ADMINISTRADOR'
 
     let where: any = {}
-    if (servicio_id) where.servicio_id = parseInt(servicio_id as string)
     if (mes) where.mes = parseInt(mes as string)
     if (anio) where.anio = parseInt(anio as string)
     if (estado) where.estado = estado
     if (tipo) where.tipo = tipo
+
+    // La "Nómina General" (Planificación) es visible desde cualquier isla, además
+    // de la que se pidió puntualmente — no está atada a un solo servicio.
+    const servicioGeneral = await prisma.servicio.findUnique({ where: { nombre: SERVICIO_GENERAL_NOMBRE } })
 
     if (!adminUser) {
       const permisos = await prisma.usuarioServicioPermiso.findMany({
         where: { usuario_id: req.user!.userId, puede_ver: true },
         select: { servicio_id: true },
       })
-      const serviciosPermitidos = permisos.map((p) => p.servicio_id)
+      const idsVisibles = servicioGeneral
+        ? [...permisos.map((p) => p.servicio_id), servicioGeneral.id]
+        : permisos.map((p) => p.servicio_id)
       where.servicio_id = servicio_id
-        ? { in: serviciosPermitidos.filter((s) => s === parseInt(servicio_id as string)) }
-        : { in: serviciosPermitidos }
+        ? { in: idsVisibles.filter((s) => s === parseInt(servicio_id as string) || s === servicioGeneral?.id) }
+        : { in: idsVisibles }
+    } else if (servicio_id) {
+      const ids = [parseInt(servicio_id as string)]
+      if (servicioGeneral) ids.push(servicioGeneral.id)
+      where.servicio_id = { in: ids }
     }
 
     const nominas = await prisma.nominaMensual.findMany({
@@ -34,7 +50,8 @@ export const listNominas = async (req: AuthRequest, res: Response) => {
     })
 
     return res.json(nominas)
-  } catch {
+  } catch (err) {
+    console.error(err)
     return res.status(500).json({ error: 'Error al listar nóminas' })
   }
 }
@@ -112,6 +129,44 @@ export const updateNominaStatus = async (req: AuthRequest, res: Response) => {
     return res.json(nomina)
   } catch {
     return res.status(500).json({ error: 'Error al actualizar estado' })
+  }
+}
+
+export const updateNominaPeriodo = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const mes = parseInt(req.body.mes)
+    const anio = parseInt(req.body.anio)
+    if (!mes || mes < 1 || mes > 12 || !anio || anio < 2000) {
+      return res.status(400).json({ error: 'Mes o año inválido' })
+    }
+
+    const anterior = await prisma.nominaMensual.findUnique({ where: { id } })
+    if (!anterior) return res.status(404).json({ error: 'Nómina no encontrada' })
+
+    const nomina = await prisma.nominaMensual.update({
+      where: { id },
+      data: { mes, anio },
+    })
+
+    await createAuditLog({
+      usuario_id: req.user!.userId,
+      accion: 'CAMBIO_PERIODO_NOMINA',
+      entidad: 'NominaMensual',
+      entidad_id: String(id),
+      servicio_id: nomina.servicio_id,
+      nomina_mensual_id: id,
+      valor_anterior: `${anterior.mes}/${anterior.anio}`,
+      valor_nuevo: `${mes}/${anio}`,
+    })
+
+    return res.json(nomina)
+  } catch (err: any) {
+    if (err?.code === 'P2002') {
+      return res.status(409).json({ error: 'Ya existe una nómina para ese servicio en ese mes/año' })
+    }
+    console.error(err)
+    return res.status(500).json({ error: 'Error al actualizar el período' })
   }
 }
 
@@ -687,5 +742,170 @@ export const compareNominas = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: 'Error al comparar nóminas' })
+  }
+}
+
+function normalizarDniImport(val: any): string {
+  return String(val ?? '').replace(/\D/g, '').trim()
+}
+
+// "6 X 5" / "7,2 X 5" -> { horasPorDia: 6, diasTrabajadosSemana: 5 }
+function parseContrato(raw: any): { horasPorDia: number | null; diasTrabajadosSemana: number | null } {
+  const str = String(raw ?? '').trim()
+  const match = str.match(/^([\d,.]+)\s*[xX]\s*([\d,.]+)$/)
+  if (!match) return { horasPorDia: null, diasTrabajadosSemana: null }
+  const horasPorDia = parseFloat(match[1].replace(',', '.'))
+  const diasTrabajadosSemana = parseFloat(match[2].replace(',', '.'))
+  return {
+    horasPorDia: isNaN(horasPorDia) ? null : horasPorDia,
+    diasTrabajadosSemana: isNaN(diasTrabajadosSemana) ? null : diasTrabajadosSemana,
+  }
+}
+
+// Importa el formato "Nomina de servicios.xlsx": Dni | Representante | Servicios | Hs FINAL | Contratos | ACTIVO?
+// Crea/actualiza UNA nómina general (no separada por isla) — el segmento de cada agente se resuelve
+// dinámicamente en Planificación según la isla activa, así que no hace falta partirla acá.
+export const importNominaServicios = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' })
+    const mes = parseInt(req.body.mes ?? req.query.mes as string)
+    const anio = parseInt(req.body.anio ?? req.query.anio as string)
+    if (!mes || mes < 1 || mes > 12 || !anio || anio < 2000) {
+      fs.unlinkSync(req.file.path)
+      return res.status(400).json({ error: 'Parámetros mes y anio requeridos' })
+    }
+
+    const wb = XLSX.readFile(req.file.path)
+    fs.unlinkSync(req.file.path)
+
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+    const dataRows = rows.slice(1).filter((r) => r && r.length > 0 && r[0])
+
+    const errores: { fila: number; motivo: string }[] = []
+    interface FilaNomina {
+      dni: string; nombre: string; segmento: string; hsFinal: number
+      estado: string; horasPorDia: number | null; diasTrabajadosSemana: number | null
+    }
+    const filas: FilaNomina[] = []
+
+    dataRows.forEach((row, idx) => {
+      const dni = normalizarDniImport(row[0])
+      const nombre = String(row[1] ?? '').trim()
+      const segmento = String(row[2] ?? '').trim()
+      const hsFinal = parseFloat(row[3])
+      const activoRaw = String(row[5] ?? '').trim().toUpperCase()
+
+      if (!dni || !nombre) {
+        errores.push({ fila: idx + 2, motivo: 'Falta DNI o Representante' })
+        return
+      }
+
+      const { horasPorDia, diasTrabajadosSemana } = parseContrato(row[4])
+      filas.push({
+        dni, nombre, segmento,
+        hsFinal: isNaN(hsFinal) ? 0 : hsFinal,
+        estado: activoRaw === 'SI' ? 'ACTIVO' : 'LP',
+        horasPorDia, diasTrabajadosSemana,
+      })
+    })
+
+    const servicioGeneral = await prisma.servicio.upsert({
+      where: { nombre: SERVICIO_GENERAL_NOMBRE },
+      update: {},
+      create: { nombre: SERVICIO_GENERAL_NOMBRE, descripcion: 'Nómina unificada de todos los servicios, para Planificación' },
+    })
+
+    const nomina = await prisma.nominaMensual.upsert({
+      where: { servicio_id_mes_anio_tipo: { servicio_id: servicioGeneral.id, mes, anio, tipo: 'OPERACION' } },
+      update: {
+        archivo_nombre: req.file.originalname,
+        cargado_por: req.user!.userId,
+        fecha_carga: new Date(),
+        total_agentes: filas.length,
+        estado: 'ACTIVA',
+      },
+      create: {
+        servicio_id: servicioGeneral.id, mes, anio, tipo: 'OPERACION',
+        archivo_nombre: req.file.originalname,
+        cargado_por: req.user!.userId,
+        fecha_carga: new Date(),
+        total_agentes: filas.length,
+        estado: 'ACTIVA',
+      },
+    })
+
+    let creados = 0
+    let actualizados = 0
+
+    for (const fila of filas) {
+      const agente = await prisma.agente.upsert({
+        where: { dni: fila.dni },
+        update: {
+          nombre: fila.nombre,
+          segmento: fila.segmento,
+          estado: fila.estado,
+          contrato: String(fila.hsFinal),
+        },
+        create: {
+          dni: fila.dni,
+          usuario: fila.dni,
+          nombre: fila.nombre,
+          segmento: fila.segmento,
+          estado: fila.estado,
+          contrato: String(fila.hsFinal),
+          servicio_id: servicioGeneral.id,
+        },
+      })
+
+      const existente = await prisma.agenteNominaMensual.findUnique({
+        where: { nomina_mensual_id_agente_id: { nomina_mensual_id: nomina.id, agente_id: agente.id } },
+      })
+
+      await prisma.agenteNominaMensual.upsert({
+        where: { nomina_mensual_id_agente_id: { nomina_mensual_id: nomina.id, agente_id: agente.id } },
+        update: {
+          dni: fila.dni, usuario: fila.dni, nombre: fila.nombre, segmento: fila.segmento,
+          estado: fila.estado, contrato: String(fila.hsFinal),
+          horas_por_dia: fila.horasPorDia, dias_trabajados_semana: fila.diasTrabajadosSemana,
+          presente_en_nomina: true,
+        },
+        create: {
+          nomina_mensual_id: nomina.id, agente_id: agente.id,
+          dni: fila.dni, usuario: fila.dni, nombre: fila.nombre, segmento: fila.segmento,
+          estado: fila.estado, contrato: String(fila.hsFinal),
+          horas_por_dia: fila.horasPorDia, dias_trabajados_semana: fila.diasTrabajadosSemana,
+        },
+      })
+
+      if (existente) actualizados++
+      else creados++
+    }
+
+    await prisma.nominaMensual.update({
+      where: { id: nomina.id },
+      data: { agentes_creados: creados, agentes_actualizados: actualizados, errores: errores.length },
+    })
+
+    await createAuditLog({
+      usuario_id: req.user!.userId,
+      accion: 'IMPORTAR_NOMINA_SERVICIOS',
+      entidad: 'NominaMensual',
+      entidad_id: String(nomina.id),
+      nomina_mensual_id: nomina.id,
+      valor_nuevo: `${filas.length} agentes (${creados} nuevos, ${actualizados} actualizados)`,
+    })
+
+    return res.json({
+      nomina_id: nomina.id,
+      total_filas: dataRows.length,
+      procesados: filas.length,
+      creados,
+      actualizados,
+      errores,
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error al importar la nómina de servicios' })
   }
 }

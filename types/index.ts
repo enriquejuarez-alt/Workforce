@@ -173,6 +173,10 @@ export interface AgenteNominaMensual {
   jefe: string | null
   servicio_id: number | null
   servicio?: Servicio
+  /** Horas por dia trabajado, parseadas de la columna "Contratos" (ej. "6 X 5" -> 6). */
+  horas_por_dia: number | null
+  /** Dias trabajados por semana, parseados de la columna "Contratos" (ej. "6 X 5" -> 5). */
+  dias_trabajados_semana: number | null
   presente_en_nomina: boolean
   observaciones: string | null
 }
@@ -448,6 +452,37 @@ export interface ReductorServicioRow {
   deslogueo: number
   ausentismo: number
   rotacion: number
+}
+
+export interface FrancoImportacion {
+  id: number
+  mes: number
+  anio: number
+  nombre: string | null
+  archivo_nombre: string | null
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  fecha_actualizacion: string
+  servicios?: FrancoServicioRow[]
+  _count?: { servicios: number }
+}
+
+export interface FrancoServicioRow {
+  id: number
+  importacion_id: number
+  servicio: string
+  servicio_norm: string
+  dotacion: number
+  ponderado_horas: number
+  ponderado_dias: number
+  franco_lunes: number
+  franco_martes: number
+  franco_miercoles: number
+  franco_jueves: number
+  franco_viernes: number
+  franco_sabado: number
+  franco_domingo: number
 }
 
 export interface PlanificacionGuardadaListItem {

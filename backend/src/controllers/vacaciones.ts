@@ -16,9 +16,14 @@ function parseWfDate(val: any): Date | null {
     return new Date(utc_days * 86400 * 1000)
   }
   const str = String(val).trim()
-  const match = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  // Formato argentino d/m/yyyy, sin exigir ceros a la izquierda (el export
+  // real trae "31/8/2026", "1/8/2026", etc.) — antes esto caía al parser
+  // nativo de Date(), que interpreta mm/dd/yyyy y corrompía o descartaba fechas.
+  const match = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (match) {
-    return new Date(`${match[3]}-${match[2]}-${match[1]}T00:00:00.000Z`)
+    const dia = match[1].padStart(2, '0')
+    const mes = match[2].padStart(2, '0')
+    return new Date(`${match[3]}-${mes}-${dia}T00:00:00.000Z`)
   }
   const d = new Date(str)
   return isNaN(d.getTime()) ? null : d
@@ -164,7 +169,7 @@ export const importVacaciones = async (req: AuthRequest, res: Response) => {
 
 export const listVacaciones = async (req: AuthRequest, res: Response) => {
   try {
-    const { search, estado, importacion_id } = req.query
+    const { search, estado, importacion_id, desde, hasta } = req.query
     const now = new Date()
 
     const where: any = {}
@@ -176,7 +181,11 @@ export const listVacaciones = async (req: AuthRequest, res: Response) => {
       ]
     }
 
-    if (estado) {
+    // Rango de fechas: vacaciones que se superponen con [desde, hasta] (p.ej. el mes de una planificación)
+    if (desde && hasta) {
+      where.fecha_desde = { lte: new Date(hasta as string) }
+      where.fecha_hasta = { gte: new Date(desde as string) }
+    } else if (estado) {
       const e = (estado as string).toUpperCase()
       if (e === 'VIGENTE') {
         where.fecha_desde = { lte: now }

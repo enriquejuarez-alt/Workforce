@@ -23,6 +23,7 @@ import { serializarMatrices } from "@/lib/domain/serializacion";
 import { planificacionesGuardadasApi } from "@/lib/api";
 import { Activity, Download, TrendingUp, TrendingDown, Minus, Save, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { SinDatos } from "@/components/SinDatos";
 import type { MatrizServicio, ServicioKey } from "@/lib/domain/types";
 import type { HistorialSnapshot } from "@/store/useResultados";
@@ -50,7 +51,7 @@ export default function DashboardPage() {
     servicioKey,
     servicioNombre,
   } = useResultados();
-  const { modoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
+  const { modoReductor, setModoReductor, topeFacturacion, setTopeFacturacion } = useUploads();
   const { reglas } = useFrancoConfig();
 
   const [showGuardarInput, setShowGuardarInput] = useState(false);
@@ -159,6 +160,17 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Modo de cálculo del reductor */}
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+              <span className={modoReductor === "aditivo" ? "font-medium text-gray-800" : ""}>Aditivo</span>
+              <Switch
+                checked={modoReductor === "multiplicativo"}
+                onCheckedChange={(v) => setModoReductor(v ? "multiplicativo" : "aditivo")}
+              />
+              <span className={modoReductor === "multiplicativo" ? "font-medium text-gray-800" : ""}>
+                Multiplicativo
+              </span>
+            </div>
             {/* Tope de facturación */}
             <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5">
               <span className="text-xs text-gray-500">Tope</span>

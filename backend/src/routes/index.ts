@@ -24,7 +24,7 @@ import {
   confirmarHistorialServicio,
   listHistorialServicioImportaciones,
 } from '../controllers/historialServicioImport'
-import { listNominas, getNomina, updateNominaStatus, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina } from '../controllers/nominas'
+import { listNominas, getNomina, updateNominaStatus, updateNominaPeriodo, deleteNomina, listAgentesNomina, editAgentNomina, deleteAgentNomina, compareNominas, replicarNomina, importNominaServicios } from '../controllers/nominas'
 import { validateExcel, confirmExcel, listImportaciones } from '../controllers/excel'
 import { listLicencias, createLicencia, updateLicencia, deleteLicencia, importLicenciasWF, listImportacionesLicencias, deleteImportacionLicencias, getCalendarioLicencias, exportCalendarioLicencias } from '../controllers/licencias'
 import { listCambios, createCambio, updateCambio, deleteCambio } from '../controllers/cambios'
@@ -47,6 +47,13 @@ import {
   updateReductorServicio,
   deleteReductorImportacion,
 } from '../controllers/reductores'
+import {
+  listFrancoImportaciones,
+  getFrancoImportacion,
+  createFrancoImportacion,
+  updateFrancoServicio,
+  deleteFrancoImportacion,
+} from '../controllers/francos'
 import {
   listPlanificacionesGuardadas,
   getPlanificacionGuardada,
@@ -101,9 +108,11 @@ router.post('/historial-agente/import/confirmar', authenticate, requireRole('ADM
 router.get('/historial-agente/import', authenticate, requireRole('ADMINISTRADOR', 'WORKFORCE'), listHistorialServicioImportaciones)
 
 router.get('/nominas/comparar', authenticate, blockRole('CAPACITADOR', 'LIDER'), compareNominas)
+router.post('/nominas/import-servicios', authenticate, requireAdmin, uploadExcel.single('file'), importNominaServicios)
 router.get('/nominas', authenticate, blockRole('CAPACITADOR'), listNominas)
 router.get('/nominas/:id', authenticate, blockRole('CAPACITADOR'), getNomina)
 router.patch('/nominas/:id/estado', authenticate, requireAdmin, updateNominaStatus)
+router.patch('/nominas/:id/periodo', authenticate, requireAdmin, updateNominaPeriodo)
 router.delete('/nominas/:id', authenticate, requireAdmin, deleteNomina)
 router.post('/nominas/:id/replicar', authenticate, requireAdmin, replicarNomina)
 router.get('/nominas/:nominaId/agentes', authenticate, listAgentesNomina)
@@ -192,6 +201,12 @@ router.get('/reductores/:id', authenticate, getReductorImportacion)
 router.post('/reductores', authenticate, createReductorImportacion)
 router.patch('/reductores/:id/servicios/:servicioId', authenticate, updateReductorServicio)
 router.delete('/reductores/:id', authenticate, deleteReductorImportacion)
+
+router.get('/francos', authenticate, listFrancoImportaciones)
+router.get('/francos/:id', authenticate, getFrancoImportacion)
+router.post('/francos', authenticate, createFrancoImportacion)
+router.patch('/francos/:id/servicios/:servicioId', authenticate, updateFrancoServicio)
+router.delete('/francos/:id', authenticate, deleteFrancoImportacion)
 
 router.get('/planificaciones-guardadas', authenticate, listPlanificacionesGuardadas)
 router.get('/planificaciones-guardadas/:id', authenticate, getPlanificacionGuardada)

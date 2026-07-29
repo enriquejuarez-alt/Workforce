@@ -51,6 +51,7 @@ model Usuario {
   vacacion_importaciones       VacacionImportacion[]
   programaciones_creadas       ProgramacionMensual[]
   reductor_importaciones       ReductorImportacion[]
+  franco_importaciones         FrancoImportacion[]
   planificaciones_guardadas    PlanificacionGuardada[]
   agente_servicio_historial_creados  AgenteServicioHistorial[]
   agente_modalidad_historial_creados AgenteModalidadHistorial[]
@@ -293,6 +294,8 @@ model AgenteNominaMensual {
   modalidad         String?
   jefe              String?
   servicio_id       Int?
+  horas_por_dia     Float?
+  dias_trabajados_semana Float?
   presente_en_nomina Boolean @default(true)
   observaciones     String?
   fecha_actualizacion DateTime @updatedAt
@@ -665,6 +668,45 @@ model ReductorServicio {
 
   @@index([importacion_id])
   @@map("reductor_servicios")
+}
+
+model FrancoImportacion {
+  id                  Int      @id @default(autoincrement())
+  mes                 Int
+  anio                Int
+  nombre              String?
+  archivo_nombre      String?
+  importado_por       Int
+  fecha_importacion   DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  importador Usuario          @relation(fields: [importado_por], references: [id])
+  servicios  FrancoServicio[]
+
+  @@index([mes, anio])
+  @@map("franco_importaciones")
+}
+
+model FrancoServicio {
+  id               Int    @id @default(autoincrement())
+  importacion_id   Int
+  servicio         String
+  servicio_norm    String
+  dotacion         Float  @default(0)
+  ponderado_horas  Float  @default(0)
+  ponderado_dias   Float  @default(0)
+  franco_lunes     Float  @default(0)
+  franco_martes    Float  @default(0)
+  franco_miercoles Float  @default(0)
+  franco_jueves    Float  @default(0)
+  franco_viernes   Float  @default(0)
+  franco_sabado    Float  @default(0)
+  franco_domingo   Float  @default(0)
+
+  importacion FrancoImportacion @relation(fields: [importacion_id], references: [id])
+
+  @@index([importacion_id])
+  @@map("franco_servicios")
 }
 
 model PlanificacionGuardada {

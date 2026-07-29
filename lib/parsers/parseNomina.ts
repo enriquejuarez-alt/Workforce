@@ -203,9 +203,42 @@ function normalizarFecha(raw: string): string | null {
   return null;
 }
 
+function normalizarDni(dni: string): string {
+  return dni.replace(/\D/g, "");
+}
+
+/** Suma, por DNI, los días de vacaciones que caen dentro de [mesInicio, mesFin]. */
+export function construirVacacionesPorDni(
+  vacaciones: { agente_dni: string; fecha_desde: string | Date; fecha_hasta: string | Date }[],
+  mesInicio: Date,
+  mesFin: Date
+): Map<string, number> {
+  const mapa = new Map<string, number>();
+  for (const v of vacaciones) {
+    const desde = new Date(v.fecha_desde);
+    const hasta = new Date(v.fecha_hasta);
+    const inicio = desde < mesInicio ? mesInicio : desde;
+    const fin = hasta > mesFin ? mesFin : hasta;
+    if (inicio > fin) continue;
+    const dias = Math.round((fin.getTime() - inicio.getTime()) / 86_400_000) + 1;
+    const dni = normalizarDni(v.agente_dni);
+    if (!dni) continue;
+    mapa.set(dni, (mapa.get(dni) ?? 0) + dias);
+  }
+  return mapa;
+}
+
 // Calcula hsMensualBrutas para cada agente; los agentes CAPA prorratean según fecha de inicio
-export function aplicarDiasAlMes(agentes: Agente[], diasDelMes: number): Agente[] {
+// y los agentes con vacaciones ese mes (vacacionesPorDni) prorratean por los días tomados.
+export function aplicarDiasAlMes(
+  agentes: Agente[],
+  diasDelMes: number,
+  vacacionesPorDni?: Map<string, number>
+): Agente[] {
   return agentes.map((a) => {
+    const diasVacacion = vacacionesPorDni?.get(normalizarDni(a.dni)) ?? 0;
+    const factorVacaciones = Math.max(0, 1 - diasVacacion / diasDelMes);
+
     if (a.esCapa && a.fechaInicioAtencion) {
       const inicio = new Date(a.fechaInicioAtencion);
       const diaInicio = inicio.getDate(); // 1-based
@@ -213,12 +246,12 @@ export function aplicarDiasAlMes(agentes: Agente[], diasDelMes: number): Agente[
       const proporcion = diasDisponibles / diasDelMes;
       return {
         ...a,
-        hsMensualBrutas: a.hsSemanal * (diasDelMes / 7) * proporcion,
+        hsMensualBrutas: a.hsSemanal * (diasDelMes / 7) * proporcion * factorVacaciones,
       };
     }
     return {
       ...a,
-      hsMensualBrutas: a.hsSemanal * (diasDelMes / 7),
+      hsMensualBrutas: a.hsSemanal * (diasDelMes / 7) * factorVacaciones,
     };
   });
 }

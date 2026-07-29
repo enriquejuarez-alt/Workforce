@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import {
   AlertCircle, ArrowRight, ChevronDown, AlertTriangle,
   Loader2, CheckCircle2, X, FilePen, Calculator, Database, RotateCcw,
-  Save, Trash2, FolderOpen, UserPlus, Plus,
+  Save, Trash2, FolderOpen, UserPlus, Plus, Upload,
   Layers, ClipboardList, SlidersHorizontal, Users2, Settings2,
 } from "lucide-react";
 import ConfirmDialog from "@/components/hr/ui/ConfirmDialog";
@@ -44,12 +44,13 @@ import {
   parseNomina,
   aplicarDiasAlMes,
   parsearHorario,
+  construirVacacionesPorDni,
 } from "@/lib/parsers/parseNomina";
 import { parseCPVentas, validarHojasCPVentas } from "@/lib/parsers/parseCPVentas";
 import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularReductoresDesdeArchivos, reductoresAFile } from "@/lib/parsers/calcularReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
-import type { Agente, Reductor } from "@/lib/domain/types";
+import type { Agente, FrancoServicioDatos, Reductor } from "@/lib/domain/types";
 import {
   expandirAgentesHipoteticos,
   contarAgentesHipoteticos,
@@ -67,7 +68,7 @@ import { SERVICIOS_BO } from "@/lib/config/servicesBo";
 import { SERVICIOS_TECH } from "@/lib/config/servicesTech";
 import { SERVICIOS_INTEGRAL } from "@/lib/config/servicesIntegral";
 import { extraerHorasContrato } from "@/lib/utils/excel";
-import { nominasApi, reductorImportacionesApi } from "@/lib/api";
+import { nominasApi, reductorImportacionesApi, francoImportacionesApi, vacacionesApi } from "@/lib/api";
 import type { NominaMensual, AgenteNominaMensual } from "@/types";
 import {
   Select,
@@ -208,7 +209,9 @@ export default function UploadPage() {
       nominasApi
         .list({ servicio_id: servicioActivo!.id, mes: reqMes, anio: reqAnio })
         .then((r) => r.data),
-    enabled: !!servicioActivo && !servicioDemoActivo && !!serviciosNomina && !useArchivoNomina,
+    // Se consulta incluso en islas "demo" (sin Servicio real propio): la Nómina
+    // General de Planificación es visible desde cualquier isla igual.
+    enabled: !!servicioActivo && !!serviciosNomina && !useArchivoNomina,
   });
 
   const { data: reductoresGuardados = [], isLoading: loadingReductoresGuardados } = useQuery({
@@ -770,6 +773,55 @@ export default function UploadPage() {
       const todosErrores = [...errCP2Bloqueantes, ...errRed2, ...errNom2];
       if (todosErrores.length > 0) { setErrores(todosErrores); return; }
 
+      setPasoActual("Descontando vacaciones...");
+      let vacacionesPorDni: Map<string, number> | undefined;
+      const primeraMatriz = matrices.values().next().value;
+      const primerDia = primeraMatriz?.dias[0]?.fecha;
+      const ultimoDia = primeraMatriz?.dias[primeraMatriz.dias.length - 1]?.fecha;
+      if (primerDia && ultimoDia) {
+        try {
+          const { data: vacaciones } = await vacacionesApi.list({
+            desde: primerDia.toISOString().slice(0, 10),
+            hasta: ultimoDia.toISOString().slice(0, 10),
+          });
+          vacacionesPorDni = construirVacacionesPorDni(vacaciones, primerDia, ultimoDia);
+        } catch {
+          // No bloqueante: si falla la consulta, se procesa sin descuento de vacaciones.
+        }
+      }
+
+      setPasoActual("Buscando francos reales...");
+      let francosServicio: FrancoServicioDatos[] = [];
+      if (primerDia) {
+        try {
+          const mesReal = primerDia.getMonth() + 1;
+          const anioReal = primerDia.getFullYear();
+          const { data: importacionesFrancos } = await francoImportacionesApi.list();
+          const match = importacionesFrancos
+            .filter((f) => f.mes === mesReal && f.anio === anioReal)
+            .sort((a, b) => new Date(b.fecha_importacion).getTime() - new Date(a.fecha_importacion).getTime())[0];
+          if (match) {
+            const { data: detalleFrancos } = await francoImportacionesApi.get(match.id);
+            francosServicio = (detalleFrancos.servicios ?? []).map((s) => ({
+              servicio: s.servicio,
+              servicioNorm: s.servicio_norm,
+              dotacion: s.dotacion,
+              ponderadoHoras: s.ponderado_horas,
+              ponderadoDias: s.ponderado_dias,
+              francoLunes: s.franco_lunes,
+              francoMartes: s.franco_martes,
+              francoMiercoles: s.franco_miercoles,
+              francoJueves: s.franco_jueves,
+              francoViernes: s.franco_viernes,
+              francoSabado: s.franco_sabado,
+              francoDomingo: s.franco_domingo,
+            }));
+          }
+        } catch {
+          // No bloqueante: si falla la consulta, se procesa con el cálculo plano.
+        }
+      }
+
       setPasoActual("Calculando cumplimiento...");
       const paseMap = new Map(pases.map((p) => [p.dni.trim().toLowerCase(), p.servicioDestino]));
       const agentesConPases = agentesRaw.map((a) => {
@@ -777,8 +829,8 @@ export default function UploadPage() {
         return dest ? { ...a, segmentoNorm: dest } : a;
       });
       const hipoteticos = expandirAgentesHipoteticos(agentesHipoteticos);
-      const agentes = aplicarDiasAlMes([...agentesConPases, ...hipoteticos], diasDelMes);
-      const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion);
+      const agentes = aplicarDiasAlMes([...agentesConPases, ...hipoteticos], diasDelMes, vacacionesPorDni);
+      const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, francosServicio);
 
       setPasoActual("Generando alertas...");
       const alertas = generarAlertas(resultado);
@@ -1374,7 +1426,7 @@ export default function UploadPage() {
                             <Database className="h-3.5 w-3.5 shrink-0 text-[#0054A6]" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-slate-700 truncate">{n.tipo}</p>
+                            <p className="text-xs font-semibold text-slate-700 truncate">{n.archivo_nombre ?? n.tipo}</p>
                             <p className="text-[10px] text-slate-400">{n.total_agentes} agentes</p>
                           </div>
                         </button>
@@ -1399,6 +1451,14 @@ export default function UploadPage() {
                   >
                     o subir Excel manualmente
                   </button>
+
+                  <Link
+                    href="/planificacion/nomina-general"
+                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 text-[11px] font-semibold text-slate-500 transition-colors hover:border-[#0054A6]/50 hover:text-[#0054A6]"
+                    title="Precargar y administrar la nómina de todos los servicios (Nómina General)"
+                  >
+                    <Upload className="h-3.5 w-3.5" />Precargar nómina de todos los servicios
+                  </Link>
                 </div>
               ) : (
                 <div className="space-y-2">

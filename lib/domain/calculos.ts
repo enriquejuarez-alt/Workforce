@@ -2,6 +2,7 @@ import type {
   Agente,
   AgentesEquivalentes,
   FrancoAjuste,
+  FrancoServicioDatos,
   MatrizServicio,
   ModoReductor,
   Reductor,
@@ -16,6 +17,7 @@ import {
   getFrancoConfigRuntime,
 } from "../config/servicesRuntime";
 import { normalizar } from "../config/services";
+import { calcularHsLogueoDiaADia } from "./hsLogueoDiaADia";
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
 
@@ -148,7 +150,8 @@ export function calcularResultados(
   reductores: Reductor[],
   diasDelMes: number,
   modo: ModoReductor,
-  topeFacturacion = 103
+  topeFacturacion = 103,
+  francosServicio: FrancoServicioDatos[] = []
 ): ResultadoGeneral {
   const reductorPorServicio = new Map<ServicioKey, Reductor>();
   for (const r of reductores) {
@@ -162,6 +165,24 @@ export function calcularResultados(
       reductorPorServicio.set(key as ServicioKey, r);
     }
   }
+
+  const francoPorServicio = new Map<ServicioKey, FrancoServicioDatos>();
+  for (const f of francosServicio) {
+    const keys = getServiciosActivos()
+      .filter((def) =>
+        def.reductorNombres.some((alias) => normalizar(alias) === normalizar(f.servicioNorm))
+      )
+      .map((def) => def.key);
+    const resolvedKeys = keys.length > 0 ? keys : [resolverServicioPorReductorRuntime(f.servicioNorm)].filter(Boolean);
+    for (const key of resolvedKeys) {
+      francoPorServicio.set(key as ServicioKey, f);
+    }
+  }
+
+  const primeraMatrizPre = matrices.values().next().value as MatrizServicio | undefined;
+  const primerFechaPre = primeraMatrizPre?.dias[0]?.fecha;
+  const mesNumPre = primerFechaPre ? primerFechaPre.getMonth() + 1 : null;
+  const anioNumPre = primerFechaPre ? primerFechaPre.getFullYear() : null;
 
   const grupos = agruparAgentesPorServicio(agentes);
   const resultados: ResultadoServicio[] = [];
@@ -185,8 +206,45 @@ export function calcularResultados(
     const ausentismo = reductor?.ausentismo ?? 0;
     const rotacion = reductor?.rotacion ?? 0;
 
-    const factorProductivo = calcularFactorProductivo(deslogueo, ausentismo, rotacion, modo);
-    const hsNetas = grupo.hsBrutas * factorProductivo;
+    const factorProductivoPlano = calcularFactorProductivo(deslogueo, ausentismo, rotacion, modo);
+    let hsNetas = grupo.hsBrutas * factorProductivoPlano;
+    let factorProductivo = factorProductivoPlano;
+
+    const franco = francoPorServicio.get(servicio);
+    if (franco && mesNumPre && anioNumPre && franco.ponderadoHoras > 0) {
+      // Nomina inicial "efectiva" (activos ya ajustados por vacaciones parciales,
+      // ver aplicarDiasAlMes) + LP, ya que el motor dia-a-dia resta LP el mes entero.
+      const nominaInicialEfectiva =
+        hsSemanalPromedio > 0
+          ? grupo.hsBrutas / (hsSemanalPromedio * (diasDelMes / 7))
+          : grupo.hcActivos;
+      const nominaInicial = nominaInicialEfectiva + grupo.hcLP;
+
+      const { totalHsLogueo } = calcularHsLogueoDiaADia({
+        nominaInicial,
+        diasDelMes,
+        anio: anioNumPre,
+        mes: mesNumPre,
+        licenciaConstante: grupo.hcLP,
+        rotacionMensual: rotacion,
+        ausentismoMensual: ausentismo,
+        deslogueoMensual: deslogueo,
+        ponderadoHoras: franco.ponderadoHoras,
+        francoPorDiaSemana: {
+          lunes: franco.francoLunes,
+          martes: franco.francoMartes,
+          miercoles: franco.francoMiercoles,
+          jueves: franco.francoJueves,
+          viernes: franco.francoViernes,
+          sabado: franco.francoSabado,
+          domingo: franco.francoDomingo,
+        },
+      });
+
+      hsNetas = totalHsLogueo;
+      factorProductivo = grupo.hsBrutas > 0 ? hsNetas / grupo.hsBrutas : factorProductivoPlano;
+    }
+
     const rawHsReq = matrices.get(servicio)?.totalMes ?? 0;
     const hsRequeridas = isNaN(rawHsReq) ? 0 : rawHsReq;
     const cumplimiento = calcularCumplimiento(hsNetas, hsRequeridas);
@@ -251,13 +309,11 @@ export function calcularResultados(
   const totalTeoricoFacturable = resultados.reduce((a, r) => safeAdd(a, r.teoricoFacturable), 0);
   const cumplimientoTotal = calcularCumplimiento(totalHsNetas, totalHsRequeridas);
 
-  const primeraMatriz = matrices.values().next().value as MatrizServicio | undefined;
-  const primerFecha = primeraMatriz?.dias[0]?.fecha;
-  const mes = primerFecha
-    ? primerFecha.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+  const mes = primerFechaPre
+    ? primerFechaPre.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
     : "Sin fecha";
-  const mesNum  = primerFecha ? primerFecha.getMonth() + 1 : new Date().getMonth() + 1;
-  const anioNum = primerFecha ? primerFecha.getFullYear() : new Date().getFullYear();
+  const mesNum  = mesNumPre ?? new Date().getMonth() + 1;
+  const anioNum = anioNumPre ?? new Date().getFullYear();
 
   return {
     mes,

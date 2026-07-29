@@ -37,6 +37,23 @@ export interface Reductor {
   rotacion: number;
 }
 
+// ─── Francos (rotacion real de dia de descanso, dia-a-dia) ─────────────────────
+
+export interface FrancoServicioDatos {
+  servicio: string;
+  servicioNorm: string;
+  dotacion: number;
+  ponderadoHoras: number;
+  ponderadoDias: number;
+  francoLunes: number;
+  francoMartes: number;
+  francoMiercoles: number;
+  francoJueves: number;
+  francoViernes: number;
+  francoSabado: number;
+  francoDomingo: number;
+}
+
 // ─── Matrices CP ───────────────────────────────────────────────────────────────
 
 export interface DiaInfo {

@@ -5,7 +5,7 @@ import type {
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, CambioHorario, Capacitacion, Remocion,
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
   ProgramacionMensual, FactorReduccion, SimulacionResponse, CronogramaResponse,
-  ReductorImportacion, ReductorServicioRow, AgenteServicioHistorial,
+  ReductorImportacion, ReductorServicioRow, FrancoImportacion, FrancoServicioRow, AgenteServicioHistorial,
   HistorialServicioImportacion,
   PlanificacionGuardadaListItem, PlanificacionGuardadaDetalle,
 } from '@/types'
@@ -112,8 +112,16 @@ export const historialServicioImportApi = {
 // Nóminas
 export const nominasApi = {
   list: (params?: Record<string, any>) => api.get<NominaMensual[]>('/nominas', { params }),
+  importServicios: (formData: FormData) =>
+    api.post<{ nomina_id: number; total_filas: number; procesados: number; creados: number; actualizados: number; errores: { fila: number; motivo: string }[] }>(
+      '/nominas/import-servicios',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ),
   get: (id: number) => api.get<NominaMensual>(`/nominas/${id}`),
   updateStatus: (id: number, estado: string) => api.patch(`/nominas/${id}/estado`, { estado }),
+  updatePeriodo: (id: number, mes: number, anio: number) =>
+    api.patch<NominaMensual>(`/nominas/${id}/periodo`, { mes, anio }),
   agentes: (nominaId: number, params?: Record<string, any>) =>
     api.get<AgenteNominaMensual[]>(`/nominas/${nominaId}/agentes`, { params }),
   editAgente: (snapshotId: number, data: Partial<AgenteNominaMensual>) =>
@@ -329,6 +337,39 @@ export const reductorImportacionesApi = {
     data: Partial<Pick<ReductorServicioRow, 'deslogueo' | 'ausentismo' | 'rotacion'>>,
   ) => api.patch<ReductorServicioRow>(`/reductores/${id}/servicios/${servicioId}`, data),
   delete: (id: number) => api.delete(`/reductores/${id}`),
+}
+
+// Francos guardados (Planificación)
+export const francoImportacionesApi = {
+  list: () => api.get<FrancoImportacion[]>('/francos'),
+  get: (id: number) => api.get<FrancoImportacion>(`/francos/${id}`),
+  create: (data: {
+    mes: number
+    anio: number
+    nombre?: string
+    archivo_nombre?: string
+    servicios: Array<{
+      servicio: string
+      servicioNorm: string
+      dotacion: number
+      ponderadoHoras: number
+      ponderadoDias: number
+      francoLunes: number
+      francoMartes: number
+      francoMiercoles: number
+      francoJueves: number
+      francoViernes: number
+      francoSabado: number
+      francoDomingo: number
+    }>
+  }) => api.post<FrancoImportacion>('/francos', data),
+  updateServicio: (
+    id: number,
+    servicioId: number,
+    data: Partial<Pick<FrancoServicioRow, 'dotacion' | 'ponderado_horas' | 'ponderado_dias' |
+      'franco_lunes' | 'franco_martes' | 'franco_miercoles' | 'franco_jueves' | 'franco_viernes' | 'franco_sabado' | 'franco_domingo'>>,
+  ) => api.patch<FrancoServicioRow>(`/francos/${id}/servicios/${servicioId}`, data),
+  delete: (id: number) => api.delete(`/francos/${id}`),
 }
 
 // Planificaciones guardadas (Planificación)

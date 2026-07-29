@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useResultados } from "@/store/useResultados";
 import { extraerOpciones, hayFiltrosActivos } from "@/lib/domain/filterEngine";
+import { getServiciosKeys } from "@/lib/config/servicesRuntime";
 import type { ActiveFilters } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -44,7 +46,14 @@ function FiltroSelect({
 
 export function FilterBar() {
   const { agentes, activeFilters, setFilter, clearFilters } = useResultados();
-  const opciones = extraerOpciones(agentes);
+  // La nomina puede traer agentes de TODA la empresa (nomina general precargada);
+  // los filtros solo deben ofrecer las islas que realmente se cargaron con requerido
+  // este mes, no cualquier segmento presente en la nomina.
+  const agentesRelevantes = useMemo(() => {
+    const keys = new Set(getServiciosKeys());
+    return agentes.filter((a) => keys.has(a.segmentoNorm));
+  }, [agentes]);
+  const opciones = extraerOpciones(agentesRelevantes);
   const activo = hayFiltrosActivos(activeFilters);
 
   const haySitios = opciones.sitios.length > 1;

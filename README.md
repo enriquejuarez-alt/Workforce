@@ -94,6 +94,32 @@ y se concatenan a los agentes reales antes de `aplicarDiasAlMes`, asi que
 cuentan en todo el calculo: cumplimiento, curvas, francos y exportaciones.
 La action bar muestra cuantos hay incluidos en la corrida actual.
 
+## Nomina General
+
+Pagina `/planificacion/nomina-general`: precarga el archivo "Nomina de
+servicios.xlsx" (Dni, Representante, Servicios, Hs FINAL, Contratos, Activo)
+**una sola vez por mes**, en vez de subirlo isla por isla.
+
+- Se guarda como una unica `NominaMensual` bajo un Servicio "paraguas" fijo
+  llamado `Nómina General` (creado por upsert en
+  `importNominaServicios`, `backend/src/controllers/nominas.ts`). El
+  segmento de cada agente no se parte por isla al importar: se resuelve
+  dinamicamente en Planificacion segun la isla activa.
+- Es visible desde cualquier isla ademas de la nomina propia de ese
+  servicio (`listNominas` agrega el id de `Nómina General` a los servicios
+  visibles del usuario, sea admin o no).
+- Se puede editar el mes/año de una carga ya hecha (`PATCH
+  /nominas/:id/periodo`, `updateNominaPeriodo`) sin tener que volver a
+  subir el archivo, y borrarla cuando ya no hace falta.
+- El listado de nominas de cada isla en `/planificacion` (paso "Nomina
+  activa") ahora se consulta tambien para islas "demo" sin Servicio propio,
+  ya que la Nómina General puede cubrirlas igual.
+- Fix relacionado: el selector de Isla en `FilterBar` filtraba mal cuando la
+  nomina cargada trae agentes de toda la empresa (justamente lo que hace la
+  Nómina General) — antes listaba cualquier segmento presente en la nomina;
+  ahora solo ofrece las islas realmente configuradas para el servicio activo
+  (`getServiciosKeys()` en `lib/config/servicesRuntime.ts`).
+
 ## Reductores
 
 Los reductores representan perdida esperada de productividad:
@@ -221,6 +247,68 @@ Backend: modelo `PlanificacionGuardada` (Prisma) y CRUD en
 `backend/src/controllers/planificacionesGuardadas.ts`
 (`GET/POST /planificaciones-guardadas`, `GET /planificaciones-guardadas/:id`,
 `DELETE /planificaciones-guardadas/:id`), con auditoria de creacion/borrado.
+
+## Francos reales y motor de calculo dia a dia
+
+No confundir con la seccion "Contratos y francos" de mas abajo (esa es un
+**modelo probabilistico** de franco por tipo de contrato, usado en Curvas).
+Esta es la carga del **% de franco real** medido, servicio por servicio.
+
+Pagina `/planificacion/francos`: importa un Excel de "Francos y contratos"
+con dos hojas fijas:
+
+- `% Francos Julio`: grilla de bloques de 8 filas por servicio (1 fila de
+  encabezado + Lun..Dom) con el % real de gente de franco cada dia.
+- `Detalle Contratos`: dotacion, horas ponderadas y dias ponderados por
+  servicio.
+
+El parser (`lib/parsers/parseFrancos.ts::parseFrancos`) cruza ambas hojas
+por nombre de servicio normalizado y arma un `FrancoServicioDatos` por
+servicio. Se guarda con mes/año (`FrancoImportacion`/`FrancoServicio`,
+CRUD en `backend/src/controllers/francos.ts`:
+`GET/POST /francos`, `GET /francos/:id`,
+`PATCH /francos/:id/servicios/:servicioId`, `DELETE /francos/:id`), se
+puede editar valor por valor despues de importar, y se listan varias cargas
+por mes (se usa la mas reciente).
+
+### Como se conecta al calculo
+
+Al procesar en `/planificacion` (`app/planificacion/page.tsx`), antes de
+calcular resultados:
+
+1. Busca si hay Francos cargados para el mes/año de la corrida y el
+   servicio activo (matcheando por los mismos alias de nombre que usa el
+   resto del sistema).
+2. Busca tambien vacaciones que se superponen con ese rango de fechas
+   (`GET /vacaciones?desde=&hasta=`) y arma un descuento real por DNI
+   (`construirVacacionesPorDni`), en vez de estimarlo.
+
+Si hay Francos para ese servicio+mes+año, `calcularResultados`
+(`lib/domain/calculos.ts`) reemplaza el modelo plano
+(`Hs netas = Hs brutas * factor productivo`) por el motor dia a dia
+(`lib/domain/hsLogueoDiaADia.ts::calcularHsLogueoDiaADia`), que para cada
+dia del mes encadena:
+
+```text
+nomina activa dia = nomina inicial - vacaciones dia - licencia - bajas por rotacion (en rampa lineal)
+agentes de franco dia = % franco real del dia de semana * nomina activa dia
+agentes ausentes dia  = (nomina activa dia - agentes de franco dia) * ausentismo mensual
+agentes presentes dia = nomina activa dia - agentes de franco dia - agentes ausentes dia
+hs logueo dia         = agentes presentes dia * horas ponderadas * (1 - deslogueo mensual)
+```
+
+`totalHsLogueo` (suma de todos los dias) pasa a ser las HS Netas del
+servicio, y el factor productivo mostrado se recalcula como
+`hsNetas / hsBrutas` solo para mantener coherente el resto de la UI. Si no
+hay Francos cargados para ese servicio+mes+año, se sigue usando el modelo
+plano de siempre sin cambios.
+
+**Fix de parseo de fechas incluido:** el export de vacaciones trae fechas
+`d/m/yyyy` sin cero a la izquierda (ej. `31/8/2026`); el regex de
+`parseWfDate` (`backend/src/controllers/vacaciones.ts`) antes exigia
+`dd/mm/yyyy` exacto y caia al parser nativo de `Date()` (que interpreta
+`mm/dd/yyyy` en inglés), corrompiendo fechas. Ahora acepta 1 o 2 digitos y
+los rellena con cero antes de armar el ISO string.
 
 ## Formatos de CP soportados
 
@@ -558,7 +646,9 @@ app/planificacion/resumen/page.tsx      Resumen, filtros y guardar planificacion
 app/planificacion/guardadas/page.tsx    Listado de planificaciones guardadas
 app/planificacion/guardadas/[id]/page.tsx Ficha de una planificacion guardada + cargar en sesion
 app/planificacion/curvas/page.tsx       Curvas por servicio
-app/planificacion/franco/page.tsx       Planificacion de francos
+app/planificacion/franco/page.tsx       Planificacion de francos (modelo probabilistico)
+app/planificacion/francos/page.tsx      Importador de francos reales y contratos (motor dia a dia)
+app/planificacion/nomina-general/page.tsx Precarga de Nomina General (todas las islas, una sola carga)
 app/planificacion/contratos/page.tsx    Configuracion de contratos y francos por servicio
 app/planificacion/simulador/page.tsx    Simulador de dotacion
 app/ppay/page.tsx                       Flujo especifico para Personal Pay (formato KON)
@@ -566,7 +656,9 @@ components/config/FrancoRulesEditor.tsx Editor de reglas de contratos y francos
 components/tables/SimuladorTable.tsx    UI del constructor de escenarios
 components/charts/CumplimientoBarChart.tsx Grafico de cumplimiento con leyenda de niveles
 lib/domain/calculos.ts                  Matematica principal
-lib/domain/francoEngine.ts              Calculo de francos
+lib/domain/francoEngine.ts              Calculo de francos (modelo probabilistico)
+lib/domain/hsLogueoDiaADia.ts           Motor de HS Netas dia a dia (con Francos reales cargados)
+lib/parsers/parseFrancos.ts             Parser de "Francos y contratos" (hojas "% Francos Julio" + "Detalle Contratos")
 lib/domain/agentesHipoteticos.ts        Expande filas de agentes hipoteticos a Agente[]
 lib/domain/serializacion.ts             Serializa/deserializa el Map de matrices CP para guardar como JSON
 lib/config/servicesMovil.ts             Definicion de servicio Movil (segmentos estimados)
@@ -580,6 +672,7 @@ lib/parsers/parseCPOnb.ts               Parser formato Onboarding
 lib/utils/exportSimulador.ts            Exportacion Excel (5 hojas)
 backend/src/controllers/reductores.ts   CRUD de reductores guardados (ReductorImportacion/ReductorServicio)
 backend/src/controllers/planificacionesGuardadas.ts CRUD de planificaciones guardadas (PlanificacionGuardada)
+backend/src/controllers/francos.ts      CRUD de francos reales cargados (FrancoImportacion/FrancoServicio)
 CALCULO_REDUCTORES.md                   Nota corta del calculo de reductores
 ```
 

@@ -24,6 +24,43 @@ function toNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizarHeader(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+const DIAS_SEMANA_ORDEN = [
+  "lunes",
+  "martes",
+  "miercoles",
+  "jueves",
+  "viernes",
+  "sabado",
+  "domingo",
+] as const;
+
+const HEADERS_POR_AGENTE = ["nombre", "dni", "gestion", "horas", "dias", ...DIAS_SEMANA_ORDEN];
+
+/**
+ * Detecta el formato "roster por agente" (una fila por agente, con columnas
+ * NOMBRE/DNI/GESTION/HORAS/DIAS/LUNES..DOMINGO donde cada columna de dia es
+ * un indicador 0/1 de franco ese dia). Es el formato crudo del que sale el
+ * agregado por servicio de "% Francos Julio"/"Detalle Contratos"; cuando
+ * viene asi, se agrega por servicio (GESTION) en `parseFrancosPorAgente`.
+ * Devuelve el nombre de la primera hoja cuyo encabezado matchea, o null.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function detectarHojaPorAgente(wb: any): string | null {
+  for (const nombre of wb.SheetNames as string[]) {
+    const header = (getSheetRows(wb, nombre)[0] ?? []).map(normalizarHeader);
+    if (HEADERS_POR_AGENTE.every((h) => header.includes(h))) return nombre;
+  }
+  return null;
+}
+
 /**
  * Hoja "% Francos Julio": la tabla real esta en las columnas 0-3 (Servico/Dia/Francos/%)
  * en grupos de 8 filas (1 fila de encabezado con el servicio + dotacion, y 7 filas
@@ -93,19 +130,10 @@ function parseDetalleContratos(
   return resultado;
 }
 
-export function parseFrancos(buffer: ArrayBuffer): ParseFrancosResult {
+function parseFrancosAgregado(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const wb = XLSX.read(buffer, { type: "array" }) as any;
-  const errores: string[] = [];
-
-  if (!wb.SheetNames.includes(HOJA_FRANCOS)) {
-    errores.push(`No se encontró la hoja '${HOJA_FRANCOS}'`);
-  }
-  if (!wb.SheetNames.includes(HOJA_CONTRATOS)) {
-    errores.push(`No se encontró la hoja '${HOJA_CONTRATOS}'`);
-  }
-  if (errores.length > 0) return { servicios: [], errores };
-
+  wb: any
+): ParseFrancosResult {
   const francosPorDia = parseFrancosPorDia(wb);
   const contratos = parseDetalleContratos(wb);
 
@@ -136,6 +164,111 @@ export function parseFrancos(buffer: ArrayBuffer): ParseFrancosResult {
   servicios.sort((a, b) => a.servicio.localeCompare(b.servicio));
 
   return { servicios, errores: [] };
+}
+
+interface AcumuladorAgente {
+  servicio: string;
+  n: number;
+  sumaHoras: number;
+  sumaDias: number;
+  // orden: lunes, martes, miercoles, jueves, viernes, sabado, domingo
+  sumaFranco: [number, number, number, number, number, number, number];
+}
+
+/**
+ * Formato "roster por agente" (una fila por agente): agrega dotacion,
+ * horas/dias ponderados y % de franco por dia de semana, servicio por
+ * servicio (columna GESTION), a partir de los indicadores 0/1 de cada
+ * columna de dia. Es el equivalente granular de lo que ya trae calculado
+ * el formato "% Francos Julio"/"Detalle Contratos": dotacion = cantidad de
+ * agentes del servicio, ponderado horas/dias = promedio simple de HORAS/DIAS
+ * de esos agentes, y % franco de un dia = fraccion de agentes del servicio
+ * con el indicador en 1 ese dia.
+ */
+function parseFrancosPorAgente(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  wb: any,
+  hoja: string
+): ParseFrancosResult {
+  const rows = getSheetRows(wb, hoja);
+  const header = (rows[0] ?? []).map(normalizarHeader);
+
+  const idxGestion = header.indexOf("gestion");
+  const idxHoras = header.indexOf("horas");
+  const idxDias = header.indexOf("dias");
+  const idxDiasSemana = DIAS_SEMANA_ORDEN.map((d) => header.indexOf(d));
+
+  const acumuladores = new Map<string, AcumuladorAgente>();
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((c) => c === null)) continue;
+
+    const gestionRaw = row[idxGestion];
+    if (typeof gestionRaw !== "string" || !gestionRaw.trim()) continue;
+
+    const servicio = gestionRaw.trim();
+    const clave = normalizar(servicio);
+    let acc = acumuladores.get(clave);
+    if (!acc) {
+      acc = { servicio, n: 0, sumaHoras: 0, sumaDias: 0, sumaFranco: [0, 0, 0, 0, 0, 0, 0] };
+      acumuladores.set(clave, acc);
+    }
+
+    acc.n += 1;
+    acc.sumaHoras += toNum(row[idxHoras]);
+    acc.sumaDias += toNum(row[idxDias]);
+    idxDiasSemana.forEach((colIdx, d) => {
+      acc!.sumaFranco[d] += toNum(row[colIdx]);
+    });
+  }
+
+  const servicios: FrancoServicioDatos[] = [];
+  for (const [clave, acc] of acumuladores) {
+    const [lunes, martes, miercoles, jueves, viernes, sabado, domingo] = acc.sumaFranco.map(
+      (s) => s / acc.n
+    );
+    servicios.push({
+      servicio: acc.servicio,
+      servicioNorm: clave,
+      dotacion: acc.n,
+      ponderadoHoras: acc.sumaHoras / acc.n,
+      ponderadoDias: acc.sumaDias / acc.n,
+      francoLunes: lunes,
+      francoMartes: martes,
+      francoMiercoles: miercoles,
+      francoJueves: jueves,
+      francoViernes: viernes,
+      francoSabado: sabado,
+      francoDomingo: domingo,
+    });
+  }
+
+  servicios.sort((a, b) => a.servicio.localeCompare(b.servicio));
+
+  return { servicios, errores: [] };
+}
+
+export function parseFrancos(buffer: ArrayBuffer): ParseFrancosResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wb = XLSX.read(buffer, { type: "array" }) as any;
+
+  if (wb.SheetNames.includes(HOJA_FRANCOS) && wb.SheetNames.includes(HOJA_CONTRATOS)) {
+    return parseFrancosAgregado(wb);
+  }
+
+  const hojaPorAgente = detectarHojaPorAgente(wb);
+  if (hojaPorAgente) {
+    return parseFrancosPorAgente(wb, hojaPorAgente);
+  }
+
+  return {
+    servicios: [],
+    errores: [
+      `No se reconoce el formato del archivo. Se admite: hojas '${HOJA_FRANCOS}' + '${HOJA_CONTRATOS}', ` +
+        `o una hoja con columnas Nombre/DNI/Gestion/Horas/Dias/Lunes..Domingo (una fila por agente).`,
+    ],
+  };
 }
 
 export function validarHojasFrancos(sheetNames: string[]): string[] {

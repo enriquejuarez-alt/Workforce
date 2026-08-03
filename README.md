@@ -254,17 +254,34 @@ No confundir con la seccion "Contratos y francos" de mas abajo (esa es un
 **modelo probabilistico** de franco por tipo de contrato, usado en Curvas).
 Esta es la carga del **% de franco real** medido, servicio por servicio.
 
-Pagina `/planificacion/francos`: importa un Excel de "Francos y contratos"
-con dos hojas fijas:
+Pagina `/planificacion/francos`: importa un Excel de francos. El parser
+(`lib/parsers/parseFrancos.ts::parseFrancos`) detecta automaticamente cual
+de los dos formatos soportados trae el archivo:
 
-- `% Francos Julio`: grilla de bloques de 8 filas por servicio (1 fila de
-  encabezado + Lun..Dom) con el % real de gente de franco cada dia.
-- `Detalle Contratos`: dotacion, horas ponderadas y dias ponderados por
-  servicio.
+- **Agregado** (`% Francos Julio` + `Detalle Contratos`, dos hojas fijas):
+  - `% Francos Julio`: grilla de bloques de 8 filas por servicio (1 fila de
+    encabezado + Lun..Dom) con el % real de gente de franco cada dia.
+  - `Detalle Contratos`: dotacion, horas ponderadas y dias ponderados por
+    servicio.
+  - Se cruzan ambas hojas por nombre de servicio normalizado
+    (`parseFrancosAgregado`).
+- **Roster por agente** (una sola hoja, una fila por agente): columnas
+  `Nombre / DNI / Gestion / Horas / Dias / Lunes..Domingo`, donde cada
+  columna de dia es un indicador `0`/`1` de franco ese dia
+  (`parseFrancosPorAgente`, detectado por encabezado en
+  `detectarHojaPorAgente`). Se agrega por servicio (columna `Gestion`):
+  dotacion = cantidad de agentes, horas/dias ponderados = promedio simple
+  de `Horas`/`Dias` de esos agentes, y el % de franco de un dia = fraccion
+  de agentes del servicio con el indicador en `1` ese dia. Es el roster
+  crudo del que sale el formato agregado — mismo resultado, sin el paso
+  intermedio de agregacion manual en Excel.
 
-El parser (`lib/parsers/parseFrancos.ts::parseFrancos`) cruza ambas hojas
-por nombre de servicio normalizado y arma un `FrancoServicioDatos` por
-servicio. Se guarda con mes/año (`FrancoImportacion`/`FrancoServicio`,
+Si el archivo no matchea ninguno de los dos formatos, se devuelve un error
+en vez de importar datos parciales. El resultado de cualquiera de los dos
+caminos es el mismo `FrancoServicioDatos[]`, asi que el resto del flujo
+(guardado, edicion, motor de calculo) no distingue de donde vino.
+
+Se guarda con mes/año (`FrancoImportacion`/`FrancoServicio`,
 CRUD en `backend/src/controllers/francos.ts`:
 `GET/POST /francos`, `GET /francos/:id`,
 `PATCH /francos/:id/servicios/:servicioId`, `DELETE /francos/:id`), se
@@ -658,7 +675,7 @@ components/charts/CumplimientoBarChart.tsx Grafico de cumplimiento con leyenda d
 lib/domain/calculos.ts                  Matematica principal
 lib/domain/francoEngine.ts              Calculo de francos (modelo probabilistico)
 lib/domain/hsLogueoDiaADia.ts           Motor de HS Netas dia a dia (con Francos reales cargados)
-lib/parsers/parseFrancos.ts             Parser de "Francos y contratos" (hojas "% Francos Julio" + "Detalle Contratos")
+lib/parsers/parseFrancos.ts             Parser de Francos: formato agregado o roster por agente (autodetectado)
 lib/domain/agentesHipoteticos.ts        Expande filas de agentes hipoteticos a Agente[]
 lib/domain/serializacion.ts             Serializa/deserializa el Map de matrices CP para guardar como JSON
 lib/config/servicesMovil.ts             Definicion de servicio Movil (segmentos estimados)

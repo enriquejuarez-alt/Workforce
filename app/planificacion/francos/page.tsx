@@ -99,10 +99,11 @@ export default function FrancosPage() {
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-0.5">Francos y contratos</h2>
           <p className="text-sm text-gray-500">
-            Cargá el archivo "Francos y contratos" ("% Francos" + "Detalle Contratos") para que la
-            Planificación calcule las HS de logueo día a día con la rotación real de francos por servicio,
-            en vez del modelo plano. Si un servicio no tiene francos cargados para el mes, se usa el
-            cálculo plano como antes.
+            Cargá el archivo de francos para que la Planificación calcule las HS de logueo día a día
+            con la rotación real de francos por servicio, en vez del modelo plano. Acepta el formato
+            agregado ("% Francos" + "Detalle Contratos") o el roster por agente (Nombre/DNI/Gestión/
+            Horas/Días/Lunes..Domingo) — se detecta automáticamente. Si un servicio no tiene francos
+            cargados para el mes, se usa el cálculo plano como antes.
           </p>
         </div>
 

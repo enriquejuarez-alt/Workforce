@@ -59,6 +59,7 @@ export const createPlanificacionGuardada = async (req: AuthRequest, res: Respons
       agentes,
       reductores,
       alertas,
+      francos_servicio,
     } = req.body as {
       servicio_key: string
       servicio_nombre: string
@@ -73,6 +74,7 @@ export const createPlanificacionGuardada = async (req: AuthRequest, res: Respons
       agentes: unknown
       reductores: unknown
       alertas: unknown
+      francos_servicio?: unknown
     }
 
     const mesNum = parseInt(String(mes))
@@ -108,6 +110,7 @@ export const createPlanificacionGuardada = async (req: AuthRequest, res: Respons
         agentes: agentes as object,
         reductores: reductores as object,
         alertas: alertas as object,
+        francos_servicio: francos_servicio ? (francos_servicio as object) : undefined,
         guardado_por: req.user!.userId,
       },
       include: { guardador: { select: { id: true, nombre: true } } },

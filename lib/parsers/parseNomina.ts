@@ -240,8 +240,13 @@ export function aplicarDiasAlMes(
     const factorVacaciones = Math.max(0, 1 - diasVacacion / diasDelMes);
 
     if (a.esCapa && a.fechaInicioAtencion) {
+      // fechaInicioAtencion siempre llega como ISO "YYYY-MM-DD" (normalizarFecha
+      // acá, o toISOString().slice(0,10) en el backend), que Date la interpreta
+      // en UTC medianoche. getDate() (hora local) corre el dia 1 al mes anterior
+      // en timezones detras de UTC (Argentina, UTC-3), restando un dia de menos
+      // al prorrateo y sobreestimando las hs del agente CAPA.
       const inicio = new Date(a.fechaInicioAtencion);
-      const diaInicio = inicio.getDate(); // 1-based
+      const diaInicio = inicio.getUTCDate(); // 1-based
       const diasDisponibles = Math.max(0, diasDelMes - diaInicio + 1);
       const proporcion = diasDisponibles / diasDelMes;
       return {

@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import type { MatrizServicio, ServicioKey } from "../domain/types";
 import { SERVICIOS_PPAY, normalizar } from "../config/servicesPpay";
-import { generarFranjas, safeNum, serialToDate, esFeriado } from "../utils/excel";
+import { generarFranjas, safeNum, serialToDate, esDiaFeriado } from "../utils/excel";
 
 export interface ParseCPPpayResult {
   matrices: Map<ServicioKey, MatrizServicio>;
@@ -90,7 +90,7 @@ export function parseCPPpay(buffer: ArrayBuffer): ParseCPPpayResult {
     dias.push({
       fecha,
       diaSemana: diaSemanaRaw,
-      esFeriado: esFeriado(diaSemanaRaw),
+      esFeriado: esDiaFeriado(diaSemanaRaw, fecha),
       indiceColumna: col,
     });
     columnasValidas.push(col);
@@ -99,7 +99,7 @@ export function parseCPPpay(buffer: ArrayBuffer): ParseCPPpayResult {
   const diasDelMes = dias.length;
   let mes = "";
   if (dias.length > 0) {
-    mes = dias[0].fecha.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+    mes = dias[0].fecha.toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
   }
 
   const franjas = generarFranjas();

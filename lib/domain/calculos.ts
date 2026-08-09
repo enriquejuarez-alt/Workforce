@@ -17,7 +17,12 @@ import {
   getFrancoConfigRuntime,
 } from "../config/servicesRuntime";
 import { normalizar } from "../config/services";
-import { calcularHsLogueoDiaADia } from "./hsLogueoDiaADia";
+import {
+  calcularHsLogueoDiaADia,
+  calcularFrancoFeriados,
+  type InputDiaADia,
+  type ResultadoDiaADia,
+} from "./hsLogueoDiaADia";
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
 
@@ -140,6 +145,102 @@ function agruparAgentesPorServicio(
   return mapa;
 }
 
+// Arma el input del motor dia a dia para un servicio puntual a partir de su grupo
+// de agentes, franco real y reductor. Devuelve null si no hay franco real cargado
+// (sin ponderadoHoras > 0 el servicio usa el modelo plano, no dia a dia).
+function construirInputDiaADia(
+  grupo: GrupoServicio,
+  franco: FrancoServicioDatos | undefined,
+  reductor: Reductor | undefined,
+  matrizServicio: MatrizServicio | undefined,
+  diasDelMes: number,
+  mesNum: number,
+  anioNum: number
+): InputDiaADia | null {
+  if (!franco || franco.ponderadoHoras <= 0) return null;
+
+  const hsSemanalPromedio =
+    grupo.hsSemanalConteo > 0 ? grupo.hsSemanalSuma / grupo.hsSemanalConteo : 36;
+  const deslogueo = reductor?.deslogueo ?? 0;
+  const ausentismo = reductor?.ausentismo ?? 0;
+  const rotacion = reductor?.rotacion ?? 0;
+
+  // Nomina inicial "efectiva" (activos ya ajustados por vacaciones parciales,
+  // ver aplicarDiasAlMes) + LP, ya que el motor dia-a-dia resta LP el mes entero.
+  const nominaInicialEfectiva =
+    hsSemanalPromedio > 0
+      ? grupo.hsBrutas / (hsSemanalPromedio * (diasDelMes / 7))
+      : grupo.hcActivos;
+  const nominaInicial = nominaInicialEfectiva + grupo.hcLP;
+
+  const francoFeriadoPorDia = matrizServicio ? calcularFrancoFeriados(matrizServicio) : undefined;
+
+  return {
+    nominaInicial,
+    diasDelMes,
+    anio: anioNum,
+    mes: mesNum,
+    licenciaConstante: grupo.hcLP,
+    rotacionMensual: rotacion,
+    ausentismoMensual: ausentismo,
+    deslogueoMensual: deslogueo,
+    ponderadoHoras: franco.ponderadoHoras,
+    francoPorDiaSemana: {
+      lunes: franco.francoLunes,
+      martes: franco.francoMartes,
+      miercoles: franco.francoMiercoles,
+      jueves: franco.francoJueves,
+      viernes: franco.francoViernes,
+      sabado: franco.francoSabado,
+      domingo: franco.francoDomingo,
+    },
+    francoFeriadoPorDia,
+  };
+}
+
+/**
+ * Re-corre el motor dia a dia para UN servicio puntual, con eventos de dotacion
+ * fechados opcionales (bajas/altas/cambios de servicio) — usado por el simulador
+ * dia a dia para previsualizar el impacto de un movimiento en una fecha concreta,
+ * con el mismo motor que produce el resultado "oficial" (ver `calcularResultados`).
+ * Devuelve null si el servicio no tiene Francos reales cargados (no aplica dia a dia).
+ */
+export function simularDiaADiaServicio(
+  servicio: ServicioKey,
+  agentes: Agente[],
+  matrices: Map<ServicioKey, MatrizServicio>,
+  reductores: Reductor[],
+  francosServicio: FrancoServicioDatos[],
+  diasDelMes: number,
+  eventosPorDia?: Map<number, number>
+): (ResultadoDiaADia & { input: InputDiaADia }) | null {
+  const grupo = agruparAgentesPorServicio(agentes).get(servicio);
+  if (!grupo) return null;
+
+  const reductor = reductores.find((r) =>
+    getServiciosActivos()
+      .filter((def) => def.key === servicio)
+      .some((def) => def.reductorNombres.some((alias) => normalizar(alias) === normalizar(r.servicioNorm)))
+  );
+  const franco = francosServicio.find((f) =>
+    getServiciosActivos()
+      .filter((def) => def.key === servicio)
+      .some((def) => def.reductorNombres.some((alias) => normalizar(alias) === normalizar(f.servicioNorm)))
+  );
+
+  const matrizServicio = matrices.get(servicio);
+  const primerFecha = matrizServicio?.dias[0]?.fecha;
+  const mesNum = primerFecha ? new Date(primerFecha).getUTCMonth() + 1 : null;
+  const anioNum = primerFecha ? new Date(primerFecha).getUTCFullYear() : null;
+  if (!mesNum || !anioNum) return null;
+
+  const input = construirInputDiaADia(grupo, franco, reductor, matrizServicio, diasDelMes, mesNum, anioNum);
+  if (!input) return null;
+
+  const resultado = calcularHsLogueoDiaADia({ ...input, eventosPorDia });
+  return { ...resultado, input };
+}
+
 // ─── Cálculo principal ─────────────────────────────────────────────────────────
 
 // Función central: cruza nómina, matrices CP y reductores para producir ResultadoGeneral.
@@ -178,11 +279,21 @@ export function calcularResultados(
       francoPorServicio.set(key as ServicioKey, f);
     }
   }
+  if (francosServicio.length > 0 && typeof window !== "undefined") {
+    console.log(
+      `[francos] francoPorServicio resuelto: ${francoPorServicio.size} de ${francosServicio.length} servicios matchearon. Keys activos:`,
+      getServiciosActivos().map((d) => d.key),
+      "Keys con franco:", [...francoPorServicio.keys()]
+    );
+  }
 
   const primeraMatrizPre = matrices.values().next().value as MatrizServicio | undefined;
   const primerFechaPre = primeraMatrizPre?.dias[0]?.fecha;
-  const mesNumPre = primerFechaPre ? primerFechaPre.getMonth() + 1 : null;
-  const anioNumPre = primerFechaPre ? primerFechaPre.getFullYear() : null;
+  // Las fechas de dias vienen de serialToDate() en UTC medianoche. Con getMonth()/
+  // getFullYear() (hora local) el dia 1 del mes se corre al mes anterior en
+  // timezones detras de UTC (ej. Argentina, UTC-3) — usar los getters UTC.
+  const mesNumPre = primerFechaPre ? primerFechaPre.getUTCMonth() + 1 : null;
+  const anioNumPre = primerFechaPre ? primerFechaPre.getUTCFullYear() : null;
 
   const grupos = agruparAgentesPorServicio(agentes);
   const resultados: ResultadoServicio[] = [];
@@ -211,38 +322,25 @@ export function calcularResultados(
     let factorProductivo = factorProductivoPlano;
 
     const franco = francoPorServicio.get(servicio);
-    if (franco && mesNumPre && anioNumPre && franco.ponderadoHoras > 0) {
-      // Nomina inicial "efectiva" (activos ya ajustados por vacaciones parciales,
-      // ver aplicarDiasAlMes) + LP, ya que el motor dia-a-dia resta LP el mes entero.
-      const nominaInicialEfectiva =
-        hsSemanalPromedio > 0
-          ? grupo.hsBrutas / (hsSemanalPromedio * (diasDelMes / 7))
-          : grupo.hcActivos;
-      const nominaInicial = nominaInicialEfectiva + grupo.hcLP;
-
-      const { totalHsLogueo } = calcularHsLogueoDiaADia({
-        nominaInicial,
-        diasDelMes,
-        anio: anioNumPre,
-        mes: mesNumPre,
-        licenciaConstante: grupo.hcLP,
-        rotacionMensual: rotacion,
-        ausentismoMensual: ausentismo,
-        deslogueoMensual: deslogueo,
-        ponderadoHoras: franco.ponderadoHoras,
-        francoPorDiaSemana: {
-          lunes: franco.francoLunes,
-          martes: franco.francoMartes,
-          miercoles: franco.francoMiercoles,
-          jueves: franco.francoJueves,
-          viernes: franco.francoViernes,
-          sabado: franco.francoSabado,
-          domingo: franco.francoDomingo,
-        },
-      });
-
-      hsNetas = totalHsLogueo;
-      factorProductivo = grupo.hsBrutas > 0 ? hsNetas / grupo.hsBrutas : factorProductivoPlano;
+    if (typeof window !== "undefined" && francosServicio.length > 0) {
+      console.log(
+        `[francos] servicio=${servicio}: franco=${franco ? "encontrado" : "NO encontrado"}` +
+          (franco ? ` ponderadoHoras=${franco.ponderadoHoras} mesNumPre=${mesNumPre} anioNumPre=${anioNumPre}` : "")
+      );
+    }
+    if (mesNumPre && anioNumPre) {
+      const matrizServicio = matrices.get(servicio);
+      const inputDiaADia = construirInputDiaADia(grupo, franco, reductor, matrizServicio, diasDelMes, mesNumPre, anioNumPre);
+      if (inputDiaADia) {
+        const { totalHsLogueo } = calcularHsLogueoDiaADia(inputDiaADia);
+        hsNetas = totalHsLogueo;
+        factorProductivo = grupo.hsBrutas > 0 ? hsNetas / grupo.hsBrutas : factorProductivoPlano;
+        if (typeof window !== "undefined") {
+          console.log(
+            `[francos] dia-a-dia servicio=${servicio}: hcActivos=${grupo.hcActivos} hcLP=${grupo.hcLP} hsBrutas=${grupo.hsBrutas} nominaInicial=${inputDiaADia.nominaInicial} totalHsLogueo=${totalHsLogueo} (flat hubiera dado ${grupo.hsBrutas * factorProductivoPlano})`
+          );
+        }
+      }
     }
 
     const rawHsReq = matrices.get(servicio)?.totalMes ?? 0;
@@ -284,6 +382,7 @@ export function calcularResultados(
       hcCapa: grupo.hcCapa,
       hsBrutas: grupo.hsBrutas,
       factorProductivo,
+      factorProductivoPlano,
       hsNetas,
       hsRequeridas,
       cumplimiento,
@@ -310,7 +409,7 @@ export function calcularResultados(
   const cumplimientoTotal = calcularCumplimiento(totalHsNetas, totalHsRequeridas);
 
   const mes = primerFechaPre
-    ? primerFechaPre.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+    ? primerFechaPre.toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" })
     : "Sin fecha";
   const mesNum  = mesNumPre ?? new Date().getMonth() + 1;
   const anioNum = anioNumPre ?? new Date().getFullYear();

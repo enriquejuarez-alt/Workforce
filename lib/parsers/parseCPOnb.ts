@@ -3,7 +3,7 @@ import type { MatrizServicio, ServicioKey } from "../domain/types";
 import { SERVICIOS_ONB } from "../config/servicesOnb";
 import { normalizar } from "../config/services";
 import {
-  esFeriado,
+  esDiaFeriado,
   generarFranjas,
   safeNum,
   serialToDate,
@@ -97,7 +97,7 @@ export function parseCPOnb(buffer: ArrayBuffer): ParseCPOnbResult {
       dias.push({
         fecha,
         diaSemana: diaSemanaRaw,
-        esFeriado: esFeriado(diaSemanaRaw),
+        esFeriado: esDiaFeriado(diaSemanaRaw, fecha),
         indiceColumna: col,
       });
       columnasValidas.push(col);
@@ -112,6 +112,7 @@ export function parseCPOnb(buffer: ArrayBuffer): ParseCPOnbResult {
     mes = dias[0].fecha.toLocaleDateString("es-AR", {
       month: "long",
       year: "numeric",
+      timeZone: "UTC",
     });
 
     const matriz: number[][] = [];

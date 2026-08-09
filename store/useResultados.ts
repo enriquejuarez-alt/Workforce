@@ -6,6 +6,7 @@ import type {
   ActiveFilters,
   Agente,
   Alerta,
+  FrancoServicioDatos,
   MatrizServicio,
   MappingOverride,
   Pase,
@@ -20,6 +21,7 @@ interface ResultadosState {
   matrices: Map<ServicioKey, MatrizServicio>;
   agentes: Agente[];
   reductores: Reductor[];
+  francosServicio: FrancoServicioDatos[];
   diasDelMes: number;
   procesando: boolean;
   errores: string[];
@@ -41,6 +43,7 @@ interface ResultadosState {
   setMatrices: (m: Map<ServicioKey, MatrizServicio>) => void;
   setAgentes: (a: Agente[]) => void;
   setReductores: (r: Reductor[]) => void;
+  setFrancosServicio: (f: FrancoServicioDatos[]) => void;
   setDiasDelMes: (d: number) => void;
   setProcesando: (v: boolean) => void;
   setErrores: (e: string[]) => void;
@@ -71,7 +74,7 @@ export interface HistorialSnapshot {
   servicios: { servicio: string; cumplimiento: number; hcActivos: number }[];
 }
 
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 
 // Storage personalizado que maneja la serialización del Map y objetos Date
 const sessionStorageWithMap = {
@@ -132,6 +135,7 @@ export const useResultados = create<ResultadosState>()(
       matrices: new Map(),
       agentes: [],
       reductores: [],
+      francosServicio: [],
       diasDelMes: 31,
       procesando: false,
       errores: [],
@@ -174,6 +178,7 @@ export const useResultados = create<ResultadosState>()(
       setMatrices: (m) => set({ matrices: m }),
       setAgentes: (a) => set({ agentes: a }),
       setReductores: (r) => set({ reductores: r }),
+      setFrancosServicio: (f) => set({ francosServicio: f }),
       setDiasDelMes: (d) => set({ diasDelMes: d }),
       setProcesando: (v) => set({ procesando: v }),
       setErrores: (e) => set({ errores: e }),
@@ -213,6 +218,7 @@ export const useResultados = create<ResultadosState>()(
           matrices: new Map(),
           agentes: [],
           reductores: [],
+          francosServicio: [],
           diasDelMes: 31,
           procesando: false,
           errores: [],
@@ -239,6 +245,7 @@ export const useResultados = create<ResultadosState>()(
         matrices: state.matrices,
         agentes: state.agentes,
         reductores: state.reductores,
+        francosServicio: state.francosServicio,
         diasDelMes: state.diasDelMes,
         alertas: state.alertas,
         agentesExcluidos: state.agentesExcluidos,

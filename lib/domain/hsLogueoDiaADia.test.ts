@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calcularHsLogueoDiaADia,
+  calcularFrancoFeriados,
   derivarFrancoYPonderado,
   detectarDiasCerrados,
 } from "./hsLogueoDiaADia";
@@ -87,9 +88,174 @@ describe("calcularHsLogueoDiaADia", () => {
     const cerrados = dias.filter((d) => d.diaSemana === "sabado" || d.diaSemana === "domingo");
     expect(cerrados.every((d) => d.hsLogueo === 0)).toBe(true);
   });
+
+  it("con francoFeriadoPorDia y franco normal en 0, el feriado da directamente (1 - %hsRequeridasFeriado) de ausencia", () => {
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 10,
+      diasDelMes: 7,
+      anio: 2026,
+      mes: 8,
+      licenciaConstante: 0,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      // Agosto 2026 dia 1 = sabado. Franco normal 0 todos los dias.
+      francoPorDiaSemana: { lunes: 0, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 },
+      francoFeriadoPorDia: new Map([[3, 0.5]]), // dia 3 (lunes) feriado, cliente pide 50% de lo habitual
+    });
+    // francoPct = 0 + (1-0)*(1-0.5) = 0.5
+    expect(dias[2].agentesFranco).toBeCloseTo(5, 5); // 50% de 10
+    expect(dias[2].hsLogueo).toBeCloseTo(30, 5); // 5 presentes * 6hs
+    // El resto de los dias no se ve afectado
+    expect(dias[0].agentesFranco).toBe(0);
+    expect(dias[1].agentesFranco).toBe(0);
+  });
+
+  it("con franco normal > 0, el ajuste de feriado se SUMA sobre la gente que quedaria presente (no reemplaza el franco normal)", () => {
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 10,
+      diasDelMes: 7,
+      anio: 2026,
+      mes: 8,
+      licenciaConstante: 0,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      // Dia 3 (lunes) tiene 20% de franco normal.
+      francoPorDiaSemana: { lunes: 0.2, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 },
+      francoFeriadoPorDia: new Map([[3, 0.5]]), // ese lunes es feriado, cliente pide 50% de lo habitual
+    });
+    // francoPct = 0.2 + (1-0.2)*(1-0.5) = 0.2 + 0.4 = 0.6 (NO 0.5)
+    expect(dias[2].agentesFranco).toBeCloseTo(6, 5);
+  });
+
+  it("si el feriado pide el 100% de lo habitual, se comporta como un dia normal (sin ajuste extra)", () => {
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 10,
+      diasDelMes: 7,
+      anio: 2026,
+      mes: 8,
+      licenciaConstante: 0,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      francoPorDiaSemana: { lunes: 0.2, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 },
+      francoFeriadoPorDia: new Map([[3, 1]]),
+    });
+    expect(dias[2].agentesFranco).toBeCloseTo(2, 5); // igual que un lunes normal (20% de 10)
+  });
+
+  it("si el feriado es cierre total (pide 0%), todos los que quedaban presentes pasan a franco", () => {
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 10,
+      diasDelMes: 7,
+      anio: 2026,
+      mes: 8,
+      licenciaConstante: 0,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      francoPorDiaSemana: { lunes: 0.2, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 },
+      francoFeriadoPorDia: new Map([[3, 0]]),
+    });
+    expect(dias[2].agentesFranco).toBeCloseTo(10, 5); // 100% de franco
+    expect(dias[2].hsLogueo).toBe(0);
+  });
+
+  // Caso real Soporte-Entretenimiento julio 2026: nomina 51, -5 el dia 8, -9 el
+  // dia 16 (baja acumulada de 14 personas, la nomina se queda en 37 el resto del mes).
+  it("eventosPorDia: un evento en un dia puntual desplaza la nomina desde ese dia en adelante", () => {
+    const francoPorDiaSemana = { lunes: 0, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 };
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 51,
+      diasDelMes: 31,
+      anio: 2026,
+      mes: 7,
+      licenciaConstante: 2,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      francoPorDiaSemana,
+      eventosPorDia: new Map([[8, -5]]),
+    });
+
+    expect(dias[6].nominaBase).toBe(51); // dia 7, antes del evento
+    expect(dias[7].nominaBase).toBe(46); // dia 8, el evento ya impacto
+    expect(dias[30].nominaBase).toBe(46); // dia 31, se mantiene (evento es permanente)
+    // nominaActiva = nominaBase - licencia (sin vacaciones/rotacion en este caso)
+    expect(dias[7].nominaActiva).toBeCloseTo(44, 5);
+  });
+
+  it("eventosPorDia: dos eventos se acumulan (no se reemplazan)", () => {
+    const francoPorDiaSemana = { lunes: 0, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 };
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 51,
+      diasDelMes: 31,
+      anio: 2026,
+      mes: 7,
+      licenciaConstante: 0,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      francoPorDiaSemana,
+      eventosPorDia: new Map([[8, -5], [16, -9]]),
+    });
+
+    expect(dias[7].nominaBase).toBe(46); // dia 8: 51-5
+    expect(dias[14].nominaBase).toBe(46); // dia 15, antes del segundo evento
+    expect(dias[15].nominaBase).toBe(37); // dia 16: 46-9
+    expect(dias[30].nominaBase).toBe(37); // se mantiene el resto del mes
+  });
+
+  it("eventosPorDia: la rampa de rotacion sigue calculandose sobre la nomina inicial original, no sobre la nomina con eventos", () => {
+    const francoPorDiaSemana = { lunes: 0, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 };
+    const conEvento = calcularHsLogueoDiaADia({
+      nominaInicial: 100,
+      diasDelMes: 10,
+      anio: 2026,
+      mes: 1,
+      licenciaConstante: 0,
+      rotacionMensual: 0.1, // 10% del mes => 1%/dia sobre 100 = 1/dia
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 1,
+      francoPorDiaSemana,
+      eventosPorDia: new Map([[5, -50]]),
+    });
+    // dia 5: nominaBase=50, bajasRotacion = (0.1/10)*5*100 = 5 (sobre nominaInicial=100, no sobre 50)
+    expect(conEvento.dias[4].bajasRotacion).toBeCloseTo(5, 5);
+    expect(conEvento.dias[4].nominaActiva).toBeCloseTo(45, 5); // 50 - 5
+  });
+
+  it("sin eventosPorDia, el comportamiento es identico al de antes (nominaBase = nominaInicial todo el mes)", () => {
+    const { dias } = calcularHsLogueoDiaADia({
+      nominaInicial: 30,
+      diasDelMes: 5,
+      anio: 2026,
+      mes: 1,
+      licenciaConstante: 0,
+      rotacionMensual: 0,
+      ausentismoMensual: 0,
+      deslogueoMensual: 0,
+      ponderadoHoras: 6,
+      francoPorDiaSemana: { lunes: 0, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 },
+    });
+    expect(dias.every((d) => d.nominaBase === 30)).toBe(true);
+  });
 });
 
-function buildMatriz(totalDiarioPorDia: number[], anio: number, mes: number): MatrizServicio {
+function buildMatriz(
+  totalDiarioPorDia: number[],
+  anio: number,
+  mes: number,
+  feriados: number[] = []
+): MatrizServicio {
   return {
     servicio: "TEST",
     franjas: [],
@@ -100,11 +266,47 @@ function buildMatriz(totalDiarioPorDia: number[], anio: number, mes: number): Ma
     dias: totalDiarioPorDia.map((_, i) => ({
       fecha: new Date(Date.UTC(anio, mes - 1, i + 1)),
       diaSemana: "",
-      esFeriado: false,
+      esFeriado: feriados.includes(i + 1),
       indiceColumna: i,
     })),
   };
 }
+
+describe("calcularFrancoFeriados", () => {
+  it("un feriado con la mitad del requerido habitual da %hsRequeridasFeriado = 0.5", () => {
+    // Agosto 2026: dia 6 = jueves. Otros jueves (13, 20, 27) piden 200; el feriado (6) pide 100.
+    const totalDiario = Array(31).fill(200);
+    totalDiario[5] = 100; // dia 6 (indice 5), feriado
+    const ratios = calcularFrancoFeriados(buildMatriz(totalDiario, 2026, 8, [6]));
+    expect(ratios.get(6)).toBeCloseTo(0.5, 5);
+  });
+
+  it("un feriado con cierre total (requerido 0) da %hsRequeridasFeriado = 0", () => {
+    const totalDiario = Array(31).fill(200);
+    totalDiario[5] = 0;
+    const ratios = calcularFrancoFeriados(buildMatriz(totalDiario, 2026, 8, [6]));
+    expect(ratios.get(6)).toBe(0);
+  });
+
+  it("un feriado que pide lo mismo que un dia normal da %hsRequeridasFeriado = 1 (sin ajuste extra)", () => {
+    const totalDiario = Array(31).fill(200);
+    const ratios = calcularFrancoFeriados(buildMatriz(totalDiario, 2026, 8, [6]));
+    expect(ratios.get(6)).toBeCloseTo(1, 5);
+  });
+
+  it("sin otros dias con el mismo dia de semana para comparar, no genera entrada", () => {
+    // Un solo dia en la matriz, marcado feriado: no hay "dias similares" no-feriados.
+    const ratios = calcularFrancoFeriados(buildMatriz([50], 2026, 8, [1]));
+    expect(ratios.has(1)).toBe(false);
+  });
+
+  it("dias no feriados nunca generan entrada, sea cual sea su requerido", () => {
+    const totalDiario = Array(31).fill(200);
+    totalDiario[5] = 0; // dia 6 con requerido 0 pero NO marcado feriado
+    const ratios = calcularFrancoFeriados(buildMatriz(totalDiario, 2026, 8, []));
+    expect(ratios.size).toBe(0);
+  });
+});
 
 describe("detectarDiasCerrados", () => {
   it("marca como cerrado un dia de la semana con requerido en 0 todo el mes (Integral Movil Amba: fin de semana)", () => {

@@ -18,7 +18,7 @@ import { AlertsPanel } from "@/components/alerts/AlertsPanel";
 import { Button } from "@/components/ui/button";
 import { SinDatos } from "@/components/SinDatos";
 import { nivelCumplimiento } from "@/lib/domain/types";
-import type { ResultadoGeneral, Agente, Reductor, Alerta } from "@/lib/domain/types";
+import type { ResultadoGeneral, Agente, Reductor, Alerta, FrancoServicioDatos } from "@/lib/domain/types";
 import { fmtNumero, fmtPct, fmtHoras } from "@/lib/utils/formato";
 import { MESES } from "@/types";
 
@@ -33,7 +33,7 @@ export default function PlanificacionGuardadaDetallePage() {
     enabled: Number.isFinite(id),
   });
 
-  const { setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes, setAlertas, setServicioActivo, clearFilters } =
+  const { setResultado, setMatrices, setAgentes, setReductores, setFrancosServicio, setDiasDelMes, setAlertas, setServicioActivo, clearFilters } =
     useResultados();
   const { setTopeFacturacion, setModoReductor } = useUploads();
   const { setSelectedServicioKey } = useFrancoConfig();
@@ -57,6 +57,7 @@ export default function PlanificacionGuardadaDetallePage() {
     setMatrices(deserializarMatrices(p.matrices));
     setAgentes(p.agentes as Agente[]);
     setReductores(p.reductores as Reductor[]);
+    setFrancosServicio((p.francos_servicio as FrancoServicioDatos[]) ?? []);
     setDiasDelMes(p.dias_del_mes);
     setAlertas(p.alertas as Alerta[]);
     setServicioActivo(p.servicio_key, p.servicio_nombre);

@@ -35,11 +35,38 @@ export interface InputDiaADia {
   ponderadoHoras: number;
   /** % (0-1) de agentes de franco por dia de la semana, ya ponderado por mix de contratos. */
   francoPorDiaSemana: Record<DiaSemana, number>;
+  /**
+   * % (0-1, puede superar 1) de Requerido feriado / Requerido promedio de
+   * dias similares, por dia del mes (1-based), calculado por
+   * `calcularFrancoFeriados`. En un dia con entrada acá, la cantidad de
+   * francos NO reemplaza al franco normal del dia de semana — se le suma un
+   * extra sobre la gente que quedaria presente:
+   *
+   *   francoPct = %francoNormal + (1 - %francoNormal) * (1 - %hsRequeridasFeriado)
+   *
+   * Si el cliente pide el 100% de lo habitual, el extra da 0 (el feriado se
+   * comporta como un dia normal de esa semana). Si pide 0% (cierre total),
+   * el extra manda a franco a todos los que quedaban.
+   */
+  francoFeriadoPorDia?: Map<number, number>;
+  /**
+   * Eventos de dotación fechados (bajas/altas/cambios de servicio puntuales),
+   * keyeados por día del mes (1-based). El valor es el delta NETO de ese día
+   * puntual (no acumulado) — positivo para altas, negativo para bajas. Se
+   * acumulan internamente día a día: a partir del día del evento, la nómina
+   * base queda desplazada por la suma de los deltas anteriores, replicando la
+   * columna "Ingresos" del archivo de referencia del cliente (que hace que la
+   * Nómina Final baje/suba en una fecha puntual en vez de asumir una nómina
+   * constante todo el mes).
+   */
+  eventosPorDia?: Map<number, number>;
 }
 
 export interface ResultadoDia {
   dia: number;
   diaSemana: DiaSemana;
+  /** nominaInicial + eventos de dotacion acumulados hasta este dia (antes de vacaciones/LP/rotacion). */
+  nominaBase: number;
   nominaActiva: number;
   bajasRotacion: number;
   agentesFranco: number;
@@ -60,24 +87,39 @@ export interface ResultadoDiaADia {
 export function calcularHsLogueoDiaADia(input: InputDiaADia): ResultadoDiaADia {
   const dias: ResultadoDia[] = [];
   let totalHsLogueo = 0;
+  let acumuladoEventos = 0;
 
   for (let dia = 1; dia <= input.diasDelMes; dia++) {
     const fecha = new Date(Date.UTC(input.anio, input.mes - 1, dia));
     const diaSemana = DIA_SEMANA_POR_INDICE[fecha.getUTCDay()];
 
+    acumuladoEventos += input.eventosPorDia?.get(dia) ?? 0;
+    const nominaBase = input.nominaInicial + acumuladoEventos;
+
     const vacaciones = input.vacacionesPorDia ? input.vacacionesPorDia(dia) : 0;
     const licencia = input.licenciaPorDia
       ? input.licenciaPorDia(dia)
       : input.licenciaConstante ?? 0;
+    // La rampa de rotacion sigue calculandose sobre la nomina inicial original:
+    // modela la baja "estimada" no registrada, independiente de los eventos
+    // puntuales ya conocidos (que se suman/restan aparte via nominaBase).
     const bajasRotacion =
       (input.rotacionMensual / input.diasDelMes) * dia * input.nominaInicial;
 
     const nominaActiva = Math.max(
       0,
-      input.nominaInicial - vacaciones - licencia - bajasRotacion
+      nominaBase - vacaciones - licencia - bajasRotacion
     );
 
-    const francoPct = input.francoPorDiaSemana[diaSemana] ?? 0;
+    const francoPctNormal = input.francoPorDiaSemana[diaSemana] ?? 0;
+    const pctHsRequeridasFeriado = input.francoFeriadoPorDia?.get(dia);
+    // CANTIDAD DE FRANCOS (feriado) = Dotacion*%Francos + Dotacion*(1-%Francos)*(1-%HsReqFeriado)
+    // El franco normal del dia de semana es la base; el ajuste del feriado
+    // solo se aplica sobre la gente que quedaria presente, no lo reemplaza.
+    const francoPct =
+      pctHsRequeridasFeriado === undefined
+        ? francoPctNormal
+        : Math.min(1, Math.max(0, francoPctNormal + (1 - francoPctNormal) * (1 - pctHsRequeridasFeriado)));
     const agentesFranco = francoPct * nominaActiva;
 
     const agentesAusentes = Math.max(0, nominaActiva - agentesFranco) * input.ausentismoMensual;
@@ -88,6 +130,7 @@ export function calcularHsLogueoDiaADia(input: InputDiaADia): ResultadoDiaADia {
     dias.push({
       dia,
       diaSemana,
+      nominaBase,
       nominaActiva,
       bajasRotacion,
       agentesFranco,
@@ -127,6 +170,48 @@ export function detectarDiasCerrados(
     if (promedio <= umbral) cerrados.add(dia);
   }
   return cerrados;
+}
+
+/**
+ * Deriva %HS REQUERIDAS FERIADO por cada dia feriado de la matriz CP: el
+ * Requerido del cliente ese feriado puntual, sobre el promedio de Requerido
+ * de los demas dias con el mismo dia de semana (no feriados) del mes —
+ * "dias similares". Si el cliente pide la mitad de lo habitual, da 0.5; si
+ * pide lo mismo de siempre, da 1; si pide 0 (cierre total), da 0.
+ *
+ * El valor devuelto se usa en `calcularHsLogueoDiaADia` para ajustar la
+ * cantidad de francos de ese dia (ver formula en `InputDiaADia.francoFeriadoPorDia`).
+ *
+ * Sin dias no-feriados con el mismo dia de semana para comparar, no se puede
+ * derivar una base — ese feriado queda sin entrada en el mapa (se calcula
+ * como un dia normal, sin ajuste).
+ */
+export function calcularFrancoFeriados(matriz: MatrizServicio): Map<number, number> {
+  const requeridoPorDiaSemana = new Map<number, number[]>();
+
+  matriz.dias.forEach((dia, i) => {
+    if (dia.esFeriado) return;
+    const diaSemanaIdx = new Date(dia.fecha).getUTCDay();
+    const arr = requeridoPorDiaSemana.get(diaSemanaIdx) ?? [];
+    arr.push(matriz.totalDiario[i] ?? 0);
+    requeridoPorDiaSemana.set(diaSemanaIdx, arr);
+  });
+
+  const pctHsRequeridasFeriado = new Map<number, number>();
+  matriz.dias.forEach((dia, i) => {
+    if (!dia.esFeriado) return;
+    const fecha = new Date(dia.fecha);
+    const similares = requeridoPorDiaSemana.get(fecha.getUTCDay()) ?? [];
+    if (similares.length === 0) return;
+
+    const promedioSimilar = similares.reduce((a, b) => a + b, 0) / similares.length;
+    if (promedioSimilar <= 0) return;
+
+    const requeridoFeriado = matriz.totalDiario[i] ?? 0;
+    pctHsRequeridasFeriado.set(fecha.getUTCDate(), requeridoFeriado / promedioSimilar);
+  });
+
+  return pctHsRequeridasFeriado;
 }
 
 /**

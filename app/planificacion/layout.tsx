@@ -59,7 +59,13 @@ export default function PlanificacionLayout({ children }: { children: React.Reac
   const setAgentesDesdeApi = useResultados((s) => s.setAgentesDesdeApi);
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const authHydrated = useAuthStore((s) => s.hydrated);
+  const hydrateAuth = useAuthStore((s) => s.hydrate);
   const { collapsed } = useSidebarStore();
+
+  useEffect(() => {
+    hydrateAuth();
+  }, [hydrateAuth]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -73,10 +79,10 @@ export default function PlanificacionLayout({ children }: { children: React.Reac
   }, []);
 
   useEffect(() => {
-    if (embeddedChecked && !embedded && !isAuthenticated) {
+    if (embeddedChecked && !embedded && authHydrated && !isAuthenticated) {
       router.replace("/login");
     }
-  }, [embeddedChecked, embedded, isAuthenticated, router]);
+  }, [embeddedChecked, embedded, authHydrated, isAuthenticated, router]);
 
   // En standalone autenticado, cargar servicios desde la API si no llegaron por postMessage
   useEffect(() => {
@@ -117,7 +123,7 @@ export default function PlanificacionLayout({ children }: { children: React.Reac
     return <main className="min-h-screen bg-[#F8F9FA]">{children}</main>;
   }
 
-  if (!isAuthenticated) return <PageLoading />;
+  if (!authHydrated || !isAuthenticated) return <PageLoading />;
 
   // Standalone: mismo layout que el resto de la app
   return (

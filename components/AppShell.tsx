@@ -57,6 +57,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setAgentesDesdeApi = useResultados((s) => s.setAgentesDesdeApi);
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const authHydrated = useAuthStore((s) => s.hydrated);
+  const hydrateAuth = useAuthStore((s) => s.hydrate);
+
+  useEffect(() => {
+    hydrateAuth();
+  }, [hydrateAuth]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -70,10 +76,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (embeddedChecked && !embedded && !isAuthenticated) {
+    if (embeddedChecked && !embedded && authHydrated && !isAuthenticated) {
       router.replace("/login");
     }
-  }, [embeddedChecked, embedded, isAuthenticated, router]);
+  }, [embeddedChecked, embedded, authHydrated, isAuthenticated, router]);
 
   useEffect(() => {
     if (window.parent !== window) {
@@ -109,7 +115,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   // Standalone: esperar auth confirmada
-  if (!isAuthenticated) return null;
+  if (!authHydrated || !isAuthenticated) return null;
 
   return (
     <>

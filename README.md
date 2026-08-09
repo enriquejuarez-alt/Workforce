@@ -227,10 +227,14 @@ poder volver a abrirla despues sin repetir la carga de archivos.
 
 - Boton "Guardar planificacion" en `/planificacion/resumen`, con nombre
   opcional. Guarda el estado vigente del store (`resultado`, `matrices`,
-  `agentes`, `reductores`, `alertas`, `diasDelMes`, `topeFacturacion`,
-  `modoReductor`) junto al servicio activo (`servicioKey`/`servicioNombre`,
-  seteados por `setServicioActivo` al terminar de procesar en
-  `app/planificacion/page.tsx`).
+  `agentes`, `reductores`, `francosServicio`, `alertas`, `diasDelMes`,
+  `topeFacturacion`, `modoReductor`) junto al servicio activo
+  (`servicioKey`/`servicioNombre`, seteados por `setServicioActivo` al
+  terminar de procesar en `app/planificacion/page.tsx`).
+  **Fix:** antes no se guardaba `francosServicio` — una planificacion
+  guardada que usaba el motor dia a dia volvia silenciosamente al modelo
+  plano al recargarla desde "Cargar en sesion activa". Ahora se persiste
+  (columna `francos_servicio`, nullable) y se restaura junto al resto.
 - Listado en `/planificacion/guardadas` con filtro por servicio y por
   mes/anio, y borrado individual.
 - Ficha en `/planificacion/guardadas/:id` con los KPIs, alertas, grafico de
@@ -320,12 +324,62 @@ servicio, y el factor productivo mostrado se recalcula como
 hay Francos cargados para ese servicio+mes+año, se sigue usando el modelo
 plano de siempre sin cambios.
 
+`calcularResultados` arma el input del motor via el helper compartido
+`construirInputDiaADia` (`lib/domain/calculos.ts`), reutilizado tambien por
+`simularDiaADiaServicio` (ver "Simulador dia a dia" mas abajo) para que el
+calculo "oficial" y el simulador nunca diverjan.
+
 **Fix de parseo de fechas incluido:** el export de vacaciones trae fechas
 `d/m/yyyy` sin cero a la izquierda (ej. `31/8/2026`); el regex de
 `parseWfDate` (`backend/src/controllers/vacaciones.ts`) antes exigia
 `dd/mm/yyyy` exacto y caia al parser nativo de `Date()` (que interpreta
 `mm/dd/yyyy` en inglés), corrompiendo fechas. Ahora acepta 1 o 2 digitos y
 los rellena con cero antes de armar el ISO string.
+
+### Feriados dentro del motor dia a dia
+
+El calculo de HS de logueo en un dia FERIADO usa la misma cadena de arriba,
+cambiando unicamente la cantidad de francos de ese dia. Formula dada por el
+area de referencia (verificada formula-por-formula contra su Excel, ver
+`lib/domain/hsLogueoDiaADia.ts::calcularHsLogueoDiaADia`):
+
+```text
+Dias no feriados: Francos = Dotacion Activa * %Francos (normal del dia de semana)
+Dias feriados:     Francos = Dotacion Activa * %Francos
+                            + Dotacion Activa * (1 - %Francos) * (1 - %HsRequeridasFeriado)
+```
+
+`%HsRequeridasFeriado` (el "%Presente" que la referencia declara a mano por
+feriado) se deriva automaticamente de la propia curva del CP:
+`calcularFrancoFeriados` compara el Requerido de ese feriado puntual contra
+el promedio de Requerido de los demas dias con el mismo dia de semana en el
+mes ("dias similares"). Si el feriado pide la mitad de lo habitual da 0.5;
+si pide lo mismo de siempre da 1 (sin ajuste extra); si es cierre total da 0
+(todos los que quedaban pasan a franco). El ajuste se SUMA sobre el franco
+normal del dia, nunca lo reemplaza.
+
+Un dia se considera feriado si el CP lo marca explicitamente en su fila de
+dia de semana (texto "Feriado"), **o** si la fecha cae en el calendario de
+feriados nacionales de Argentina (`lib/config/feriadosArgentina.ts`,
+`esDiaFeriado` en `lib/utils/excel.ts`) — red de seguridad para cuando el CP
+no lo marca. Ese calendario cubre feriados de fecha fija, los calculados a
+partir de la Pascua (algoritmo de Gauss: Carnaval, Viernes Santo) y los
+"trasladables" por Ley 27.399 (San Martin, Diversidad Cultural, Soberania
+Nacional). **No cubre** los "dias no laborables" que el Gobierno decreta
+puntualmente cada año (puentes) — esos no siguen ninguna regla fija y solo
+se pueden corregir marcando el CP a mano.
+
+### Eventos de dotacion fechados (bajas/altas puntuales)
+
+El motor tambien acepta `eventosPorDia` (`Map<dia, delta>`) en
+`InputDiaADia`: un delta neto de nomina para un dia puntual del mes,
+acumulado dia a dia a partir de ese dia. Replica la columna "Ingresos" del
+archivo de referencia del cliente, que hace que la Nomina Final baje o suba
+en una fecha concreta en vez de asumir una nomina constante todo el mes (la
+rampa de rotacion sigue calculandose aparte, sobre la nomina inicial
+original — modela la baja "estimada" no registrada, independiente de estos
+eventos ya conocidos). Sin `eventosPorDia`, el comportamiento es identico al
+de antes. Ver "Simulador dia a dia" para donde se cargan estos eventos.
 
 ## Formatos de CP soportados
 
@@ -630,6 +684,32 @@ Si se define un periodo desde/hasta, todos los cambios se prorratean:
 dias efectivos = dias del periodo que intersectan con el mes cargado
 ```
 
+## Simulador dia a dia
+
+Pagina separada (`/planificacion/simulador-dia-a-dia`), distinta del
+Simulador de arriba — ese usa un prorrateo lineal por cantidad de dias
+(exacto para el modelo plano, pero una aproximacion para servicios con
+Francos reales); este re-corre el motor dia a dia real
+(`simularDiaADiaServicio`, `lib/domain/calculos.ts`) para simular el
+impacto exacto de un movimiento en una fecha puntual, replicando la columna
+"Ingresos" del archivo de referencia del cliente.
+
+- Solo lista servicios con Francos reales cargados (donde el motor dia a
+  dia esta activo); para el resto, el prorrateo lineal del simulador
+  clasico ya es exacto.
+- Alta de eventos con calendario (`store/useSimuladorDiaADia.ts`): Alta,
+  Baja o Cambio de servicio, con dia del mes, cantidad y (para cambio de
+  servicio) servicio destino. Un cambio de servicio resta en el origen y
+  suma en el destino el mismo dia (`eventosADeltasPorDia`).
+- Tabla dia a dia completa (dia, dia semana, nomina base, nomina activa,
+  francos, ausentes, presentes, HS logueo) comparando la corrida base
+  contra la corrida con los eventos cargados, con el dia donde impacta cada
+  evento resaltado.
+- Panel "Fuente de datos": permite cargar cualquier planificacion guardada
+  directamente desde esta pantalla (sin pasar por `/planificacion/guardadas`)
+  para simular sobre datos ya guardados, ademas de los que se acaban de
+  procesar en la sesion activa.
+
 ## Exportacion Excel
 
 El exportable `planificador_<mes>.xlsx` genera 5 hojas:
@@ -668,13 +748,16 @@ app/planificacion/francos/page.tsx      Importador de francos reales y contratos
 app/planificacion/nomina-general/page.tsx Precarga de Nomina General (todas las islas, una sola carga)
 app/planificacion/contratos/page.tsx    Configuracion de contratos y francos por servicio
 app/planificacion/simulador/page.tsx    Simulador de dotacion
+app/planificacion/simulador-dia-a-dia/page.tsx Simulador dia a dia (eventos fechados sobre el motor real)
 app/ppay/page.tsx                       Flujo especifico para Personal Pay (formato KON)
 components/config/FrancoRulesEditor.tsx Editor de reglas de contratos y francos
 components/tables/SimuladorTable.tsx    UI del constructor de escenarios
 components/charts/CumplimientoBarChart.tsx Grafico de cumplimiento con leyenda de niveles
 lib/domain/calculos.ts                  Matematica principal
 lib/domain/francoEngine.ts              Calculo de francos (modelo probabilistico)
-lib/domain/hsLogueoDiaADia.ts           Motor de HS Netas dia a dia (con Francos reales cargados)
+lib/domain/hsLogueoDiaADia.ts           Motor de HS Netas dia a dia (con Francos reales cargados), feriados y eventosPorDia
+lib/config/feriadosArgentina.ts         Calendario de feriados nacionales de Argentina (fallback cuando el CP no marca el feriado)
+store/useSimuladorDiaADia.ts            Eventos de dotacion fechados (altas/bajas/cambios de servicio) para el Simulador dia a dia
 lib/parsers/parseFrancos.ts             Parser de Francos: formato agregado o roster por agente (autodetectado)
 lib/domain/agentesHipoteticos.ts        Expande filas de agentes hipoteticos a Agente[]
 lib/domain/serializacion.ts             Serializa/deserializa el Map de matrices CP para guardar como JSON

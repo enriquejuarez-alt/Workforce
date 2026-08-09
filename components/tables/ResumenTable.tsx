@@ -89,6 +89,8 @@ export function ResumenTable({ resultados, francoMap }: Props) {
           {ordenados.map((r, i) => {
             const nivel = nivelCumplimiento(r.cumplimiento);
             const pctReductor = ((1 - r.factorProductivo) * 100).toFixed(1);
+            const pctReductorInput = ((1 - r.factorProductivoPlano) * 100).toFixed(1);
+            const reductorDifiere = Math.abs(r.factorProductivo - r.factorProductivoPlano) > 0.0005;
             const eq = r.agentesEquivalentes;
             const tieneDeficit = r.deltaHC103 > 0;
             const fa = r.francoAjuste;
@@ -104,7 +106,14 @@ export function ResumenTable({ resultados, francoMap }: Props) {
                   <td className="px-4 py-3 tabular-nums text-gray-700">{fmtNumero(r.hcActivos)}</td>
                   <td className="px-4 py-3 tabular-nums text-gray-500">{fmtNumero(r.hcLP)}</td>
                   <td className="px-4 py-3 tabular-nums text-gray-600">{fmtHoras(r.hsBrutas)}</td>
-                  <td className="px-4 py-3 tabular-nums text-gray-500">-{pctReductor}%</td>
+                  <td className="px-4 py-3 tabular-nums text-gray-500">
+                    -{pctReductor}%
+                    {reductorDifiere && (
+                      <div className="text-[10px] text-gray-400" title="Reductor de entrada (deslogueo+ausentismo+rotacion) antes del motor dia a dia">
+                        entrada: -{pctReductorInput}%
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 tabular-nums text-gray-700">{fmtHoras(r.hsNetas)}</td>
                   <td className="px-4 py-3 tabular-nums text-gray-600">{fmtHoras(r.hsRequeridas)}</td>
                   <td className="px-4 py-3 tabular-nums text-gray-600">{fmtHoras(r.hsRequeridas * 1.03)}</td>

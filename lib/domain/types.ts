@@ -215,6 +215,11 @@ export interface ResultadoServicio {
   hcCapa: number;
   hsBrutas: number;
   factorProductivo: number;
+  /** Factor productivo "de entrada" (solo deslogueo+ausentismo+rotacion, sin el
+   *  motor dia a dia). Cuando hay Francos reales, factorProductivo termina
+   *  siendo hsNetas/hsBrutas (impacto neto), que suele ser mejor que este —
+   *  se guardan los dos para poder mostrar ambos en la UI. */
+  factorProductivoPlano: number;
   hsNetas: number;
   hsRequeridas: number;
   cumplimiento: number;

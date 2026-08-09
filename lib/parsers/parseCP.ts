@@ -8,7 +8,7 @@ import {
 } from "../config/servicesRuntime";
 import { normalizar, type ServiceDefinition } from "../config/services";
 import {
-  esFeriado,
+  esDiaFeriado,
   generarFranjas,
   safeNum,
   serialToDate,
@@ -105,7 +105,7 @@ export function parseCPConServicios(
       dias.push({
         fecha,
         diaSemana: diaSemanaRaw,
-        esFeriado: esFeriado(diaSemanaRaw),
+        esFeriado: esDiaFeriado(diaSemanaRaw, fecha),
         indiceColumna: col,
       });
       columnasValidas.push(col);
@@ -115,7 +115,7 @@ export function parseCPConServicios(
 
     if (dias.length > 0) {
       const d = dias[0].fecha;
-      mes = d.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+      mes = d.toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
     }
 
     const franjas = generarFranjas();

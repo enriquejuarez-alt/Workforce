@@ -67,7 +67,12 @@ import { SERVICIOS_RETENCION } from "@/lib/config/servicesRetencion";
 import { SERVICIOS_BO } from "@/lib/config/servicesBo";
 import { SERVICIOS_TECH } from "@/lib/config/servicesTech";
 import { SERVICIOS_INTEGRAL } from "@/lib/config/servicesIntegral";
-import { extraerHorasContrato } from "@/lib/utils/excel";
+import { SERVICIOS_VENTAS } from "@/lib/config/servicesVentas";
+import { SERVICIOS_SMB } from "@/lib/config/servicesSmb";
+import { SERVICIOS_ONB } from "@/lib/config/servicesOnb";
+import { SERVICIOS_PPAY } from "@/lib/config/servicesPpay";
+import type { ServiceDefinition } from "@/lib/config/services";
+import { extraerHorasContrato, archivoEnMemoria } from "@/lib/utils/excel";
 import { nominasApi, reductorImportacionesApi, francoImportacionesApi, vacacionesApi } from "@/lib/api";
 import type { NominaMensual, AgenteNominaMensual } from "@/types";
 import {
@@ -126,7 +131,17 @@ const fade = {
   transition: { duration: 0.3 },
 };
 
-type ModoCargaReductores = "archivo" | "calculadora" | "guardado";
+type ModoCargaReductores = "archivo" | "manual" | "calculadora" | "guardado";
+
+/** Fila de edicion manual: mismos campos que Reductor, pero deslogueo/ausentismo/rotacion
+ * se editan como % (0-100) en vez de fraccion (0-1), mas natural para tipear a mano. */
+interface FilaReductorManual {
+  servicio: string;
+  servicioNorm: string;
+  deslogueoPct: number;
+  ausentismoPct: number;
+  rotacionPct: number;
+}
 type FuenteCalculadora = "deslogueo" | "ausentismo" | "rotacion";
 
 export default function UploadPage() {
@@ -140,7 +155,7 @@ export default function UploadPage() {
 
   const {
     mappingOverrides, pases,
-    setResultado, setMatrices, setAgentes, setReductores,
+    setResultado, setMatrices, setAgentes, setReductores, setFrancosServicio,
     setDiasDelMes, setAlertas, setProcesando, setErrores,
     setAgentesExcluidos, clearAgentesDesdeApi, setAgentesDesdeApi,
     errores, agentesExcluidos, segmentosNoReconocidos,
@@ -167,6 +182,7 @@ export default function UploadPage() {
     Partial<Record<FuenteCalculadora, { file: File; buffer: ArrayBuffer }>>
   >({});
   const [reductoresPreview, setReductoresPreview] = useState<Reductor[]>([]);
+  const [reductoresManual, setReductoresManual] = useState<FilaReductorManual[]>([]);
   const [reqMes, setReqMes] = useState(new Date().getMonth() + 1);
   const [reqAnio, setReqAnio] = useState(new Date().getFullYear());
   const [cargandoNomina, setCargandoNomina] = useState(false);
@@ -294,6 +310,26 @@ export default function UploadPage() {
       normalizar(servicioActivo?.nombre ?? "").includes("interior"));
   const esVentas = reqServicioId === -13 || reqServicioId === -14 || reqServicioId === -15 ||
     (servicioActivo?.nombre ?? "").toLowerCase().startsWith("ventas");
+
+  // Servicios que realmente aparecen en el CP (Requerido) ya subido, para
+  // precargar la pestaña "Manual" de reductores con exactamente esos — no un
+  // grupo entero de config que puede no coincidir con lo que trae el archivo.
+  const serviciosDelCP = useMemo(() => {
+    if (hojasCP.length === 0) return [];
+    const universo: ServiceDefinition[] = esPersonalPay
+      ? SERVICIOS_PPAY
+      : esSmb
+        ? SERVICIOS_SMB
+        : esOnboarding
+          ? SERVICIOS_ONB
+        : esVentas
+          ? SERVICIOS_VENTAS
+        : getServiciosActivos();
+    return universo.filter((def) => {
+      const aliases = Array.isArray(def.hojaCP) ? def.hojaCP : [def.hojaCP];
+      return aliases.some((alias) => hojasCP.some((h) => normalizar(h) === normalizar(alias)));
+    });
+  }, [hojasCP, esPersonalPay, esSmb, esOnboarding, esVentas]);
 
   // Islas/segmentos detectados dentro de la nomina cargada para el servicio activo
   // (ej. Soporte Tecnico agrupa varias islas bajo un unico servicio_id en el sistema)
@@ -534,6 +570,7 @@ export default function UploadPage() {
       setHojasCP([]);
       setErrCP("");
       setReductoresPreview([]);
+      setReductoresManual([]);
       // Reset nomina from API when service changes
       clearAgentesDesdeApi();
       setIslaFiltro(null);
@@ -568,7 +605,10 @@ export default function UploadPage() {
       );
       if (errValidacionBloqueantes.length > 0) { setErrCP(errValidacionBloqueantes.join(" - ")); return; }
       setHojasCP(hojas);
-      setArchivoCP(file);
+      setArchivoCP(archivoEnMemoria(file, buffer));
+      // Un CP nuevo puede traer un set de servicios distinto al anterior —
+      // no dejar pisadas las filas manuales precargadas para el CP viejo.
+      setReductoresManual([]);
     } catch (e) {
       setErrCP(`Error al leer el archivo: ${e}`);
     } finally {
@@ -585,7 +625,7 @@ export default function UploadPage() {
       const { reductores, errores: err } = parseReductores(buffer);
       if (err.length > 0) { setErrRed(err.join(" - ")); return; }
       setReductoresPreview(reductores);
-      setArchivoReductores(file);
+      setArchivoReductores(archivoEnMemoria(file, buffer));
     } catch (e) {
       setErrRed(`Error al leer el archivo: ${e}`);
     } finally {
@@ -643,6 +683,85 @@ export default function UploadPage() {
     toast.success("Reductores guardados listos para usar");
   }, [reductorGuardadoDetalle, setArchivoReductores]);
 
+  const handleAbrirReductoresManual = useCallback(() => {
+    setModoCargaReductores("manual");
+    setErrRed("");
+  }, []);
+
+  // Mantiene las filas de "Manual" sincronizadas con los servicios que
+  // realmente aparecen en el CP (Requerido) ya subido — no un grupo entero de
+  // config que puede no coincidir con lo que trae el archivo. Corre cada vez
+  // que cambia el CP (nuevo archivo, distinto formato), no solo la primera
+  // vez que se abre la pestaña, así no queda una lista vieja pegada si el CP
+  // se sube despues de haber entrado a Manual. Conserva los valores ya
+  // tipeados para los servicios que siguen coincidiendo.
+  useEffect(() => {
+    if (serviciosDelCP.length === 0) return;
+    setReductoresManual((prev) => {
+      const prevPorNorm = new Map(prev.map((f) => [f.servicioNorm, f]));
+      return serviciosDelCP.map((def) => {
+        const nombre = def.reductorNombres[0] ?? def.label;
+        const norm = normalizar(nombre);
+        return (
+          prevPorNorm.get(norm) ?? {
+            servicio: nombre,
+            servicioNorm: norm,
+            deslogueoPct: 0,
+            ausentismoPct: 0,
+            rotacionPct: 0,
+          }
+        );
+      });
+    });
+  }, [serviciosDelCP]);
+
+  const handleAgregarFilaManual = useCallback(() => {
+    setReductoresManual((prev) => [
+      ...prev,
+      { servicio: "", servicioNorm: "", deslogueoPct: 0, ausentismoPct: 0, rotacionPct: 0 },
+    ]);
+  }, []);
+
+  const handleQuitarFilaManual = useCallback((idx: number) => {
+    setReductoresManual((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const handleEditarFilaManual = useCallback(
+    (idx: number, campo: keyof FilaReductorManual, valor: string) => {
+      setReductoresManual((prev) =>
+        prev.map((fila, i) => {
+          if (i !== idx) return fila;
+          if (campo === "servicio") return { ...fila, servicio: valor, servicioNorm: normalizar(valor) };
+          // parseFloat("1,2") da 1 (corta en la coma) sin avisar — acepta coma
+          // o punto como separador decimal antes de parsear.
+          const num = parseFloat(valor.replace(",", "."));
+          return { ...fila, [campo]: isNaN(num) ? 0 : num };
+        })
+      );
+    },
+    []
+  );
+
+  const handleUsarReductoresManual = useCallback(() => {
+    const filasValidas = reductoresManual.filter((f) => f.servicio.trim());
+    if (filasValidas.length === 0) {
+      setErrRed("Agregá al menos un servicio con nombre antes de usar estos reductores.");
+      return;
+    }
+    const reductores: Reductor[] = filasValidas.map((f) => ({
+      servicio: f.servicio.trim(),
+      servicioNorm: normalizar(f.servicio),
+      deslogueo: f.deslogueoPct / 100,
+      ausentismo: f.ausentismoPct / 100,
+      rotacion: f.rotacionPct / 100,
+    }));
+    const file = reductoresAFile(reductores, `reductores-manual-${reqMes}-${reqAnio}.xlsx`);
+    setArchivoReductores(file);
+    setReductoresPreview(reductores);
+    setErrRed("");
+    toast.success("Reductores manuales listos para usar");
+  }, [reductoresManual, reqMes, reqAnio, setArchivoReductores]);
+
   const handleGuardarReductoresActuales = useCallback(() => {
     if (reductoresPreview.length === 0) return;
     guardarReductoresMut.mutate({
@@ -660,7 +779,7 @@ export default function UploadPage() {
     try {
       const hojas = getNominasSheetNames(buffer);
       if (hojas.length === 0) { setErrNom("El archivo de nomina no tiene hojas"); return; }
-      setArchivoNomina(file, hojas);
+      setArchivoNomina(archivoEnMemoria(file, buffer), hojas);
       clearAgentesDesdeApi();
     } catch (e) {
       setErrNom(`Error al leer el archivo: ${e}`);
@@ -794,8 +913,12 @@ export default function UploadPage() {
       let francosServicio: FrancoServicioDatos[] = [];
       if (primerDia) {
         try {
-          const mesReal = primerDia.getMonth() + 1;
-          const anioReal = primerDia.getFullYear();
+          // primerDia viene de serialToDate() en UTC medianoche; con getMonth()/
+          // getFullYear() locales el dia 1 se corre a fin del mes anterior en
+          // timezones detras de UTC (Argentina, UTC-3), y el match de mes/anio
+          // contra los Francos importados fallaba siempre en el dia 1.
+          const mesReal = primerDia.getUTCMonth() + 1;
+          const anioReal = primerDia.getUTCFullYear();
           const { data: importacionesFrancos } = await francoImportacionesApi.list();
           const match = importacionesFrancos
             .filter((f) => f.mes === mesReal && f.anio === anioReal)
@@ -816,9 +939,18 @@ export default function UploadPage() {
               francoSabado: s.franco_sabado,
               francoDomingo: s.franco_domingo,
             }));
+            console.log(
+              `[francos] usando importacion #${match.id} (mes=${mesReal} anio=${anioReal}): ${francosServicio.length} servicios`,
+              francosServicio.map((f) => `${f.servicio} (${f.servicioNorm}) ponderadoHoras=${f.ponderadoHoras}`)
+            );
+          } else {
+            console.warn(
+              `[francos] no se encontro importacion para mes=${mesReal} anio=${anioReal}. Disponibles:`,
+              importacionesFrancos.map((f) => `id=${f.id} mes=${f.mes} anio=${f.anio} (${typeof f.mes}/${typeof f.anio})`)
+            );
           }
-        } catch {
-          // No bloqueante: si falla la consulta, se procesa con el cálculo plano.
+        } catch (err) {
+          console.error("[francos] error al buscar francos reales, se usa el calculo plano:", err);
         }
       }
 
@@ -838,6 +970,7 @@ export default function UploadPage() {
       setMatrices(matrices);
       setAgentes(agentes);
       setReductores(reductores);
+      setFrancosServicio(francosServicio);
       setDiasDelMes(diasDelMes);
       setResultado(resultado);
       setAlertas(alertas);
@@ -878,7 +1011,7 @@ export default function UploadPage() {
   }, [
     agentesDesdeApi, agentesFiltradosPorIsla, archivoCP, archivoReductores, archivoNomina,
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases, agentesHipoteticos,
-    setResultado, setMatrices, setAgentes, setReductores, setDiasDelMes,
+    setResultado, setMatrices, setAgentes, setReductores, setFrancosServicio, setDiasDelMes,
     setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
     esPersonalPay, esSmb, esOnboarding, esVentas, servicioActivo,
     setServicioActivo, selectedServicioKey,
@@ -1062,16 +1195,21 @@ export default function UploadPage() {
                 "bg-purple-500"
               )}
 
-              <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100/80 p-1">
+              <div className="grid grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-slate-100/80 p-1">
                 {([
-                  ["archivo", "Cargar reductores"],
-                  ["calculadora", "Usar calculadora"],
+                  ["archivo", "Cargar"],
+                  ["manual", "Manual"],
+                  ["calculadora", "Calculadora"],
                   ["guardado", "Guardados"],
                 ] as const).map(([value, label]) => (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => { setModoCargaReductores(value); setErrRed(""); }}
+                    onClick={() => {
+                      if (value === "manual") { handleAbrirReductoresManual(); return; }
+                      setModoCargaReductores(value);
+                      setErrRed("");
+                    }}
                     className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold transition-colors ${
                       modoCargaReductores === value
                         ? "bg-white text-[#0054A6] shadow-sm"
@@ -1092,6 +1230,75 @@ export default function UploadPage() {
                   error={errRed}
                   loading={loadingRed}
                 />
+              ) : modoCargaReductores === "manual" ? (
+                <div className="space-y-2">
+                  <div className="max-h-48 space-y-1.5 overflow-auto pr-1">
+                    {reductoresManual.length === 0 ? (
+                      <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+                        {hojasCP.length === 0
+                          ? "Subí primero el Requerido del cliente (CP) para precargar los servicios que trae, o agregá uno manualmente."
+                          : "El CP subido no matcheó ningún servicio conocido. Agregá una fila manualmente."}
+                      </p>
+                    ) : (
+                      reductoresManual.map((fila, idx) => (
+                        <div key={idx} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                          <div className="mb-1.5 flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="Nombre del servicio"
+                              value={fila.servicio}
+                              onChange={(e) => handleEditarFilaManual(idx, "servicio", e.target.value)}
+                              className="h-7 flex-1 min-w-0 rounded border border-slate-200 px-1.5 text-[11px] font-bold text-slate-700 outline-none focus:border-[#0054A6]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleQuitarFilaManual(idx)}
+                              className="shrink-0 text-slate-300 transition-colors hover:text-red-500"
+                              title="Quitar fila"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {([
+                              ["deslogueoPct", "Desl. %"],
+                              ["ausentismoPct", "Aus. %"],
+                              ["rotacionPct", "Rot. %"],
+                            ] as const).map(([campo, label]) => (
+                              <label key={campo} className="flex flex-col gap-0.5">
+                                <span className="text-[9px] uppercase text-slate-400">{label}</span>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  value={fila[campo]}
+                                  onChange={(e) => handleEditarFilaManual(idx, campo, e.target.value)}
+                                  className="h-7 rounded border border-slate-200 px-1.5 text-[11px] outline-none focus:border-[#0054A6]"
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAgregarFilaManual}
+                    className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 text-[11px] font-semibold text-slate-500 transition-colors hover:border-[#0054A6]/50 hover:text-[#0054A6]"
+                  >
+                    <Plus className="h-3.5 w-3.5" />Agregar servicio
+                  </button>
+                  {errRed && <p className="text-xs text-red-500 leading-relaxed">{errRed}</p>}
+                  <button
+                    type="button"
+                    onClick={handleUsarReductoresManual}
+                    disabled={reductoresManual.every((f) => !f.servicio.trim())}
+                    className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-purple-600 text-xs font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />Usar estos reductores
+                  </button>
+                </div>
               ) : modoCargaReductores === "calculadora" ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-1 gap-2">

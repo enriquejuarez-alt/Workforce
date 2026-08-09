@@ -108,17 +108,19 @@ async function idbClear(): Promise<void> {
   });
 }
 
-async function saveFile(key: string, file: File | null): Promise<void> {
+async function saveFile(key: string, file: File | null): Promise<StoredFile | null> {
   if (!file) {
     await idbDelete(key);
-    return;
+    return null;
   }
-  await idbSet(key, {
+  const stored: StoredFile = {
     name: file.name,
     type: file.type,
     lastModified: file.lastModified,
     buffer: await file.arrayBuffer(),
-  } satisfies StoredFile);
+  };
+  await idbSet(key, stored);
+  return stored;
 }
 
 function toFile(stored: StoredFile | null): File | null {
@@ -149,11 +151,20 @@ export const useUploads = create<UploadsState>((set, get) => ({
 
   setArchivoCP: (f) => {
     set({ archivoCP: f });
-    void saveFile("archivoCP", f);
+    // Tras el primer read (para persistir en IndexedDB), reemplazamos el File
+    // original (atado al disco) por uno reconstruido en memoria desde el
+    // buffer ya leido. Evita releer el File original al Procesar — si el
+    // archivo original quedo inaccesible mientras tanto (ej: OneDrive lo
+    // "deshidrato" a solo-nube), un segundo read tira NotReadableError.
+    void saveFile("archivoCP", f).then((stored) => {
+      if (stored && get().archivoCP === f) set({ archivoCP: toFile(stored) });
+    });
   },
   setArchivoReductores: (f) => {
     set({ archivoReductores: f });
-    void saveFile("archivoReductores", f);
+    void saveFile("archivoReductores", f).then((stored) => {
+      if (stored && get().archivoReductores === f) set({ archivoReductores: toFile(stored) });
+    });
   },
   setArchivoNomina: (f, hojas) => {
     set({
@@ -161,7 +172,9 @@ export const useUploads = create<UploadsState>((set, get) => ({
       hojasNomina: hojas,
       hojaNomina: hojas[0] ?? null,
     });
-    void saveFile("archivoNomina", f);
+    void saveFile("archivoNomina", f).then((stored) => {
+      if (stored && get().archivoNomina === f) set({ archivoNomina: toFile(stored) });
+    });
     saveMeta(get());
   },
   setHojaNomina: (h) => {

@@ -11,6 +11,7 @@ import {
   FilePen,
   BarChart2,
   FolderOpen,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -25,6 +26,7 @@ const NAV_GROUPS = [
       { href: "/planificacion/analisis", label: "Análisis", icon: BarChart2 },
       { href: "/planificacion/curvas", label: "Curvas", icon: TrendingUp },
       { href: "/planificacion/simulador", label: "Simulador", icon: Sliders },
+      { href: "/planificacion/simulador-dia-a-dia", label: "Simulador día a día", icon: CalendarClock },
       { href: "/planificacion/contratos", label: "Contratos", icon: FilePen },
       { href: "/planificacion/franco", label: "Franco", icon: CalendarOff },
       { href: "/planificacion/guardadas", label: "Guardadas", icon: FolderOpen },

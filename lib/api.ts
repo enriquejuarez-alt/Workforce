@@ -395,6 +395,8 @@ export const planificacionesGuardadasApi = {
     reductores: any
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     alertas: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    francos_servicio?: any
   }) => api.post<PlanificacionGuardadaDetalle>('/planificaciones-guardadas', data),
   delete: (id: number) => api.delete(`/planificaciones-guardadas/${id}`),
 }

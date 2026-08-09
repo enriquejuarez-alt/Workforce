@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import type { MatrizServicio, ServicioKey } from "../domain/types";
 import { SERVICIOS_VENTAS } from "../config/servicesVentas";
 import { normalizar } from "../config/services";
-import { esFeriado, generarFranjas, safeNum, serialToDate } from "../utils/excel";
+import { esDiaFeriado, generarFranjas, safeNum, serialToDate } from "../utils/excel";
 
 export interface ParseCPVentasResult {
   matrices: Map<ServicioKey, MatrizServicio>;
@@ -56,7 +56,7 @@ function parsearHojaWA(raw: unknown[][]): {
     const fecha = serialToDate(serial);
     if (isNaN(fecha.getTime())) continue;
     const diaSemanaRaw = String(filaDias[col] ?? "");
-    dias.push({ fecha, diaSemana: diaSemanaRaw, esFeriado: esFeriado(diaSemanaRaw), indiceColumna: col });
+    dias.push({ fecha, diaSemana: diaSemanaRaw, esFeriado: esDiaFeriado(diaSemanaRaw, fecha), indiceColumna: col });
     columnasValidas.push(col);
   }
 
@@ -131,7 +131,7 @@ function parsearHojaMovil(raw: unknown[][]): {
     const fecha = serialToDate(serial);
     if (isNaN(fecha.getTime())) continue;
     const diaSemanaRaw = String(filaDias[col] ?? "");
-    dias.push({ fecha, diaSemana: diaSemanaRaw, esFeriado: esFeriado(diaSemanaRaw), indiceColumna: col });
+    dias.push({ fecha, diaSemana: diaSemanaRaw, esFeriado: esDiaFeriado(diaSemanaRaw, fecha), indiceColumna: col });
     columnasValidas.push(col);
   }
 
@@ -199,7 +199,7 @@ export function parseCPVentas(buffer: ArrayBuffer): ParseCPVentasResult {
     const { dias, matriz, totalDiario } = result;
 
     if (dias.length > diasDelMes) diasDelMes = dias.length;
-    if (!mes) mes = dias[0].fecha.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+    if (!mes) mes = dias[0].fecha.toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" });
 
     const formato = detectarFormatoCP(matriz);
     const hcMatrix: number[][] = matriz.map((fila) =>

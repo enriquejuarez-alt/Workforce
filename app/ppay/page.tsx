@@ -29,6 +29,7 @@ import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
 import { generarAlertas } from "@/lib/domain/alertEngine";
 import { resolverServicioPpayPorSegmento } from "@/lib/config/servicesPpay";
+import { archivoEnMemoria } from "@/lib/utils/excel";
 import {
   Select,
   SelectContent,
@@ -99,7 +100,7 @@ export default function PpayUploadPage() {
           return;
         }
         setHojasCP(hojas);
-        setArchivoCP(file);
+        setArchivoCP(archivoEnMemoria(file, buffer));
       } catch (e) {
         setErrCP(`Error al leer el archivo: ${e}`);
       } finally {
@@ -119,7 +120,7 @@ export default function PpayUploadPage() {
           setErrRed(err.join(" · "));
           return;
         }
-        setArchivoReductores(file);
+        setArchivoReductores(archivoEnMemoria(file, buffer));
       } catch (e) {
         setErrRed(`Error al leer el archivo: ${e}`);
       } finally {
@@ -139,7 +140,7 @@ export default function PpayUploadPage() {
           setErrNom("El archivo de nómina no tiene hojas");
           return;
         }
-        setArchivoNomina(file, hojas);
+        setArchivoNomina(archivoEnMemoria(file, buffer), hojas);
       } catch (e) {
         setErrNom(`Error al leer el archivo: ${e}`);
       } finally {

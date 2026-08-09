@@ -86,7 +86,7 @@ describe("aplicarDiasAlMes con vacaciones", () => {
     const fechaInicioAtencion = "2026-08-11";
     const capa = agente({ esCapa: true, fechaInicioAtencion });
     const [a] = aplicarDiasAlMes([capa], 31, vacaciones);
-    const diaInicio = new Date(fechaInicioAtencion).getDate();
+    const diaInicio = new Date(fechaInicioAtencion).getUTCDate();
     const proporcionCapa = (31 - diaInicio + 1) / 31;
     const esperado = 35 * (31 / 7) * proporcionCapa * (1 - 5 / 31);
     expect(a.hsMensualBrutas).toBeCloseTo(esperado, 5);

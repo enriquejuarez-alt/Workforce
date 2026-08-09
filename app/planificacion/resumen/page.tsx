@@ -43,6 +43,7 @@ export default function DashboardPage() {
     agentes,
     matrices,
     reductores,
+    francosServicio,
     diasDelMes,
     alertas,
     activeFilters,
@@ -76,6 +77,7 @@ export default function DashboardPage() {
         agentes,
         reductores,
         alertas,
+        francos_servicio: francosServicio,
       });
     },
     onSuccess: () => {
@@ -83,7 +85,8 @@ export default function DashboardPage() {
       setShowGuardarInput(false);
       setNombreGuardado("");
     },
-    onError: () => toast.error("No se pudo guardar la planificación"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error ?? err?.message ?? "No se pudo guardar la planificación"),
   });
 
   const francoMap = useMemo(() => {
@@ -108,7 +111,8 @@ export default function DashboardPage() {
         reductores,
         diasDelMes,
         modoReductor,
-        topeFacturacion
+        topeFacturacion,
+        francosServicio
       );
       return activeFilters.isla
         ? {
@@ -119,7 +123,7 @@ export default function DashboardPage() {
     } catch {
       return resultado;
     }
-  }, [resultado, agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, activeFilters]);
+  }, [resultado, agentes, matrices, reductores, francosServicio, diasDelMes, modoReductor, topeFacturacion, activeFilters]);
 
   if (!resultado || !resultadoMostrado) return <SinDatos />;
 

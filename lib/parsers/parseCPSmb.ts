@@ -3,7 +3,7 @@ import type { MatrizServicio, ServicioKey } from "../domain/types";
 import { SERVICIOS_SMB } from "../config/servicesSmb";
 import { normalizar } from "../config/services";
 import {
-  esFeriado,
+  esDiaFeriado,
   generarFranjas,
   safeNum,
   serialToDate,
@@ -120,7 +120,7 @@ export function parseCPSmb(buffer: ArrayBuffer): ParseCPSmbResult {
       dias.push({
         fecha,
         diaSemana: diaSemanaRaw,
-        esFeriado: esFeriado(diaSemanaRaw),
+        esFeriado: esDiaFeriado(diaSemanaRaw, fecha),
         indiceColumna: col,
       });
       columnasValidas.push(col);
@@ -135,6 +135,7 @@ export function parseCPSmb(buffer: ArrayBuffer): ParseCPSmbResult {
     mes = dias[0].fecha.toLocaleDateString("es-AR", {
       month: "long",
       year: "numeric",
+      timeZone: "UTC",
     });
 
     const secciones = detectarSecciones(raw, nombreHoja).filter(

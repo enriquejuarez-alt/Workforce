@@ -29,8 +29,11 @@ app.use(cors({
   credentials: true,
 }))
 
-app.use(express.json({ limit: '500kb' }))
-app.use(express.urlencoded({ extended: true, limit: '500kb' }))
+// "Guardar planificación" sube el snapshot completo (resultado + matrices CP +
+// agentes + reductores + alertas) de un servicio; con nominas grandes o
+// servicios agrupados (varias islas) esto supera facil los 500kb originales.
+app.use(express.json({ limit: '15mb' }))
+app.use(express.urlencoded({ extended: true, limit: '15mb' }))
 
 app.use('/uploads', express.static(path.join(__dirname, '..', process.env.UPLOADS_DIR || 'uploads')))
 app.use('/api', routes)

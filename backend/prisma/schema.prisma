@@ -729,6 +729,7 @@ model PlanificacionGuardada {
   agentes             Json
   reductores          Json
   alertas             Json
+  francos_servicio    Json?
 
   guardado_por        Int
   guardador           Usuario  @relation(fields: [guardado_por], references: [id])

@@ -197,14 +197,25 @@ export function parseCP(buffer: ArrayBuffer): ParseCPResult {
 }
 
 export function validarHojasCP(sheetNames: string[]): string[] {
+  const servicios = getServiciosKeys();
   const errores: string[] = [];
-  for (const servicio of getServiciosKeys()) {
+  for (const servicio of servicios) {
     if (!resolverHojaCPRuntime(servicio, sheetNames)) {
       const aliases = getHojasCPRuntime(servicio);
       errores.push(
         `Falta la hoja del servicio '${servicio}' (esperadas: ${aliases.join(", ")})`
       );
     }
+  }
+  // "Falta la hoja del servicio X" es un aviso no bloqueante (normal que un CP
+  // no traiga todas las islas) — pero si NINGUNA hoja matcheo, es senal de que
+  // el archivo no es un CP valido para este formato, no que falten un par de
+  // islas. Ese caso si debe bloquear (mensaje que no empieza con el prefijo
+  // de arriba, para no ser filtrado como aviso en handleCP/handleProcesar).
+  if (servicios.length > 0 && errores.length === servicios.length) {
+    errores.unshift(
+      "No se reconoció ninguna hoja de servicio en el archivo — verificá que sea el CP correcto para este formato (Soporte)."
+    );
   }
   return errores;
 }

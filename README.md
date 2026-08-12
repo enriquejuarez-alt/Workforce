@@ -387,6 +387,15 @@ de antes. Ver "Simulador dia a dia" para donde se cargan estos eventos.
 
 Una hoja por servicio nombrada igual al servicio. El sistema valida que las hojas esperadas existan.
 
+`validarHojasCP` (`lib/parsers/parseCP.ts`) distingue dos niveles de error: que falte la
+hoja de UN servicio puntual es un aviso no bloqueante (normal que un CP no
+traiga todas las islas), pero si **ninguna** hoja de servicio matcheo, es
+señal de que el archivo no es un CP válido para este formato — ese caso
+bloquea la carga con un mensaje explícito en vez de procesar en silencio
+con 0 horas requeridas y 0% de cumplimiento. Los otros 4 formatos (Ventas,
+SMB, Onboarding, Personal Pay) ya tenían esta misma protección via su hoja
+obligatoria (`TOTAL HS`, `Resumen`, `KON`, etc.).
+
 ### KON (Personal Pay)
 
 Hoja unica llamada `KON` con todas las islas del servicio como secciones consecutivas.

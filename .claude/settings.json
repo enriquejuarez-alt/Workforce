@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(sort -k6,7 -r)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | Select-Object OwningProcess\")",
+      "PowerShell(Stop-Process -Id 4744 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Id 4624 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Id 5200 -ErrorAction SilentlyContinue)",
+      "Bash(mkdir -p /tmp/docx_extract)",
+      "Bash(unzip -o \"C:/Users/Dante/Downloads/Calculo HS LOGUEO MES Planificacion.docx\" -d .)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000,3001,3002 -State Listen -ErrorAction SilentlyContinue)",
+      "Bash(curl -s -o /dev/null -w \"3000: %{http_code}\\\\n\" http://localhost:3000)",
+      "Bash(curl -s -o /dev/null -w \"3001: %{http_code}\\\\n\" http://localhost:3001)",
+      "Bash(curl -s -o /dev/null -w \"3002: %{http_code}\\\\n\" http://localhost:3002)",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(curl -s http://localhost:3002/)",
+      "Bash(npx tsx *)",
+      "Bash(grep -o '\"text\":\"Ac\\\\\\\\u00e1 va lo concreto para pedirle a Darito.\\\\{0,3000\\\\}' \"C:/Users/Dante/.claude/projects/c--Users-Dante-Desktop-Nomina/a239cda5-6495-475b-be97-c853611c50e2.jsonl\")"
+    ]
+  }
+}

@@ -485,6 +485,32 @@ export interface FrancoServicioRow {
   franco_domingo: number
 }
 
+export interface CpImportacion {
+  id: number
+  mes: number
+  anio: number
+  formato: string
+  nombre: string | null
+  archivo_nombre: string | null
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  fecha_actualizacion: string
+  servicios?: CpServicioRow[]
+  _count?: { servicios: number }
+}
+
+export interface CpServicioRow {
+  id: number
+  importacion_id: number
+  servicio: string
+  servicio_norm: string
+  dias_del_mes: number
+  total_mes: number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  matriz: any
+}
+
 export interface PlanificacionGuardadaListItem {
   id: number
   servicio_key: string

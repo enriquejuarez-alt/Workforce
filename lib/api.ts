@@ -6,7 +6,7 @@ import type {
   Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
   ProgramacionMensual, FactorReduccion, SimulacionResponse, CronogramaResponse,
   ReductorImportacion, ReductorServicioRow, FrancoImportacion, FrancoServicioRow, AgenteServicioHistorial,
-  HistorialServicioImportacion,
+  HistorialServicioImportacion, CpImportacion,
   PlanificacionGuardadaListItem, PlanificacionGuardadaDetalle,
 } from '@/types'
 
@@ -370,6 +370,28 @@ export const francoImportacionesApi = {
       'franco_lunes' | 'franco_martes' | 'franco_miercoles' | 'franco_jueves' | 'franco_viernes' | 'franco_sabado' | 'franco_domingo'>>,
   ) => api.patch<FrancoServicioRow>(`/francos/${id}/servicios/${servicioId}`, data),
   delete: (id: number) => api.delete(`/francos/${id}`),
+}
+
+// CPs (Requerido del cliente) guardados (Planificación)
+export const cpImportacionesApi = {
+  list: () => api.get<CpImportacion[]>('/cp-importaciones'),
+  get: (id: number) => api.get<CpImportacion>(`/cp-importaciones/${id}`),
+  create: (data: {
+    mes: number
+    anio: number
+    formato: string
+    nombre?: string
+    archivo_nombre?: string
+    servicios: Array<{
+      servicio: string
+      servicioNorm: string
+      diasDelMes: number
+      totalMes: number
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      matriz: any
+    }>
+  }) => api.post<CpImportacion>('/cp-importaciones', data),
+  delete: (id: number) => api.delete(`/cp-importaciones/${id}`),
 }
 
 // Planificaciones guardadas (Planificación)

@@ -12,6 +12,7 @@ import {
   BarChart2,
   FolderOpen,
   CalendarClock,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -22,6 +23,7 @@ const NAV_GROUPS = [
     label: "Planificación",
     items: [
       { href: "/planificacion", label: "Carga de archivos", icon: UploadCloud },
+      { href: "/planificacion/cp", label: "CPs guardados", icon: FileSpreadsheet },
       { href: "/planificacion/resumen", label: "Resumen", icon: LayoutDashboard },
       { href: "/planificacion/analisis", label: "Análisis", icon: BarChart2 },
       { href: "/planificacion/curvas", label: "Curvas", icon: TrendingUp },

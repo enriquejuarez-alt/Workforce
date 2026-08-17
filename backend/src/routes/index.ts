@@ -55,6 +55,12 @@ import {
   deleteFrancoImportacion,
 } from '../controllers/francos'
 import {
+  listCpImportaciones,
+  getCpImportacion,
+  createCpImportacion,
+  deleteCpImportacion,
+} from '../controllers/cp'
+import {
   listPlanificacionesGuardadas,
   getPlanificacionGuardada,
   createPlanificacionGuardada,
@@ -207,6 +213,11 @@ router.get('/francos/:id', authenticate, getFrancoImportacion)
 router.post('/francos', authenticate, createFrancoImportacion)
 router.patch('/francos/:id/servicios/:servicioId', authenticate, updateFrancoServicio)
 router.delete('/francos/:id', authenticate, deleteFrancoImportacion)
+
+router.get('/cp-importaciones', authenticate, listCpImportaciones)
+router.get('/cp-importaciones/:id', authenticate, getCpImportacion)
+router.post('/cp-importaciones', authenticate, createCpImportacion)
+router.delete('/cp-importaciones/:id', authenticate, deleteCpImportacion)
 
 router.get('/planificaciones-guardadas', authenticate, listPlanificacionesGuardadas)
 router.get('/planificaciones-guardadas/:id', authenticate, getPlanificacionGuardada)

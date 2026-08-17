@@ -375,11 +375,20 @@ El motor tambien acepta `eventosPorDia` (`Map<dia, delta>`) en
 `InputDiaADia`: un delta neto de nomina para un dia puntual del mes,
 acumulado dia a dia a partir de ese dia. Replica la columna "Ingresos" del
 archivo de referencia del cliente, que hace que la Nomina Final baje o suba
-en una fecha concreta en vez de asumir una nomina constante todo el mes (la
-rampa de rotacion sigue calculandose aparte, sobre la nomina inicial
-original — modela la baja "estimada" no registrada, independiente de estos
-eventos ya conocidos). Sin `eventosPorDia`, el comportamiento es identico al
-de antes. Ver "Simulador dia a dia" para donde se cargan estos eventos.
+en una fecha concreta en vez de asumir una nomina constante todo el mes.
+Sin `eventosPorDia`, el comportamiento es identico al de antes. Ver
+"Simulador dia a dia" para donde se cargan estos eventos.
+
+**La rampa de rotacion se calcula sobre la nomina BASE del dia (nomina
+inicial + eventos acumulados hasta ese punto), no sobre la nomina inicial
+constante.** Esto se corrigio despues de verificar la formula real de la
+referencia contra un archivo CON eventos reales (con un archivo sin
+eventos no se puede distinguir entre las dos formas de calcularla, porque
+nomina base y nomina inicial coinciden todo el mes) — su Excel calcula
+`Rotacion = %Rotacion * (dia/diasDelMes) * Nomina Final del dia`, y "Nomina
+Final" arrastra los Ingresos acumulados. Verificado exacto, digito por
+digito, contra los dias con eventos reales de Soporte-Entretenimiento
+(julio 2026: -5 el dia 8, -9 el dia 14).
 
 ## Formatos de CP soportados
 
@@ -408,6 +417,79 @@ Estructura propia con hojas separadas por isla.
 ### Formato SMB
 
 Estructura propia para las islas SMB.
+
+## CPs guardados
+
+Igual que Francos reales y Reductores: en vez de subir el archivo de CP
+(Requerido del cliente) cada vez que se quiere planificar un servicio, se
+puede guardar por mes/año/formato una sola vez y despues elegirlo desde
+Planificación sin volver a subir el archivo.
+
+- Pagina `/planificacion/cp`: arrastrás uno o varios archivos de CP a la vez
+  (o hacés clic para elegirlos), de formatos distintos entre si. Por default
+  el formato esta en **"Detectar automáticamente"**: cada archivo prueba los
+  5 formatos (Ventas → SMB → Onboarding → Personal Pay → General, en ese
+  orden) y se queda con el primero que realmente encuentre servicios — no
+  hace falta separar en tandas ni elegir nada de antemano (probado contra
+  los 13 CP reales de un mes completo: cada archivo matcheo con exactamente
+  un formato, sin ambiguedad). Si la detección se equivoca con algún archivo
+  puntual, se puede forzar un formato especifico en el selector para todo
+  el lote. Cada archivo tambien detecta su propio mes/año a partir de las
+  fechas que trae adentro (misma fecha que usa el resto de la app para
+  matchear Francos/Reductores por mes) — no hace falta re-seleccionar
+  mes/año entre archivo y archivo, así que se puede soltar de una vez el CP
+  de varios meses juntos. El selector de Mes/Año de la pantalla solo se usa
+  como *fallback* si algún archivo no trae fechas reconocibles.
+  Usa el mismo parser y la misma validación que ya usa la carga normal para
+  ese formato (`parseCP`/`parseCPVentas`/`parseCPSmb`/`parseCPOnb`/
+  `parseCPPpay`), así que un CP inválido para ese formato se rechaza igual
+  que en la carga directa — el resultado por archivo (ok/error, con mensaje)
+  se muestra debajo del dropzone al terminar el lote. Cada servicio
+  encontrado se guarda con su `MatrizServicio` completa serializada a JSON
+  (mismo formato que `lib/domain/serializacion.ts` usa para Planificaciones
+  guardadas), más `dias_del_mes` y `total_mes` para no tener que
+  deserializar solo para mostrar el listado.
+  **"General"** no es solo "Soporte": cubre todas las islas que comparten el
+  mismo parser de una-hoja-por-servicio (Soporte Técnico, Retención, Móvil,
+  Hogares Convergentes/No Convergentes) validadas contra la unión de esos
+  universos a la vez (`SERVICIOS_GENERICO` en la página) — a diferencia del
+  flujo principal, esta pantalla no tiene un "servicio activo" del que
+  heredar `getServiciosActivos()`, así que valida contra todo junto en vez
+  de contra un estado global que puede haber quedado en cualquier cosa.
+  BO GC, TECH, Integral Móvil y Migración Cobre quedan afuera a propósito:
+  sus `ServiceDefinition` usan alias de hoja placeholder pensados para
+  cuando ya se sabe de antemano cuál es el único servicio activo, y
+  mezclarlos en un universo genérico causaría matcheos ambiguos.
+- En la pantalla principal de Planificación (`app/planificacion/page.tsx`),
+  la Card 1 ("Requerido del cliente") tiene un toggle **Subir archivo /
+  CP guardado** — coexisten los dos modos, no se reemplaza uno por el otro.
+  En modo "CP guardado" el listado se filtra en dos niveles: primero por
+  formato activo (el mismo que decide que parser usar hoy: General/Ventas/
+  SMB/Onboarding/Personal Pay), y despues por si el CP realmente CONTIENE
+  el servicio activo (comparando `servicios[].servicio_norm` contra el
+  universo de `ServiceDefinition` de ese servicio). Sin este segundo filtro,
+  el universo "General" agrupa Soporte/Retencion/Movil/Hogares Convergentes/
+  Hogares No Convergentes — CPs de islas totalmente distintas que comparten
+  formato — y el picker los listaba mezclados e indistinguibles ("Agosto
+  2026 · N servicios" x5), obligando a abrir uno por uno para encontrar el
+  correcto. El endpoint `GET /cp-importaciones` devuelve ahora, ademas de
+  `_count.servicios`, un `servicios[]` liviano (`servicio`/`servicio_norm`
+  nomas, sin la `matriz` pesada) para poder filtrar y mostrar el nombre del
+  servicio en cada item de la lista sin traer las matrices completas de
+  todos los CPs solo para listarlos. Al elegir uno, se reconstruye el `Map`
+  de matrices con `deserializarMatrices` y se salta el parseo del archivo —
+  el resto del flujo (`handleProcesar`) es identico a partir de ahi. Cuando
+  hay mas de un mes disponible para el servicio activo, aparece ademas un
+  selector de Mes/Año (derivado de los periodos que realmente existen entre
+  los CPs ya filtrados por formato+servicio — no un combo generico de los
+  12 meses) para no tener que scrollear la lista buscando el periodo a ojo.
+- Backend: modelo `CpImportacion`/`CpServicio` (Prisma) y CRUD en
+  `backend/src/controllers/cp.ts` (`GET/POST /cp-importaciones`,
+  `GET /cp-importaciones/:id`, `DELETE /cp-importaciones/:id`), mismo patron
+  que `francos.ts`/`reductores.ts` (transaccion crear importacion + servicios,
+  audit log). Subir un CP para un mes/año/formato que ya tenia uno cargado
+  crea una versión nueva, no pisa la anterior — hay que borrar la vieja a mano
+  si no se necesita mas.
 
 ## Matrices CP y horas requeridas
 
@@ -754,6 +836,7 @@ app/planificacion/guardadas/[id]/page.tsx Ficha de una planificacion guardada + 
 app/planificacion/curvas/page.tsx       Curvas por servicio
 app/planificacion/franco/page.tsx       Planificacion de francos (modelo probabilistico)
 app/planificacion/francos/page.tsx      Importador de francos reales y contratos (motor dia a dia)
+app/planificacion/cp/page.tsx           Biblioteca de CPs guardados por mes/año/formato
 app/planificacion/nomina-general/page.tsx Precarga de Nomina General (todas las islas, una sola carga)
 app/planificacion/contratos/page.tsx    Configuracion de contratos y francos por servicio
 app/planificacion/simulador/page.tsx    Simulador de dotacion
@@ -782,6 +865,7 @@ lib/utils/exportSimulador.ts            Exportacion Excel (5 hojas)
 backend/src/controllers/reductores.ts   CRUD de reductores guardados (ReductorImportacion/ReductorServicio)
 backend/src/controllers/planificacionesGuardadas.ts CRUD de planificaciones guardadas (PlanificacionGuardada)
 backend/src/controllers/francos.ts      CRUD de francos reales cargados (FrancoImportacion/FrancoServicio)
+backend/src/controllers/cp.ts           CRUD de CPs guardados (CpImportacion/CpServicio)
 CALCULO_REDUCTORES.md                   Nota corta del calculo de reductores
 ```
 

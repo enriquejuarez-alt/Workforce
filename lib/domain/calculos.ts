@@ -279,14 +279,6 @@ export function calcularResultados(
       francoPorServicio.set(key as ServicioKey, f);
     }
   }
-  if (francosServicio.length > 0 && typeof window !== "undefined") {
-    console.log(
-      `[francos] francoPorServicio resuelto: ${francoPorServicio.size} de ${francosServicio.length} servicios matchearon. Keys activos:`,
-      getServiciosActivos().map((d) => d.key),
-      "Keys con franco:", [...francoPorServicio.keys()]
-    );
-  }
-
   const primeraMatrizPre = matrices.values().next().value as MatrizServicio | undefined;
   const primerFechaPre = primeraMatrizPre?.dias[0]?.fecha;
   // Las fechas de dias vienen de serialToDate() en UTC medianoche. Con getMonth()/
@@ -322,12 +314,6 @@ export function calcularResultados(
     let factorProductivo = factorProductivoPlano;
 
     const franco = francoPorServicio.get(servicio);
-    if (typeof window !== "undefined" && francosServicio.length > 0) {
-      console.log(
-        `[francos] servicio=${servicio}: franco=${franco ? "encontrado" : "NO encontrado"}` +
-          (franco ? ` ponderadoHoras=${franco.ponderadoHoras} mesNumPre=${mesNumPre} anioNumPre=${anioNumPre}` : "")
-      );
-    }
     if (mesNumPre && anioNumPre) {
       const matrizServicio = matrices.get(servicio);
       const inputDiaADia = construirInputDiaADia(grupo, franco, reductor, matrizServicio, diasDelMes, mesNumPre, anioNumPre);
@@ -335,11 +321,6 @@ export function calcularResultados(
         const { totalHsLogueo } = calcularHsLogueoDiaADia(inputDiaADia);
         hsNetas = totalHsLogueo;
         factorProductivo = grupo.hsBrutas > 0 ? hsNetas / grupo.hsBrutas : factorProductivoPlano;
-        if (typeof window !== "undefined") {
-          console.log(
-            `[francos] dia-a-dia servicio=${servicio}: hcActivos=${grupo.hcActivos} hcLP=${grupo.hcLP} hsBrutas=${grupo.hsBrutas} nominaInicial=${inputDiaADia.nominaInicial} totalHsLogueo=${totalHsLogueo} (flat hubiera dado ${grupo.hsBrutas * factorProductivoPlano})`
-          );
-        }
       }
     }
 

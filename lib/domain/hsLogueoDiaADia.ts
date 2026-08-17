@@ -100,11 +100,15 @@ export function calcularHsLogueoDiaADia(input: InputDiaADia): ResultadoDiaADia {
     const licencia = input.licenciaPorDia
       ? input.licenciaPorDia(dia)
       : input.licenciaConstante ?? 0;
-    // La rampa de rotacion sigue calculandose sobre la nomina inicial original:
-    // modela la baja "estimada" no registrada, independiente de los eventos
-    // puntuales ya conocidos (que se suman/restan aparte via nominaBase).
+    // La rampa de rotacion se calcula sobre la nomina BASE del dia (ya con
+    // los eventos acumulados hasta ese punto), no sobre la nomina inicial
+    // constante — verificado contra la formula real de la referencia
+    // (Excel: Rotacion = %Rotacion * (dia/diasDelMes) * Nomina Final del
+    // dia, con "Nomina Final" arrastrando los Ingresos acumulados). Si no
+    // hay eventos, nominaBase === nominaInicial todo el mes y esto se
+    // comporta exactamente igual que antes.
     const bajasRotacion =
-      (input.rotacionMensual / input.diasDelMes) * dia * input.nominaInicial;
+      (input.rotacionMensual / input.diasDelMes) * dia * nominaBase;
 
     const nominaActiva = Math.max(
       0,

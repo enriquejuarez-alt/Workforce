@@ -50,7 +50,8 @@ import { parseCPVentas, validarHojasCPVentas } from "@/lib/parsers/parseCPVentas
 import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularReductoresDesdeArchivos, reductoresAFile } from "@/lib/parsers/calcularReductores";
 import { calcularResultados } from "@/lib/domain/calculos";
-import type { Agente, FrancoServicioDatos, Reductor } from "@/lib/domain/types";
+import type { Agente, FrancoServicioDatos, MatrizServicio, Reductor, ServicioKey } from "@/lib/domain/types";
+import { deserializarMatrices } from "@/lib/domain/serializacion";
 import {
   expandirAgentesHipoteticos,
   contarAgentesHipoteticos,
@@ -73,7 +74,7 @@ import { SERVICIOS_ONB } from "@/lib/config/servicesOnb";
 import { SERVICIOS_PPAY } from "@/lib/config/servicesPpay";
 import type { ServiceDefinition } from "@/lib/config/services";
 import { extraerHorasContrato, archivoEnMemoria } from "@/lib/utils/excel";
-import { nominasApi, reductorImportacionesApi, francoImportacionesApi, vacacionesApi } from "@/lib/api";
+import { nominasApi, reductorImportacionesApi, francoImportacionesApi, cpImportacionesApi, vacacionesApi } from "@/lib/api";
 import type { NominaMensual, AgenteNominaMensual } from "@/types";
 import {
   Select,
@@ -132,6 +133,14 @@ const fade = {
 };
 
 type ModoCargaReductores = "archivo" | "manual" | "calculadora" | "guardado";
+type ModoCargaCP = "archivo" | "guardado";
+
+interface CpGuardadoData {
+  matrices: Map<ServicioKey, MatrizServicio>;
+  diasDelMes: number;
+  servicioKeys: ServicioKey[];
+  label: string;
+}
 
 /** Fila de edicion manual: mismos campos que Reductor, pero deslogueo/ausentismo/rotacion
  * se editan como % (0-100) en vez de fraccion (0-1), mas natural para tipear a mano. */
@@ -202,6 +211,11 @@ export default function UploadPage() {
   const [showGuardarInput, setShowGuardarInput] = useState(false);
   const [deleteReductorGuardadoId, setDeleteReductorGuardadoId] = useState<number | null>(null);
 
+  const [modoCP, setModoCP] = useState<ModoCargaCP>("archivo");
+  const [cpGuardadoId, setCpGuardadoId] = useState<number | null>(null);
+  const [cpGuardadoData, setCpGuardadoData] = useState<CpGuardadoData | null>(null);
+  const [cpPeriodoFiltro, setCpPeriodoFiltro] = useState("");
+
   // Derive numeric service ID from the shared selectedServicioKey
   const reqServicioId = selectedServicioKey ? parseInt(selectedServicioKey) : null;
 
@@ -241,6 +255,7 @@ export default function UploadPage() {
     queryFn: () => reductorImportacionesApi.get(reductorGuardadoId!).then((r) => r.data),
     enabled: reductorGuardadoId !== null,
   });
+
 
   const guardarReductoresMut = useMutation({
     mutationFn: (data: { mes: number; anio: number; nombre?: string; archivo_nombre?: string; servicios: Reductor[] }) =>
@@ -311,11 +326,101 @@ export default function UploadPage() {
   const esVentas = reqServicioId === -13 || reqServicioId === -14 || reqServicioId === -15 ||
     (servicioActivo?.nombre ?? "").toLowerCase().startsWith("ventas");
 
+  // Formato de CP activo segun el servicio elegido — mismo criterio que
+  // handleProcesar usa para elegir el parser, usado para filtrar los CPs
+  // guardados a los que efectivamente pueden matchear en esta corrida.
+  const formatoCPActivo = esPersonalPay
+    ? "ppay"
+    : esSmb
+      ? "smb"
+      : esOnboarding
+        ? "onboarding"
+        : esVentas
+          ? "ventas"
+          : "soporte";
+
+  const { data: cpsGuardados = [], isLoading: loadingCpsGuardados } = useQuery({
+    queryKey: ["cp-guardados"],
+    queryFn: () => cpImportacionesApi.list().then((r) => r.data),
+    enabled: modoCP === "guardado",
+  });
+
+  // No alcanza con filtrar por formato: "General" agrupa Soporte, Retencion,
+  // Movil y Hogares Convergentes/No Convergentes — CPs de islas totalmente
+  // distintas que comparten el mismo formato. Sin este segundo filtro, el
+  // picker mostraba todos esos CPs mezclados como "Agosto 2026 · N
+  // servicios" indistinguibles entre si, obligando a abrir uno por uno para
+  // encontrar el correcto. Se filtra ademas por si el CP realmente contiene
+  // el servicio activo (mismo universo que usa serviciosDelCP).
+  const cpsGuardadosDelFormato = useMemo(() => {
+    const universoActivo = esPersonalPay
+      ? SERVICIOS_PPAY
+      : esSmb
+        ? SERVICIOS_SMB
+        : esOnboarding
+          ? SERVICIOS_ONB
+          : esVentas
+            ? SERVICIOS_VENTAS
+            : getServiciosActivos();
+    const keysActivo = new Set(universoActivo.map((d) => d.key));
+    return cpsGuardados
+      .filter((cp) => cp.formato === formatoCPActivo)
+      .filter((cp) => (cp.servicios ?? []).some((s) => keysActivo.has(s.servicio_norm as ServicioKey)))
+      .sort((a, b) => b.anio - a.anio || b.mes - a.mes || +new Date(b.fecha_importacion) - +new Date(a.fecha_importacion));
+  }, [cpsGuardados, formatoCPActivo, esPersonalPay, esSmb, esOnboarding, esVentas]);
+
+  // Meses/años realmente disponibles entre los CPs que ya pasaron el filtro
+  // de formato+servicio de arriba — para elegir el periodo sin tener que
+  // scrollear la lista buscando a ojo.
+  const periodosCPDisponibles = useMemo(() => {
+    const mapa = new Map<string, { mes: number; anio: number }>();
+    for (const cp of cpsGuardadosDelFormato) mapa.set(`${cp.mes}-${cp.anio}`, { mes: cp.mes, anio: cp.anio });
+    return [...mapa.entries()].sort(([, a], [, b]) => b.anio - a.anio || b.mes - a.mes);
+  }, [cpsGuardadosDelFormato]);
+
+  const cpsGuardadosFiltrados = useMemo(
+    () => (cpPeriodoFiltro ? cpsGuardadosDelFormato.filter((cp) => `${cp.mes}-${cp.anio}` === cpPeriodoFiltro) : cpsGuardadosDelFormato),
+    [cpsGuardadosDelFormato, cpPeriodoFiltro]
+  );
+
+  const handleUsarCpGuardado = useCallback(async (id: number) => {
+    setErrCP("");
+    setLoadingCP(true);
+    setCpGuardadoId(id);
+    try {
+      const { data: detalle } = await cpImportacionesApi.get(id);
+      const servicios = detalle.servicios ?? [];
+      if (servicios.length === 0) {
+        setErrCP("Este CP guardado no tiene servicios.");
+        return;
+      }
+      const matrices = deserializarMatrices(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        servicios.map((s) => [s.servicio_norm, s.matriz]) as any
+      );
+      const diasDelMes = Math.max(0, ...servicios.map((s) => s.dias_del_mes));
+      setCpGuardadoData({
+        matrices,
+        diasDelMes,
+        servicioKeys: servicios.map((s) => s.servicio_norm as ServicioKey),
+        label: detalle.archivo_nombre ?? `CP ${MESES[detalle.mes - 1]} ${detalle.anio}`,
+      });
+      setArchivoCP(null);
+      setHojasCP([]);
+      setReductoresManual([]);
+      toast.success(`CP cargado: ${servicios.length} servicios`);
+    } catch {
+      setErrCP("No se pudo cargar este CP guardado.");
+      setCpGuardadoId(null);
+    } finally {
+      setLoadingCP(false);
+    }
+  }, [setArchivoCP]);
+
   // Servicios que realmente aparecen en el CP (Requerido) ya subido, para
   // precargar la pestaña "Manual" de reductores con exactamente esos — no un
   // grupo entero de config que puede no coincidir con lo que trae el archivo.
   const serviciosDelCP = useMemo(() => {
-    if (hojasCP.length === 0) return [];
     const universo: ServiceDefinition[] = esPersonalPay
       ? SERVICIOS_PPAY
       : esSmb
@@ -325,11 +430,17 @@ export default function UploadPage() {
         : esVentas
           ? SERVICIOS_VENTAS
         : getServiciosActivos();
+    // CP guardado: los servicios ya vienen resueltos a ServicioKey exacta al
+    // guardarse, no hace falta volver a matchear por alias de hoja.
+    if (cpGuardadoData) {
+      return universo.filter((def) => cpGuardadoData.servicioKeys.includes(def.key));
+    }
+    if (hojasCP.length === 0) return [];
     return universo.filter((def) => {
       const aliases = Array.isArray(def.hojaCP) ? def.hojaCP : [def.hojaCP];
       return aliases.some((alias) => hojasCP.some((h) => normalizar(h) === normalizar(alias)));
     });
-  }, [hojasCP, esPersonalPay, esSmb, esOnboarding, esVentas]);
+  }, [hojasCP, cpGuardadoData, esPersonalPay, esSmb, esOnboarding, esVentas]);
 
   // Islas/segmentos detectados dentro de la nomina cargada para el servicio activo
   // (ej. Soporte Tecnico agrupa varias islas bajo un unico servicio_id en el sistema)
@@ -539,6 +650,9 @@ export default function UploadPage() {
     setArchivoCP(null);
     setHojasCP([]);
     setErrCP("");
+    setCpGuardadoData(null);
+    setCpGuardadoId(null);
+    setCpPeriodoFiltro("");
   }, [selectedServicioKey, setArchivoCP]);
 
   useEffect(() => {
@@ -569,6 +683,9 @@ export default function UploadPage() {
       setArchivoCP(null);
       setHojasCP([]);
       setErrCP("");
+      setCpGuardadoData(null);
+      setCpGuardadoId(null);
+      setCpPeriodoFiltro("");
       setReductoresPreview([]);
       setReductoresManual([]);
       // Reset nomina from API when service changes
@@ -606,6 +723,8 @@ export default function UploadPage() {
       if (errValidacionBloqueantes.length > 0) { setErrCP(errValidacionBloqueantes.join(" - ")); return; }
       setHojasCP(hojas);
       setArchivoCP(archivoEnMemoria(file, buffer));
+      setCpGuardadoData(null);
+      setCpGuardadoId(null);
       // Un CP nuevo puede traer un set de servicios distinto al anterior —
       // no dejar pisadas las filas manuales precargadas para el CP viejo.
       setReductoresManual([]);
@@ -842,7 +961,7 @@ export default function UploadPage() {
     }
     const nominaDesdeApi = !!agentesDesdeApi;
     const nominaDesdeArchivo = !!(archivoNomina && hojaNomina);
-    if (!archivoCP || !archivoReductores || (!nominaDesdeApi && !nominaDesdeArchivo)) return;
+    if ((!archivoCP && !cpGuardadoData) || !archivoReductores || (!nominaDesdeApi && !nominaDesdeArchivo)) return;
 
     setProcesandoLocal(true);
     setProcesando(true);
@@ -850,22 +969,24 @@ export default function UploadPage() {
     setPasoActual("Leyendo archivos...");
 
     try {
-      const buffers = nominaDesdeApi
-        ? await Promise.all([archivoCP.arrayBuffer(), archivoReductores.arrayBuffer()])
-        : await Promise.all([archivoCP.arrayBuffer(), archivoReductores.arrayBuffer(), archivoNomina!.arrayBuffer()]);
-
-      const [bufCP, bufRed, bufNomina] = buffers;
+      const otrosBuffers = nominaDesdeApi
+        ? await Promise.all([archivoReductores.arrayBuffer()])
+        : await Promise.all([archivoReductores.arrayBuffer(), archivoNomina!.arrayBuffer()]);
+      const bufCP = archivoCP ? await archivoCP.arrayBuffer() : null;
+      const [bufRed, bufNomina] = otrosBuffers;
 
       setPasoActual("Procesando requerido del cliente...");
-      const { matrices, diasDelMes, errores: errCP2 } = esPersonalPay
-        ? parseCPPpay(bufCP)
-        : esSmb
-          ? parseCPSmb(bufCP)
-          : esOnboarding
-            ? parseCPOnb(bufCP)
-          : esVentas
-            ? parseCPVentas(bufCP)
-          : parseCP(bufCP);
+      const { matrices, diasDelMes, errores: errCP2 } = cpGuardadoData
+        ? { matrices: cpGuardadoData.matrices, diasDelMes: cpGuardadoData.diasDelMes, errores: [] as string[] }
+        : esPersonalPay
+          ? parseCPPpay(bufCP!)
+          : esSmb
+            ? parseCPSmb(bufCP!)
+            : esOnboarding
+              ? parseCPOnb(bufCP!)
+            : esVentas
+              ? parseCPVentas(bufCP!)
+            : parseCP(bufCP!);
 
       setPasoActual("Procesando reductores y nomina...");
       const { reductores, errores: errRed2 } = parseReductores(bufRed);
@@ -939,18 +1060,9 @@ export default function UploadPage() {
               francoSabado: s.franco_sabado,
               francoDomingo: s.franco_domingo,
             }));
-            console.log(
-              `[francos] usando importacion #${match.id} (mes=${mesReal} anio=${anioReal}): ${francosServicio.length} servicios`,
-              francosServicio.map((f) => `${f.servicio} (${f.servicioNorm}) ponderadoHoras=${f.ponderadoHoras}`)
-            );
-          } else {
-            console.warn(
-              `[francos] no se encontro importacion para mes=${mesReal} anio=${anioReal}. Disponibles:`,
-              importacionesFrancos.map((f) => `id=${f.id} mes=${f.mes} anio=${f.anio} (${typeof f.mes}/${typeof f.anio})`)
-            );
           }
         } catch (err) {
-          console.error("[francos] error al buscar francos reales, se usa el calculo plano:", err);
+          console.error("Error al buscar francos reales, se usa el calculo plano:", err);
         }
       }
 
@@ -1009,7 +1121,7 @@ export default function UploadPage() {
       setPasoActual("");
     }
   }, [
-    agentesDesdeApi, agentesFiltradosPorIsla, archivoCP, archivoReductores, archivoNomina,
+    agentesDesdeApi, agentesFiltradosPorIsla, archivoCP, cpGuardadoData, archivoReductores, archivoNomina,
     hojaNomina, modoReductor, topeFacturacion, mappingOverrides, pases, agentesHipoteticos,
     setResultado, setMatrices, setAgentes, setReductores, setFrancosServicio, setDiasDelMes,
     setAlertas, setProcesando, setErrores, setAgentesExcluidos, clearFilters, router,
@@ -1020,7 +1132,7 @@ export default function UploadPage() {
   const readOnly = isReadOnly(currentUser?.rol);
 
   const nominaLista = !!agentesDesdeApi || !!(archivoNomina && hojaNomina);
-  const cpListo = !!archivoCP;
+  const cpListo = !!archivoCP || !!cpGuardadoData;
   const listo = !!(cpListo && archivoReductores && nominaLista) && !procesandoLocal && !readOnly;
 
   const stepDot = (done: boolean, color: string, n: number) => (
@@ -1166,19 +1278,105 @@ export default function UploadPage() {
                 "bg-blue-50",
                 "bg-blue-500"
               )}
-              <DropZone
-                label={cpDropzoneLabel}
-                onFile={handleCP}
-                hasFile={!!archivoCP}
-                fileName={archivoCP?.name}
-                error={errCP}
-                loading={loadingCP}
-                accepted=".xlsx,.xls"
-                disabled={!servicioActivo}
-                disabledMessage="Elegí un servicio arriba primero"
-              />
-              {archivoCP && (
-                <FilePreview nombre={archivoCP.name} tamanio={archivoCP.size} hojas={hojasCP} />
+              <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setModoCP("archivo")}
+                  className={`flex-1 rounded-md py-1.5 transition-colors ${modoCP === "archivo" ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  Subir archivo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoCP("guardado")}
+                  className={`flex-1 rounded-md py-1.5 transition-colors ${modoCP === "guardado" ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  CP guardado
+                </button>
+              </div>
+
+              {modoCP === "archivo" ? (
+                <>
+                  <DropZone
+                    label={cpDropzoneLabel}
+                    onFile={handleCP}
+                    hasFile={!!archivoCP}
+                    fileName={archivoCP?.name}
+                    error={errCP}
+                    loading={loadingCP}
+                    accepted=".xlsx,.xls"
+                    disabled={!servicioActivo}
+                    disabledMessage="Elegí un servicio arriba primero"
+                  />
+                  {archivoCP && (
+                    <FilePreview nombre={archivoCP.name} tamanio={archivoCP.size} hojas={hojasCP} />
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-1 flex-col gap-2">
+                  {periodosCPDisponibles.length > 1 && (
+                    <Select value={cpPeriodoFiltro || "__todos"} onValueChange={(v) => setCpPeriodoFiltro(v === "__todos" ? "" : v)}>
+                      <SelectTrigger className="h-8 w-full text-xs"><SelectValue placeholder="Mes" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__todos">Todos los meses</SelectItem>
+                        {periodosCPDisponibles.map(([key, { mes, anio }]) => (
+                          <SelectItem key={key} value={key}>{MESES[mes - 1]} {anio}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {loadingCpsGuardados ? (
+                    <div className="flex flex-1 items-center justify-center py-6">
+                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    </div>
+                  ) : cpsGuardadosDelFormato.length === 0 ? (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-200 py-6 text-center">
+                      <p className="text-xs text-slate-400">No hay CPs guardados que contengan este servicio</p>
+                      <Link href="/planificacion/cp" className="text-[11px] font-semibold text-[#0054A6] hover:underline">
+                        Cargar uno →
+                      </Link>
+                    </div>
+                  ) : cpsGuardadosFiltrados.length === 0 ? (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-200 py-6 text-center">
+                      <p className="text-xs text-slate-400">Ningún CP para ese mes</p>
+                    </div>
+                  ) : (
+                    <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
+                      {cpsGuardadosFiltrados.map((cp) => {
+                        const nombresServicios = (cp.servicios ?? []).map((s) => s.servicio).join(", ");
+                        return (
+                          <button
+                            key={cp.id}
+                            type="button"
+                            onClick={() => handleUsarCpGuardado(cp.id)}
+                            disabled={loadingCP}
+                            className={`flex flex-col gap-0.5 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                              cpGuardadoId === cp.id
+                                ? "border-[#0054A6] bg-[#0054A6]/5"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate font-semibold text-slate-700">
+                                {MESES[cp.mes - 1]} {cp.anio}
+                              </span>
+                              <span className="shrink-0 text-[11px] text-slate-400">{cp._count?.servicios ?? 0} servicios</span>
+                            </div>
+                            {nombresServicios && (
+                              <span className="truncate text-[11px] text-[#0054A6]">{nombresServicios}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {errCP && <p className="text-[11px] text-red-500 leading-relaxed">{errCP}</p>}
+                  {cpGuardadoData && (
+                    <p className="text-[11px] text-emerald-600 font-medium">
+                      Usando: {cpGuardadoData.label} ({cpGuardadoData.servicioKeys.length} servicios)
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>

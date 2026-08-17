@@ -213,7 +213,7 @@ describe("calcularHsLogueoDiaADia", () => {
     expect(dias[30].nominaBase).toBe(37); // se mantiene el resto del mes
   });
 
-  it("eventosPorDia: la rampa de rotacion sigue calculandose sobre la nomina inicial original, no sobre la nomina con eventos", () => {
+  it("eventosPorDia: la rampa de rotacion se calcula sobre la nomina BASE del dia (con eventos acumulados), no sobre la nomina inicial constante", () => {
     const francoPorDiaSemana = { lunes: 0, martes: 0, miercoles: 0, jueves: 0, viernes: 0, sabado: 0, domingo: 0 };
     const conEvento = calcularHsLogueoDiaADia({
       nominaInicial: 100,
@@ -228,9 +228,9 @@ describe("calcularHsLogueoDiaADia", () => {
       francoPorDiaSemana,
       eventosPorDia: new Map([[5, -50]]),
     });
-    // dia 5: nominaBase=50, bajasRotacion = (0.1/10)*5*100 = 5 (sobre nominaInicial=100, no sobre 50)
-    expect(conEvento.dias[4].bajasRotacion).toBeCloseTo(5, 5);
-    expect(conEvento.dias[4].nominaActiva).toBeCloseTo(45, 5); // 50 - 5
+    // dia 5: nominaBase=50 (100-50), bajasRotacion = (0.1/10)*5*50 = 2.5 (sobre la nomina base del dia, no sobre los 100 originales)
+    expect(conEvento.dias[4].bajasRotacion).toBeCloseTo(2.5, 5);
+    expect(conEvento.dias[4].nominaActiva).toBeCloseTo(47.5, 5); // 50 - 2.5
   });
 
   it("sin eventosPorDia, el comportamiento es identico al de antes (nominaBase = nominaInicial todo el mes)", () => {

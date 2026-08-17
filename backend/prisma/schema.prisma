@@ -52,6 +52,7 @@ model Usuario {
   programaciones_creadas       ProgramacionMensual[]
   reductor_importaciones       ReductorImportacion[]
   franco_importaciones         FrancoImportacion[]
+  cp_importaciones             CpImportacion[]
   planificaciones_guardadas    PlanificacionGuardada[]
   agente_servicio_historial_creados  AgenteServicioHistorial[]
   agente_modalidad_historial_creados AgenteModalidadHistorial[]
@@ -707,6 +708,41 @@ model FrancoServicio {
 
   @@index([importacion_id])
   @@map("franco_servicios")
+}
+
+model CpImportacion {
+  id                  Int      @id @default(autoincrement())
+  mes                 Int
+  anio                Int
+  formato             String   // 'soporte' | 'ventas' | 'smb' | 'onboarding' | 'ppay'
+  nombre              String?
+  archivo_nombre      String?
+  importado_por       Int
+  fecha_importacion   DateTime @default(now())
+  fecha_actualizacion DateTime @updatedAt
+
+  importador Usuario      @relation(fields: [importado_por], references: [id])
+  servicios  CpServicio[]
+
+  @@index([mes, anio])
+  @@map("cp_importaciones")
+}
+
+model CpServicio {
+  id             Int    @id @default(autoincrement())
+  importacion_id Int
+  servicio       String
+  servicio_norm  String
+  dias_del_mes   Int    @default(0)
+  total_mes      Float  @default(0)
+  // MatrizServicio completa serializada (dias/matriz/hcMatrix/totalDiario),
+  // ver lib/domain/serializacion.ts para el formato exacto.
+  matriz         Json
+
+  importacion CpImportacion @relation(fields: [importacion_id], references: [id])
+
+  @@index([importacion_id])
+  @@map("cp_servicios")
 }
 
 model PlanificacionGuardada {

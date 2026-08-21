@@ -13,6 +13,7 @@ import { useFrancoConfig } from "@/store/useFrancoConfig";
 import { useResultados } from "@/store/useResultados";
 import { fmtPct } from "@/lib/utils/formato";
 import { cn } from "@/lib/utils/cn";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -34,12 +35,14 @@ const selectCls = "h-8 rounded-lg border border-gray-300 bg-white px-2 text-xs t
 const inputCls  = "w-20 h-8 bg-white border border-gray-300 rounded-lg px-2 text-xs text-gray-700 tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
 
 function descripcionOp(m: { tipo: string; servicio: string; servicioDestino?: string; cantidad: number; hsSemanal?: number; agenteNombre?: string; agenteDni?: string; deslogueoOverride?: number | null; ausentismoOverride?: number | null; rotacionOverride?: number | null }): string {
+  const servicio = obtenerNombreNomina(m.servicio, m.servicio);
+  const servicioDestino = m.servicioDestino ? obtenerNombreNomina(m.servicioDestino, m.servicioDestino) : undefined;
   switch (m.tipo) {
-    case "add_agents":      return `+${m.cantidad} personas a ${m.servicio} (${m.hsSemanal ?? 36}hs/sem)`;
-    case "remove_agents":   return `−${m.cantidad} bajas en ${m.servicio}`;
-    case "move_agents":     return `${m.cantidad} personas: ${m.servicio} → ${m.servicioDestino ?? "?"}`;
-    case "move_named_agent": return `${m.agenteNombre ?? m.agenteDni ?? "Agente"}: ${m.servicio} -> ${m.servicioDestino ?? "?"}`;
-    case "change_contract": return `Cambiar contrato de ${m.cantidad} personas en ${m.servicio} a ${m.hsSemanal ?? 36}hs`;
+    case "add_agents":      return `+${m.cantidad} personas a ${servicio} (${m.hsSemanal ?? 36}hs/sem)`;
+    case "remove_agents":   return `−${m.cantidad} bajas en ${servicio}`;
+    case "move_agents":     return `${m.cantidad} personas: ${servicio} → ${servicioDestino ?? "?"}`;
+    case "move_named_agent": return `${m.agenteNombre ?? m.agenteDni ?? "Agente"}: ${servicio} -> ${servicioDestino ?? "?"}`;
+    case "change_contract": return `Cambiar contrato de ${m.cantidad} personas en ${servicio} a ${m.hsSemanal ?? 36}hs`;
     default: return m.tipo;
   }
 }
@@ -206,7 +209,7 @@ function ReductoresEditor({ resultadosBase }: { resultadosBase: ResultadoServici
                     <tr key={r.servicio} className={cn("border-b border-gray-50", hasOverride && "bg-violet-50/40")}>
                       <td className="py-2 pr-4 font-medium text-gray-700 whitespace-nowrap">
                         {hasOverride && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-violet-500 inline-block" />}
-                        {r.servicio}
+                        {obtenerNombreNomina(r.servicio, r.servicio)}
                       </td>
                       <td className="py-2 px-2 text-center">
                         <input
@@ -669,7 +672,7 @@ export function SimuladorTable({ resultadosBase, resultadosSimulados }: Props) {
                 >
                   <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">
                     {filaModificada && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />}
-                    {base.servicio}
+                    {obtenerNombreNomina(base.servicio, base.servicio)}
                   </td>
                   <td className="px-4 py-3 tabular-nums text-gray-600 text-xs">
                     {base.hcActivos}

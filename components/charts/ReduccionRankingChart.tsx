@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { ResultadoServicio } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 
 interface Props {
   resultados: ResultadoServicio[];
@@ -172,7 +173,7 @@ export function ReduccionRankingChart({ resultados }: Props) {
             {data.map((r, i) => (
               <tr key={r.servicio} className={`border-b border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
                 <td className="px-4 py-2.5 text-gray-400 font-medium">{i + 1}</td>
-                <td className="px-4 py-2.5 font-medium text-gray-800">{r.servicio}</td>
+                <td className="px-4 py-2.5 font-medium text-gray-800">{obtenerNombreNomina(r.servicio, r.servicio)}</td>
                 <td className="px-4 py-2.5 tabular-nums text-red-500 font-medium">{r.deslogueo.toFixed(0)} hs</td>
                 <td className="px-4 py-2.5 tabular-nums text-amber-600 font-medium">{r.ausentismo.toFixed(0)} hs</td>
                 <td className="px-4 py-2.5 tabular-nums text-orange-500 font-medium">{r.rotacion.toFixed(0)} hs</td>

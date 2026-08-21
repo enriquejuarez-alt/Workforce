@@ -15,6 +15,7 @@ import {
 import type { ResultadoServicio } from "@/lib/domain/types";
 import { nivelCumplimiento } from "@/lib/domain/types";
 import { COLOR_NIVEL, fmtHoras } from "@/lib/utils/formato";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 
 interface Props {
   resultados: ResultadoServicio[];
@@ -35,7 +36,7 @@ const CustomTooltip = ({ active, payload }: TooltipProps) => {
     <div className="rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-xs shadow-xl shadow-gray-200/70">
       <div className="mb-2 flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <p className="font-bold text-gray-800">{d.servicio}</p>
+        <p className="font-bold text-gray-800">{obtenerNombreNomina(d.servicio, d.servicio)}</p>
       </div>
       <p className="text-2xl font-bold tabular-nums" style={{ color }}>
         {d.cumplimiento.toFixed(1)}%
@@ -61,7 +62,7 @@ const LEYENDA = [
 export function CumplimientoBarChart({ resultados }: Props) {
   const data = resultados.map((r) => ({
     ...r,
-    name: r.servicio.replace(/^SOPORTE[- ]?/i, ""),
+    name: obtenerNombreNomina(r.servicio, r.servicio).replace(/^SOPORTE[- ]?/i, ""),
     label: `${r.cumplimiento.toFixed(0)}%`,
   }));
   const maxCumplimiento = Math.max(120, ...data.map((r) => r.cumplimiento + 12));

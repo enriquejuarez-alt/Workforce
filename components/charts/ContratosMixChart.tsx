@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { Agente } from "@/lib/domain/types";
 import { SERVICIOS_KEYS } from "@/lib/domain/types";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 
 interface Props {
   agentes: Agente[];
@@ -19,6 +20,7 @@ interface Props {
 
 interface FilaServicio {
   servicio: string;
+  nombre: string;
   hs30: number;
   hs35: number;
   hs36: number;
@@ -47,7 +49,7 @@ function buildData(agentes: Agente[]): FilaServicio[] {
       hs35 * DIAS_DISPONIBLES[35] +
       hs36 * DIAS_DISPONIBLES[36] +
       otros * DIAS_DISPONIBLES[36];
-    return { servicio, hs30, hs35, hs36: hs36 + otros, total, hcEfectivo };
+    return { servicio, nombre: obtenerNombreNomina(servicio, servicio), hs30, hs35, hs36: hs36 + otros, total, hcEfectivo };
   }).filter((r) => r.total > 0);
 }
 
@@ -125,7 +127,7 @@ export function ContratosMixChart({ agentes }: Props) {
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} barSize={30} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
           <XAxis
-            dataKey="servicio"
+            dataKey="nombre"
             tick={{ fontSize: 11, fill: "#9ca3af" }}
             axisLine={false}
             tickLine={false}
@@ -165,7 +167,7 @@ export function ContratosMixChart({ agentes }: Props) {
               const eficiencia = r.total > 0 ? (r.hcEfectivo / r.total) * 100 : 0;
               return (
                 <tr key={r.servicio} className={`border-b border-gray-100 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
-                  <td className="px-4 py-2.5 font-medium text-gray-800">{r.servicio}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{obtenerNombreNomina(r.servicio, r.servicio)}</td>
                   <td className="px-4 py-2.5 tabular-nums">
                     <span className="font-medium text-emerald-600">{r.hs30}</span>
                   </td>

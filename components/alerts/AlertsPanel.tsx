@@ -4,6 +4,7 @@ import { AlertTriangle, AlertCircle, Info, ChevronDown, ChevronUp } from "lucide
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import type { Alerta, AlertSeveridad } from "@/lib/domain/types";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 
 interface Props {
   alertas: Alerta[];
@@ -57,11 +58,11 @@ function AlertaItem({ alerta, onServiceClick }: { alerta: Alerta; onServiceClick
                     onClick={(e) => { e.stopPropagation(); onServiceClick(alerta.servicio); }}
                     className="text-xs text-[#0054A6] border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded px-1.5 py-0.5 transition-colors"
                   >
-                    {alerta.servicio} →
+                    {obtenerNombreNomina(alerta.servicio, alerta.servicio)} →
                   </button>
                 ) : (
                   <span className="text-xs text-gray-500 border border-gray-200 bg-white rounded px-1.5 py-0.5">
-                    {alerta.servicio}
+                    {obtenerNombreNomina(alerta.servicio, alerta.servicio)}
                   </span>
                 )
               )}

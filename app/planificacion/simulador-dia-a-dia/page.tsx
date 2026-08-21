@@ -13,6 +13,7 @@ import {
   type TipoEventoDotacion,
 } from "@/store/useSimuladorDiaADia";
 import { simularDiaADiaServicio, calcularCumplimiento } from "@/lib/domain/calculos";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 import { deserializarMatrices } from "@/lib/domain/serializacion";
 import { planificacionesGuardadasApi } from "@/lib/api";
 import type { Agente, Reductor, FrancoServicioDatos, ResultadoGeneral, ServicioKey } from "@/lib/domain/types";
@@ -100,9 +101,11 @@ const selectCls = "h-8 rounded-lg border border-gray-300 bg-white px-2 text-xs t
 const inputCls = "w-20 h-8 bg-white border border-gray-300 rounded-lg px-2 text-xs text-gray-700 tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-[#0054A6]";
 
 function descripcionEvento(e: { tipo: TipoEventoDotacion; dia: number; cantidad: number; servicio: string; servicioDestino?: string }): string {
-  if (e.tipo === "alta") return `Día ${e.dia}: +${e.cantidad} altas en ${e.servicio}`;
-  if (e.tipo === "baja") return `Día ${e.dia}: −${e.cantidad} bajas en ${e.servicio}`;
-  return `Día ${e.dia}: ${e.cantidad} personas ${e.servicio} → ${e.servicioDestino ?? "?"}`;
+  const servicio = obtenerNombreNomina(e.servicio, e.servicio);
+  if (e.tipo === "alta") return `Día ${e.dia}: +${e.cantidad} altas en ${servicio}`;
+  if (e.tipo === "baja") return `Día ${e.dia}: −${e.cantidad} bajas en ${servicio}`;
+  const servicioDestino = e.servicioDestino ? obtenerNombreNomina(e.servicioDestino, e.servicioDestino) : "?";
+  return `Día ${e.dia}: ${e.cantidad} personas ${servicio} → ${servicioDestino}`;
 }
 
 export default function SimuladorDiaADiaPage() {

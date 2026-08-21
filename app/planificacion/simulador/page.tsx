@@ -24,6 +24,7 @@ import {
 import type { Agente, ResultadoServicio, ServicioKey } from "@/lib/domain/types";
 import { cn } from "@/lib/utils/cn";
 import { fmtPct } from "@/lib/utils/formato";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -287,7 +288,7 @@ function AlertasFranja({ resultadosSimulados, resultadosBase }: {
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-gray-800">{a.servicio}</span>
+                <span className="text-xs font-semibold text-gray-800">{obtenerNombreNomina(a.servicio, a.servicio)}</span>
                 <span className={cn("text-xs font-medium tabular-nums", a.cumplSim < 90 ? "text-red-600" : "text-amber-600")}>
                   {fmtPct(a.cumplSim)}
                 </span>
@@ -389,7 +390,7 @@ function ComparacionPanel({ resultadosActual }: {
                 const deltaCumpl = guard.cumplimiento - sim.cumplimiento;
                 return (
                   <tr key={sim.servicio} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-1.5 pr-3 font-medium text-gray-800">{sim.servicio}</td>
+                    <td className="py-1.5 pr-3 font-medium text-gray-800">{obtenerNombreNomina(sim.servicio, sim.servicio)}</td>
                     <td className="py-1.5 px-2 text-right tabular-nums text-gray-600">{sim.hcActivos}</td>
                     <td className="py-1.5 px-2 text-right tabular-nums font-semibold text-[#0054A6]">{guard.hcActivos}</td>
                     <td className={cn("py-1.5 px-2 text-right tabular-nums font-semibold", deltaHC > 0 ? "text-emerald-600" : deltaHC < 0 ? "text-red-600" : "text-gray-400")}>

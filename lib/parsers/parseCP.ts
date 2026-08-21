@@ -90,8 +90,28 @@ export function parseCPConServicios(
       continue;
     }
 
-    const filaDiaSemana = raw[0] as (string | number)[];
-    const filaFechas = raw[1] as (string | number)[];
+    // La fila de fechas no esta siempre en el indice 1: algunos formatos
+    // (ej. "CP VentasWA", ciertas hojas de Onboarding) traen una o mas filas
+    // extra de encabezado antes ("KONECTA", una fila en blanco, etc.), lo que
+    // corria todo un indice y hacia que el parser leyera la fila de dia-de-
+    // semana como si fuera de fechas — 0 fechas validas, dias.length=0,
+    // totalMes=0 en silencio (ver investigacion Ventas/Onboarding). Se busca
+    // la fila con mas celdas numericas en rango de fecha Excel valida (fechas
+    // de ~2000 a ~2199) entre las primeras 10 filas; la fila de dia-de-semana
+    // es siempre la inmediata anterior.
+    const esFechaSerial = (v: unknown): boolean =>
+      typeof v === "number" && v > 36526 && v < 109575;
+    let filaFechasIdx = 1;
+    let mejorConteo = 0;
+    for (let i = 0; i < Math.min(10, raw.length); i++) {
+      const conteo = (raw[i] as unknown[]).filter(esFechaSerial).length;
+      if (conteo > mejorConteo) {
+        mejorConteo = conteo;
+        filaFechasIdx = i;
+      }
+    }
+    const filaDiaSemana = (raw[filaFechasIdx - 1] ?? []) as (string | number)[];
+    const filaFechas = raw[filaFechasIdx] as (string | number)[];
 
     const dias = [];
     const columnasValidas: number[] = [];
@@ -111,6 +131,13 @@ export function parseCPConServicios(
       columnasValidas.push(col);
     }
 
+    // La columna de la etiqueta de franja horaria ("00:00", "Total", etc.)
+    // tampoco esta siempre en la columna 0 — en los mismos formatos con
+    // encabezado corrido, tambien viene corrida (ej. columna 2 en vez de 0).
+    // Es siempre la columna inmediata anterior a la primera columna de fecha
+    // valida.
+    const columnaEtiqueta = columnasValidas.length > 0 ? columnasValidas[0] - 1 : 0;
+
     if (dias.length > diasDelMes) diasDelMes = dias.length;
 
     if (dias.length > 0) {
@@ -122,14 +149,14 @@ export function parseCPConServicios(
     const matriz: number[][] = [];
     const totalDiario: number[] = Array(dias.length).fill(0);
 
-    // Empieza a buscar desde la fila 2: las filas 0 (dia de semana) y 1 (fechas)
-    // son siempre encabezado fijo (ya extraidas arriba). Si se busca desde la
-    // fila 0, una celda vacia en la esquina de la fila de fechas se lee como
-    // 0 (por el defval:0 de sheet_to_json) y matchea falsamente como franja
-    // "00:00", corriendo toda la matriz una fila y arruinando el total.
+    // Empieza a buscar justo despues de la fila de fechas (que ya no esta
+    // fija en el indice 1 — ver arriba). Si se busca desde antes, una celda
+    // vacia en la esquina de la fila de fechas se lee como 0 (por el
+    // defval:0 de sheet_to_json) y matchea falsamente como franja "00:00",
+    // corriendo toda la matriz una fila y arruinando el total.
     let filaInicioMatriz = -1;
-    for (let i = 2; i < raw.length; i++) {
-      if (esFranjaHoraria(raw[i]?.[0])) {
+    for (let i = filaFechasIdx + 1; i < raw.length; i++) {
+      if (esFranjaHoraria(raw[i]?.[columnaEtiqueta])) {
         filaInicioMatriz = i;
         break;
       }
@@ -140,7 +167,7 @@ export function parseCPConServicios(
     }
 
     for (let fila = filaInicioMatriz; fila < raw.length; fila++) {
-      const celdaRaw = raw[fila][0];
+      const celdaRaw = raw[fila][columnaEtiqueta];
       const primeraCelda = String(celdaRaw ?? "").trim().toLowerCase();
       if (primeraCelda.includes("total") || primeraCelda.includes("horas")) {
         for (let i = 0; i < columnasValidas.length; i++) {
@@ -165,6 +192,24 @@ export function parseCPConServicios(
     const hcMatrix: number[][] = matriz.map((fila) =>
       fila.map((v) => (formato === "hs" ? v / 0.5 : v))
     );
+
+    // Si la hoja no trae una fila "Total"/"Horas" explícita, totalDiario queda
+    // en 0 para todos los días (nunca se llenó en el loop de arriba). totalMes
+    // lo compensa sumando toda la matriz de una, pero totalDiario en cero por
+    // día rompe en silencio calcularFrancoFeriados (lib/domain/hsLogueoDiaADia.ts),
+    // que necesita el requerido POR DÍA para comparar un feriado contra el
+    // promedio de días similares — sin eso, el ajuste de feriado nunca se
+    // aplica (ver investigación BO GC julio 2026: la app no detectaba el
+    // cierre total de un feriado nacional porque totalDiario nunca se derivó
+    // de la matriz para esta hoja de una-sola-hoja-por-servicio).
+    if (totalDiario.every((v) => v === 0)) {
+      for (let i = 0; i < columnasValidas.length; i++) {
+        totalDiario[i] =
+          formato === "hc"
+            ? hcMatrix.reduce((sum, fila) => sum + (fila[i] ?? 0) * 0.5, 0)
+            : matriz.reduce((sum, fila) => sum + (fila[i] ?? 0), 0);
+      }
+    }
 
     // totalMes siempre en HORAS para compatibilidad con cumplimiento
     // Si CP tiene HC: total = Σ(hcReq × 0.5) para cada celda

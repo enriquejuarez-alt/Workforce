@@ -19,7 +19,9 @@ import { SERVICIOS_RETENCION } from "@/lib/config/servicesRetencion";
 import { SERVICIOS_MOVIL } from "@/lib/config/servicesMovil";
 import { SERVICIOS_HOGAR_CONVERGENTE } from "@/lib/config/servicesHogarConvergente";
 import { SERVICIOS_HOGAR_NOCONVERGENTE } from "@/lib/config/servicesHogarNoConvergente";
+import { SERVICIOS_BO } from "@/lib/config/servicesBo";
 import type { MatrizServicio, ServicioKey } from "@/lib/domain/types";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 import { MESES } from "@/types";
 
 const ANIO_ACTUAL = new Date().getFullYear();
@@ -31,6 +33,7 @@ const FORMATOS_ELEGIBLES = [
   { value: "smb", label: "SMB" },
   { value: "onboarding", label: "Onboarding" },
   { value: "ppay", label: "Personal Pay" },
+  { value: "bo", label: "Back Office (BO GC)" },
 ] as const;
 
 type Formato = (typeof FORMATOS_ELEGIBLES)[number]["value"];
@@ -44,6 +47,14 @@ const FORMATOS = [
 // mas estricta (una sola hoja obligatoria puntual, sin ambiguedad posible)
 // van primero; "soporte" (el universo General, mucho mas amplio) va al
 // final para minimizar falsos positivos.
+//
+// "bo" queda AFUERA de la deteccion automatica a proposito (aunque es un
+// formato elegible a mano en el selector): su hojaCP ("Hoja1"/"Konecta",
+// ver servicesBo.ts) es el mismo alias placeholder que usan TECH y
+// Integral Movil AMBA/Interior (servicesTech.ts, servicesIntegral.ts) —
+// si "bo" entrara al auto-detect, un CP de TECH o Integral con una sola
+// hoja "Hoja1" quedaria mal-taggeado como Back Office en silencio, en vez
+// de rechazarse como corresponde. Forzar "bo" a mano evita esa ambiguedad.
 const ORDEN_DETECCION: Formato[] = ["ventas", "smb", "onboarding", "ppay", "soporte"];
 
 // La mayoria de las islas (Soporte Tecnico, Retencion, Movil, Hogares
@@ -113,6 +124,19 @@ function parsearPorFormato(formato: Formato, buffer: ArrayBuffer): {
     const errValidacion = validarHojasCPPpay(hojas);
     if (errValidacion.length > 0) return { matrices: new Map(), diasDelMes: 0, errores: errValidacion };
     const resultado = parseCPPpay(buffer);
+    return { ...resultado, errores: sinAvisosDeHojaFaltante(resultado.errores) };
+  }
+  if (formato === "bo") {
+    const hojas = getSheetNames(buffer);
+    const errValidacion = validarHojasCPConServicios(hojas, SERVICIOS_BO);
+    if (errValidacion.length === SERVICIOS_BO.length) {
+      return {
+        matrices: new Map(),
+        diasDelMes: 0,
+        errores: ["No se reconoció la hoja de Back Office en el archivo — verificá que traiga la hoja 'Hoja1' / 'BO GC' / 'Back Office' / 'Konecta'."],
+      };
+    }
+    const resultado = parseCPConServicios(buffer, SERVICIOS_BO);
     return { ...resultado, errores: sinAvisosDeHojaFaltante(resultado.errores) };
   }
   const hojas = getSheetNames(buffer);
@@ -456,7 +480,7 @@ export default function CpPage() {
                             <tbody>
                               {detalle?.servicios?.map((s) => (
                                 <tr key={s.id} className="border-t border-slate-100">
-                                  <td className="py-1 pr-2 font-medium text-slate-700">{s.servicio}</td>
+                                  <td className="py-1 pr-2 font-medium text-slate-700">{obtenerNombreNomina(s.servicio, s.servicio)}</td>
                                   <td className="py-1 pr-2 text-right text-slate-500">{s.dias_del_mes}</td>
                                   <td className="py-1 pr-2 text-right text-slate-500">{s.total_mes.toFixed(1)}</td>
                                 </tr>

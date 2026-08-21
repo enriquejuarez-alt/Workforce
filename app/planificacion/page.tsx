@@ -68,6 +68,9 @@ import { SERVICIOS_RETENCION } from "@/lib/config/servicesRetencion";
 import { SERVICIOS_BO } from "@/lib/config/servicesBo";
 import { SERVICIOS_TECH } from "@/lib/config/servicesTech";
 import { SERVICIOS_INTEGRAL } from "@/lib/config/servicesIntegral";
+import { SERVICIOS_APGC } from "@/lib/config/servicesApgc";
+import { SERVICIOS_IMPLEMENTACION_TECNICA } from "@/lib/config/servicesImplementacionTecnica";
+import { SERVICIOS_MIGRACION_GENERAL } from "@/lib/config/servicesMigracionGeneral";
 import { SERVICIOS_VENTAS } from "@/lib/config/servicesVentas";
 import { SERVICIOS_SMB } from "@/lib/config/servicesSmb";
 import { SERVICIOS_ONB } from "@/lib/config/servicesOnb";
@@ -124,6 +127,9 @@ const SERVICIOS_DEMO: ServicioNominaRef[] = [
   { id: -17, nombre: "Movil", planiConfig: null },
   { id: -18, nombre: "Hogares Convergentes", planiConfig: null },
   { id: -19, nombre: "Hogares No Convergentes", planiConfig: null },
+  { id: -20, nombre: "Atención Personalizada Grandes Clientes", planiConfig: null },
+  { id: -21, nombre: "Implementación Técnica", planiConfig: null },
+  { id: -22, nombre: "Migración (general)", planiConfig: null },
 ];
 
 const fade = {
@@ -323,6 +329,14 @@ export default function UploadPage() {
   const esIntegralMovilInterior = reqServicioId === -10 ||
     (normalizar(servicioActivo?.nombre ?? "").includes("integral movil") &&
       normalizar(servicioActivo?.nombre ?? "").includes("interior"));
+  const esApgc = reqServicioId === -20 ||
+    normalizar(servicioActivo?.nombre ?? "") === "apgc" ||
+    normalizar(servicioActivo?.nombre ?? "").includes("atencion personalizada grandes clientes");
+  const esImplementacionTecnica = reqServicioId === -21 ||
+    normalizar(servicioActivo?.nombre ?? "").includes("implementacion tecnica");
+  const esMigracionGeneral = reqServicioId === -22 ||
+    normalizar(servicioActivo?.nombre ?? "") === "migracion general" ||
+    normalizar(servicioActivo?.nombre ?? "") === "migracion (general)";
   const esVentas = reqServicioId === -13 || reqServicioId === -14 || reqServicioId === -15 ||
     (servicioActivo?.nombre ?? "").toLowerCase().startsWith("ventas");
 
@@ -337,7 +351,15 @@ export default function UploadPage() {
         ? "onboarding"
         : esVentas
           ? "ventas"
-          : "soporte";
+          : esBoGc
+            ? "bo"
+            : esApgc
+              ? "apgc"
+              : esImplementacionTecnica
+                ? "implementacion-tecnica"
+                : esMigracionGeneral
+                  ? "migracion-general"
+                  : "soporte";
 
   const { data: cpsGuardados = [], isLoading: loadingCpsGuardados } = useQuery({
     queryKey: ["cp-guardados"],
@@ -510,6 +532,9 @@ export default function UploadPage() {
       ...SERVICIOS_BO,
       ...SERVICIOS_TECH,
       ...SERVICIOS_INTEGRAL,
+      ...SERVICIOS_APGC,
+      ...SERVICIOS_IMPLEMENTACION_TECNICA,
+      ...SERVICIOS_MIGRACION_GENERAL,
     ];
     const label = normalizar(servicioActivo?.planiConfig?.label ?? servicioActivo?.nombre ?? "");
     const selectedKey = servicioActivo?.planiConfig?.key ?? null;
@@ -525,6 +550,9 @@ export default function UploadPage() {
       esTech ||
       esIntegralMovilAmba ||
       esIntegralMovilInterior ||
+      esApgc ||
+      esImplementacionTecnica ||
+      esMigracionGeneral ||
       esVentas ||
       Boolean(selectedKey);
 
@@ -539,6 +567,10 @@ export default function UploadPage() {
       keysSeleccionadas.add("INTEGRAL-MOVIL-AMBA");
     } else if (label.includes("integral movil") && label.includes("interior")) {
       keysSeleccionadas.add("INTEGRAL-MOVIL-INTERIOR");
+    } else if (label === "apgc" || label.includes("atencion personalizada grandes clientes")) {
+      keysSeleccionadas.add("APGC");
+    } else if (label.includes("implementacion tecnica")) {
+      keysSeleccionadas.add("IMPLEMENTACION-TECNICA");
     } else if (selectedKey) {
       keysSeleccionadas.add(selectedKey);
     } else if (label.includes("personal pay") || label.includes("ppay")) {
@@ -603,6 +635,9 @@ export default function UploadPage() {
     esTech,
     esIntegralMovilAmba,
     esIntegralMovilInterior,
+    esApgc,
+    esImplementacionTecnica,
+    esMigracionGeneral,
     esVentas,
   ]);
 
@@ -630,7 +665,13 @@ export default function UploadPage() {
                     ? "Konecta Integral AMBA Julio.xlsx"
                     : esIntegralMovilInterior
                       ? "Konecta Integral INTERIOR Julio.xlsx"
-                      : reqServicioId === -13
+                      : esApgc
+                        ? "Konecta APGC Julio.xlsx"
+                        : esImplementacionTecnica
+                          ? "Konecta Implementacion Tecnica Julio.xlsx"
+                          : esMigracionGeneral
+                            ? "Konecta Migracion Julio.xlsx"
+                            : reqServicioId === -13
                         ? "CP_VentasWA_MM-AAAA.xls"
                         : reqServicioId === -14
                           ? "CP_VentasWAHogar_MM-AAAA.xls"

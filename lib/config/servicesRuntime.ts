@@ -12,6 +12,9 @@ import { SERVICIOS_VENTAS } from "./servicesVentas";
 import { SERVICIOS_MOVIL } from "./servicesMovil";
 import { SERVICIOS_HOGAR_CONVERGENTE } from "./servicesHogarConvergente";
 import { SERVICIOS_HOGAR_NOCONVERGENTE } from "./servicesHogarNoConvergente";
+import { SERVICIOS_APGC } from "./servicesApgc";
+import { SERVICIOS_IMPLEMENTACION_TECNICA } from "./servicesImplementacionTecnica";
+import { SERVICIOS_MIGRACION_GENERAL } from "./servicesMigracionGeneral";
 import { usePlaniConfig } from "@/store/usePlaniConfig";
 import { useFrancoConfig } from "@/store/useFrancoConfig";
 
@@ -43,6 +46,9 @@ export function getServiciosActivos(): ServiceDefinition[] {
   if (selectedServicioKey === "-17") return SERVICIOS_MOVIL;
   if (selectedServicioKey === "-18") return SERVICIOS_HOGAR_CONVERGENTE;
   if (selectedServicioKey === "-19") return SERVICIOS_HOGAR_NOCONVERGENTE;
+  if (selectedServicioKey === "-20") return SERVICIOS_APGC;
+  if (selectedServicioKey === "-21") return SERVICIOS_IMPLEMENTACION_TECNICA;
+  if (selectedServicioKey === "-22") return SERVICIOS_MIGRACION_GENERAL;
 
   const { serviciosNomina } = usePlaniConfig.getState();
   if (!serviciosNomina || serviciosNomina.length === 0) return SERVICIOS;
@@ -62,6 +68,9 @@ export function getServiciosActivos(): ServiceDefinition[] {
     if (nombre === "tech" || nombre.includes("tech admin")) return SERVICIOS_TECH;
     if (nombre.includes("integral movil") && nombre.includes("amba")) return [SERVICIOS_INTEGRAL[0]];
     if (nombre.includes("integral movil") && nombre.includes("interior")) return [SERVICIOS_INTEGRAL[1]];
+    if (nombre === "apgc" || nombre.includes("atencion personalizada grandes clientes")) return SERVICIOS_APGC;
+    if (nombre.includes("implementacion tecnica")) return SERVICIOS_IMPLEMENTACION_TECNICA;
+    if (nombre === "migracion") return SERVICIOS_MIGRACION_GENERAL;
     if (!selected.planiConfig && nombre.startsWith("ventas")) {
       const specific = SERVICIOS_VENTAS.find(
         (s) =>

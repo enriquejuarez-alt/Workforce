@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type { ResultadoServicio } from "@/lib/domain/types";
+import { obtenerNombreNomina } from "@/lib/config/nombresNomina";
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const BLUE_HEADER  = "FF1F4E79";
@@ -152,10 +153,10 @@ function buildEstadoActualSheet(
   ws.getRow(row).height = 16;
   const headers: [number, string, RGB][] = [
     [CA.SERVICIO,   "Servicio",         BLUE_LIGHT],
-    [CA.HS_REQ,     "Hs Requeridas",    BLUE_LIGHT],
-    [CA.HS_NETAS,   "Hs Netas",         BLUE_LIGHT],
+    [CA.HS_REQ,     "Requeridas",       BLUE_LIGHT],
+    [CA.HS_NETAS,   "Netas",            BLUE_LIGHT],
     [CA.DIFERENCIA, "Diferencia",       BLUE_LIGHT],
-    [CA.FALTANTE,   "Hs Faltantes ↓",  RED_MID],
+    [CA.FALTANTE,   "Faltantes ↓",     RED_MID],
     [CA.AG_APROX,   "Ag. para 103%",    BLUE_LIGHT],
     [CA.DESLOGUEO,  "Deslogueo",        ORANGE_DARK],
     [CA.AUSENTISMO, "Ausentismo",       ORANGE_DARK],
@@ -189,7 +190,7 @@ function buildEstadoActualSheet(
       c.border = border();
     };
 
-    setCel(CA.SERVICIO,   b.servicio,                              { bold: true, align: "left", color: "FF1F4E79" });
+    setCel(CA.SERVICIO,   obtenerNombreNomina(b.servicio, b.servicio), { bold: true, align: "left", color: "FF1F4E79" });
     setCel(CA.HS_REQ,     num(b.hsRequeridas));
     setCel(CA.HS_NETAS,   num(b.hsNetas));
     setCel(CA.DIFERENCIA, num(dif),                                { color: dif >= 0 ? GREEN_HEADER : RED_MID });
@@ -329,11 +330,11 @@ function buildSimuladoSheet(
   ws.getRow(row).height = 16;
   const headers: [number, string, RGB][] = [
     [CS.SERVICIO,     "Servicio",         BLUE_LIGHT],
-    [CS.HS_REQ,       "Hs Requeridas",    BLUE_LIGHT],
-    [CS.HS_NETAS_ACT, "Hs Netas (actual)", BLUE_LIGHT],
-    [CS.HS_NETAS_SIM, "Hs Netas (sim)",   GREEN_HEADER],
+    [CS.HS_REQ,       "Requeridas",       BLUE_LIGHT],
+    [CS.HS_NETAS_ACT, "Netas (actual)",   BLUE_LIGHT],
+    [CS.HS_NETAS_SIM, "Netas (sim)",      GREEN_HEADER],
     [CS.DIFER_SIM,    "Diferencia",       GREEN_HEADER],
-    [CS.FALT_SIM,     "Hs Faltantes ↓",  RED_MID],
+    [CS.FALT_SIM,     "Faltantes ↓",     RED_MID],
     [CS.AG_SIM,       "Ag. para 103%",    GREEN_HEADER],
     [CS.CUMPL_ACT,    "Cumpl. actual",    GRAY_DARK],
     [CS.CUMPL_SIM,    "Cumpl. simulado",  GRAY_DARK],
@@ -368,7 +369,7 @@ function buildSimuladoSheet(
       c.border = border();
     };
 
-    set(CS.SERVICIO,     b.servicio,                                  { bold: true, align: "left", color: "FF1F4E79" });
+    set(CS.SERVICIO,     obtenerNombreNomina(b.servicio, b.servicio),   { bold: true, align: "left", color: "FF1F4E79" });
     set(CS.HS_REQ,       num(b.hsRequeridas));
     set(CS.HS_NETAS_ACT, num(b.hsNetas),                              { color: "FF555555" });
     set(CS.HS_NETAS_SIM, num(s.hsNetas),                              { bold: changed, color: changed ? GREEN_HEADER : "FF555555" });
@@ -500,13 +501,13 @@ function buildBrechasSheet(
     ws.mergeCells(row, 1, row, 8); row++;
   } else {
     addColHeaders(
-      ["Servicio", "Hs Requeridas", "Hs Disponibles", "Hs Faltantes", "Cumplimiento", "Personas necesarias", "Ag. 36 hs", "Ag. 30 hs"],
+      ["Servicio", "Requeridas", "Disponibles", "Faltantes", "Cumplimiento", "Personas necesarias", "Ag. 36 hs", "Ag. 30 hs"],
       [RED_HEADER, RED_HEADER, RED_HEADER, "FFA00000", RED_HEADER, RED_HEADER, RED_HEADER, RED_HEADER]
     );
     enDeficit.forEach((b, i) => {
       const eq = b.agentesEquivalentes;
       addDataRow(
-        [b.servicio, num(b.hsRequeridas), num(b.hsNetas), num(b.faltante), pct(b.cumplimiento), Math.ceil(eq.mix), Math.ceil(eq.hs36), Math.ceil(eq.hs30)],
+        [obtenerNombreNomina(b.servicio, b.servicio), num(b.hsRequeridas), num(b.hsNetas), num(b.faltante), pct(b.cumplimiento), Math.ceil(eq.mix), Math.ceil(eq.hs36), Math.ceil(eq.hs30)],
         ["FF1F4E79", "FF000000", "FF000000", WHITE, WHITE, WHITE, "FF000000", "FF000000"],
         [null, null, null, RED_MID, RED_MID, RED_MID, RED_SOFT, RED_SOFT],
         i % 2 === 0
@@ -527,7 +528,7 @@ function buildBrechasSheet(
   addBanner("IMPACTO EN FACTURACIÓN", BLUE_HEADER, 7);
   const hasRecorte = base.some((b) => b.recorte > 0);
   addColHeaders(
-    ["Servicio", "Hs Requeridas", "Tope (cap)", "Hs Netas", "Teórico Facturable", "Recorte", "Cumplimiento"],
+    ["Servicio", "Requeridas", "Tope (cap)", "Netas", "Teórico Facturable", "Recorte", "Cumplimiento"],
     [BLUE_LIGHT, BLUE_LIGHT, BLUE_LIGHT, BLUE_LIGHT, GREEN_HEADER, VIOLET_DARK, GRAY_DARK]
   );
   const allServices = [...base].sort((a, b) => a.faltante - b.faltante || b.recorte - a.recorte);
@@ -535,7 +536,7 @@ function buildBrechasSheet(
     const tieneRecorte  = b.recorte > 0;
     const tieneFaltante = b.faltante > 0;
     addDataRow(
-      [b.servicio, num(b.hsRequeridas), num(b.tope), num(b.hsNetas), num(b.teoricoFacturable), tieneRecorte ? num(b.recorte) : "—", pct(b.cumplimiento)],
+      [obtenerNombreNomina(b.servicio, b.servicio), num(b.hsRequeridas), num(b.tope), num(b.hsNetas), num(b.teoricoFacturable), tieneRecorte ? num(b.recorte) : "—", pct(b.cumplimiento)],
       ["FF1F4E79", "FF000000", "FF555555", "FF000000", WHITE, tieneRecorte ? WHITE : "FF888888", cumplColor(b.cumplimiento)],
       [null, null, null, tieneFaltante ? RED_SOFT : null, GREEN_SOFT, tieneRecorte ? VIOLET_SOFT : null, null],
       i % 2 === 0
@@ -559,7 +560,7 @@ function buildBrechasSheet(
   if (criticos.length > 0) {
     ws.getRow(row).height = 14;
     const alert = ws.getCell(row, 1);
-    alert.value = `⚠ ${criticos.length} servicio${criticos.length !== 1 ? "s" : ""} con cumplimiento crítico (<90%): ${criticos.map((b) => b.servicio).join(", ")}`;
+    alert.value = `⚠ ${criticos.length} servicio${criticos.length !== 1 ? "s" : ""} con cumplimiento crítico (<90%): ${criticos.map((b) => obtenerNombreNomina(b.servicio, b.servicio)).join(", ")}`;
     alert.font  = { bold: true, size: 10, color: { argb: WHITE }, name: "Calibri" };
     alert.fill  = fill("FFCC0000");
     alert.alignment = { horizontal: "left", vertical: "middle" };
@@ -595,7 +596,7 @@ function buildResumenSheet(
   ws.mergeCells(row, 1, row, 6); row++;
 
   ws.getRow(row).height = 14;
-  ["Servicio", "Hs Req.", "Faltantes", "Cumpl. actual", "Cumpl. sim.", "Δ pp"].forEach((h, i) => {
+  ["Servicio", "Req.", "Faltantes", "Cumpl. actual", "Cumpl. sim.", "Δ pp"].forEach((h, i) => {
     const c = ws.getCell(row, i + 1);
     c.value = h; c.font = headerFont(); c.fill = fill(BLUE_LIGHT);
     c.alignment = { horizontal: i === 0 ? "left" : "center", vertical: "middle" };
@@ -611,7 +612,7 @@ function buildResumenSheet(
 
     ws.getRow(row).height = 13;
     const vals: [number, ExcelJS.CellValue, RGB, RGB][] = [
-      [1, b.servicio,                                              "FF1F4E79", bg],
+      [1, obtenerNombreNomina(b.servicio, b.servicio),                "FF1F4E79", bg],
       [2, num(b.hsRequeridas),                                    "FF000000", bg],
       [3, b.faltante > 0 ? num(b.faltante) : "—",               b.faltante > 0 ? RED_MID : "FF888888", faltBg],
       [4, pct(b.cumplimiento),                                    cumplColor(b.cumplimiento), bg],
@@ -677,9 +678,9 @@ function buildReductoresSheet(
     ["Deslogueo",     ORANGE_DARK],
     ["Ausentismo",    ORANGE_DARK],
     ["Rotación",      ORANGE_DARK],
-    ["Hs Brutas",     BLUE_LIGHT],
-    ["Hs Netas",      BLUE_LIGHT],
-    ["Hs Impactadas", RED_HEADER],
+    ["Brutas",        BLUE_LIGHT],
+    ["Netas",         BLUE_LIGHT],
+    ["Impactadas",    RED_HEADER],
   ];
   cols.forEach(([label, bg], i) => {
     const c = ws.getCell(row, i + 1);
@@ -704,7 +705,7 @@ function buildReductoresSheet(
       c.border = border();
     };
 
-    set(1, b.servicio,                              "FF1F4E79", undefined, true);
+    set(1, obtenerNombreNomina(b.servicio, b.servicio), "FF1F4E79", undefined, true);
     set(2, pct(b.reductoRes.deslogueo  * 100),     "FF000000", idx % 2 === 0 ? "FFFFF8F0" : "FFFEF0E0");
     set(3, pct(b.reductoRes.ausentismo * 100),     "FF000000", idx % 2 === 0 ? "FFFFF8F0" : "FFFEF0E0");
     set(4, pct(b.reductoRes.rotacion   * 100),     "FF000000", idx % 2 === 0 ? "FFFFF8F0" : "FFFEF0E0");

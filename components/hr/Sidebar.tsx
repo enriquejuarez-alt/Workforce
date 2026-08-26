@@ -51,6 +51,7 @@ const WALT_ITEMS = [
   { to: '/planificacion/nomina-general', icon: Users,        label: 'Nómina General' },
   { to: '/planificacion/cp',          icon: FileSpreadsheet, label: 'CPs guardados' },
   { to: '/planificacion/francos',     icon: CalendarClock,   label: 'Francos y contratos' },
+  { to: '/planificacion/licencias-paga', icon: ClipboardList, label: 'Licencias (paga/no paga)' },
   { to: '/planificacion/resumen',     icon: LayoutDashboard, label: 'Resumen' },
   { to: '/planificacion/analisis',    icon: BarChart2,       label: 'Análisis' },
   { to: '/planificacion/curvas',      icon: TrendingUp,      label: 'Curvas' },

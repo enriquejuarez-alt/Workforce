@@ -3,7 +3,7 @@ import type {
   Usuario, Servicio, UsuarioServicioPermiso, Agente, NominaMensual,
   AgenteNominaMensual, Licencia, LicenciaImportacion, CambioServicioTemporal, ImportacionNomina,
   AuditoriaLog, DashboardData, ExcelPreview, HistoricoBaja, CambioContrato, CambioHorario, Capacitacion, Remocion,
-  Vacacion, VacacionImportacion, CalendarioEvento, TimelineEvento,
+  Vacacion, VacacionImportacion, LicenciaPaga, LicenciaPagaImportacion, CalendarioEvento, TimelineEvento,
   ProgramacionMensual, FactorReduccion, SimulacionResponse, CronogramaResponse,
   ReductorImportacion, ReductorServicioRow, FrancoImportacion, FrancoServicioRow, AgenteServicioHistorial,
   HistorialServicioImportacion, CpImportacion,
@@ -318,6 +318,19 @@ export const vacacionesApi = {
   importaciones: () => api.get<VacacionImportacion[]>('/vacaciones/importaciones'),
   delete: (id: number) => api.delete(`/vacaciones/${id}`),
   deleteImportacion: (id: number) => api.delete(`/vacaciones/importaciones/${id}`),
+}
+
+// Licencias con condicion de pago (paga/no paga) - motor dia a dia de Planificacion
+export const licenciasPagaApi = {
+  list: (params?: Record<string, any>) => api.get<LicenciaPaga[]>('/licencias-paga', { params }),
+  import: (formData: FormData) =>
+    api.post<{ ok: boolean; total_periodos: number; agentes_encontrados: number; agentes_no_encontrados: number }>(
+      '/licencias-paga/import',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ),
+  importaciones: () => api.get<LicenciaPagaImportacion[]>('/licencias-paga/importaciones'),
+  deleteImportacion: (id: number) => api.delete(`/licencias-paga/importaciones/${id}`),
 }
 
 // Reductores guardados (Planificación)

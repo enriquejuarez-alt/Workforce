@@ -105,6 +105,9 @@ export default function FrancosPage() {
             Horas/Días/Lunes..Domingo) — se detecta automáticamente. Si un servicio no tiene francos
             cargados para el mes, se usa el cálculo plano como antes.
           </p>
+          <a href="/planificacion/licencias-paga" className="mt-2 inline-block text-xs font-medium text-[#0054A6] hover:underline">
+            Cargar condición de pago de licencias (LP paga/no paga) →
+          </a>
         </div>
 
         {/* Subir nueva */}

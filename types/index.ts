@@ -430,6 +430,31 @@ export interface Vacacion {
   estado_calculado?: 'VIGENTE' | 'PROGRAMADA' | 'FINALIZADA'
 }
 
+export interface LicenciaPagaImportacion {
+  id: number
+  archivo_nombre: string
+  importado_por: number
+  importador?: Pick<Usuario, 'id' | 'nombre'>
+  fecha_importacion: string
+  total_periodos: number
+  agentes_encontrados: number
+  agentes_no_encontrados: number
+  _count?: { licencias: number }
+}
+
+export interface LicenciaPaga {
+  id: number
+  agente_id: number | null
+  agente_dni: string
+  agente_nombre: string
+  servicio_wf: string | null
+  pagada: boolean
+  fecha_desde: string
+  fecha_hasta: string
+  importacion_id: number
+  fecha_creacion: string
+}
+
 export interface ReductorImportacion {
   id: number
   mes: number

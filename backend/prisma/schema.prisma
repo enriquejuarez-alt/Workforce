@@ -49,6 +49,7 @@ model Usuario {
   capacitaciones_creadas       Capacitacion[]
   capacitaciones_a_cargo       Capacitacion[]           @relation("CapacitacionCapacitador")
   vacacion_importaciones       VacacionImportacion[]
+  licencia_paga_importaciones  LicenciaPagaImportacion[]
   programaciones_creadas       ProgramacionMensual[]
   reductor_importaciones       ReductorImportacion[]
   franco_importaciones         FrancoImportacion[]
@@ -158,6 +159,7 @@ model Agente {
   bajas              HistoricoBaja[]
   remociones         Remocion[]
   vacaciones         Vacacion[]
+  licencias_paga     LicenciaPaga[]
   servicio_historial  AgenteServicioHistorial[]
   modalidad_historial AgenteModalidadHistorial[]
   superior_historial  AgenteSuperiorHistorial[]
@@ -589,6 +591,47 @@ model Vacacion {
   @@index([agente_dni])
   @@index([importacion_id])
   @@map("vacaciones")
+}
+
+// Licencias vigentes con su condicion de pago (SI/NO), importadas desde el
+// reporte "LP AL <fecha>" de RRHH. Distinto de `Licencia` (altas/bajas del HR
+// module): esto es especificamente para el motor dia a dia de Planificacion,
+// que necesita saber si una LP cuenta como nomina paga o no en un dia de
+// cierre total (ver `lib/domain/hsLogueoDiaADia.ts` — LP paga se suma al
+// franco del cierre, LP no paga queda directamente afuera del calculo).
+model LicenciaPagaImportacion {
+  id                     Int      @id @default(autoincrement())
+  archivo_nombre         String
+  importado_por          Int
+  fecha_importacion      DateTime @default(now())
+  total_periodos         Int      @default(0)
+  agentes_encontrados    Int      @default(0)
+  agentes_no_encontrados Int      @default(0)
+
+  importador Usuario        @relation(fields: [importado_por], references: [id])
+  licencias  LicenciaPaga[]
+
+  @@map("licencia_paga_importaciones")
+}
+
+model LicenciaPaga {
+  id             Int      @id @default(autoincrement())
+  agente_id      Int?
+  agente_dni     String
+  agente_nombre  String
+  servicio_wf    String?
+  pagada         Boolean
+  fecha_desde    DateTime @db.Date
+  fecha_hasta    DateTime @db.Date
+  importacion_id Int
+  fecha_creacion DateTime @default(now())
+
+  agente      Agente?                 @relation(fields: [agente_id], references: [id])
+  importacion LicenciaPagaImportacion @relation(fields: [importacion_id], references: [id])
+
+  @@index([agente_dni])
+  @@index([importacion_id])
+  @@map("licencias_paga")
 }
 
 model ProgramacionMensual {

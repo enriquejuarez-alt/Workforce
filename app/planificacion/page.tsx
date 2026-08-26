@@ -78,7 +78,7 @@ import { SERVICIOS_ONB } from "@/lib/config/servicesOnb";
 import { SERVICIOS_PPAY } from "@/lib/config/servicesPpay";
 import type { ServiceDefinition } from "@/lib/config/services";
 import { extraerHorasContrato, archivoEnMemoria } from "@/lib/utils/excel";
-import { nominasApi, reductorImportacionesApi, francoImportacionesApi, cpImportacionesApi, vacacionesApi } from "@/lib/api";
+import { nominasApi, reductorImportacionesApi, francoImportacionesApi, cpImportacionesApi, vacacionesApi, licenciasPagaApi } from "@/lib/api";
 import type { NominaMensual, AgenteNominaMensual } from "@/types";
 import {
   Select,
@@ -1074,6 +1074,20 @@ export default function UploadPage() {
         }
       }
 
+      setPasoActual("Buscando condición de pago de licencias...");
+      let licenciaPagaRaw: Awaited<ReturnType<typeof licenciasPagaApi.list>>["data"] = [];
+      if (primerDia && ultimoDia) {
+        try {
+          const { data } = await licenciasPagaApi.list({
+            desde: primerDia.toISOString().slice(0, 10),
+            hasta: ultimoDia.toISOString().slice(0, 10),
+          });
+          licenciaPagaRaw = data;
+        } catch {
+          // No bloqueante: sin este dato, el motor asume toda LP como paga (default previo).
+        }
+      }
+
       setPasoActual("Buscando francos reales...");
       let francosServicio: FrancoServicioDatos[] = [];
       if (primerDia) {
@@ -1135,7 +1149,8 @@ export default function UploadPage() {
         : undefined;
 
       const agentes = aplicarDiasAlMes(agentesPreVacaciones, diasDelMes, vacacionesPorDni);
-      const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, francosServicio, vacacionesParaDiaADia);
+      const licenciaPagaDetalle = licenciaPagaRaw.map((l) => ({ agente_dni: l.agente_dni, pagada: l.pagada }));
+      const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, francosServicio, vacacionesParaDiaADia, licenciaPagaDetalle);
 
       setPasoActual("Generando alertas...");
       const alertas = generarAlertas(resultado);

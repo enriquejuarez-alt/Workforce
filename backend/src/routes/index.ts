@@ -37,6 +37,7 @@ import { listCambiosHorario, createCambioHorario, updateCambioHorario, deleteCam
 import { listCapacitaciones, createCapacitacion, updateCapacitacion, deleteCapacitacion, darDeAlta } from '../controllers/capacitaciones'
 import { listRemociones, createRemocion, updateRemocion, deleteRemocion } from '../controllers/remociones'
 import { importVacaciones, listVacaciones, listImportacionesVacaciones, deleteVacacion, deleteImportacionVacaciones } from '../controllers/vacaciones'
+import { importLicenciasPaga, listLicenciasPaga, listImportacionesLicenciasPaga, deleteImportacionLicenciasPaga } from '../controllers/licenciasPaga'
 import { enviarReporte } from '../controllers/soporte'
 import { getNotificaciones } from '../controllers/notificaciones'
 import { getPlaniConfig, getPlaniNomina, updatePlaniConfig } from '../controllers/plani'
@@ -201,6 +202,11 @@ router.get('/vacaciones', authenticate, listVacaciones)
 router.get('/vacaciones/importaciones', authenticate, requireAdmin, listImportacionesVacaciones)
 router.delete('/vacaciones/:id', authenticate, requireAdmin, deleteVacacion)
 router.delete('/vacaciones/importaciones/:id', authenticate, requireAdmin, deleteImportacionVacaciones)
+
+router.post('/licencias-paga/import', authenticate, requireAdmin, uploadExcel.single('file'), importLicenciasPaga)
+router.get('/licencias-paga', authenticate, listLicenciasPaga)
+router.get('/licencias-paga/importaciones', authenticate, requireAdmin, listImportacionesLicenciasPaga)
+router.delete('/licencias-paga/importaciones/:id', authenticate, requireAdmin, deleteImportacionLicenciasPaga)
 
 router.get('/reductores', authenticate, listReductorImportaciones)
 router.get('/reductores/:id', authenticate, getReductorImportacion)

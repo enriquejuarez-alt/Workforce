@@ -33,6 +33,12 @@ export interface VacacionRaw {
   fecha_hasta: string | Date;
 }
 
+// Licencia con condicion de pago (ver `LicenciaPaga` en types/index.ts).
+export interface LicenciaPagaRaw {
+  agente_dni: string;
+  pagada: boolean;
+}
+
 // Servicios con Franco real cargado (ponderadoHoras > 0) -> usan el motor dia a
 // dia. Para esos, las vacaciones puntuales se aplican dia-a-dia via
 // `vacacionesPorDia` en vez de prorratearse en `hsMensualBrutas` (ver
@@ -145,19 +151,24 @@ export function calcularAgentesEquivalentes(
 interface GrupoServicio {
   hcActivos: number;
   hcLP: number;
+  hcLPPaga: number;
   hcCapa: number;
   hsBrutas: number;
   hsSemanalSuma: number;
   hsSemanalConteo: number;
 }
 
-// Recorre la nómina y acumula métricas por segmento normalizado (ServicioKey)
+// Recorre la nómina y acumula métricas por segmento normalizado (ServicioKey).
+// `licenciaPagaPorDni`: DNIs con licencia importados con su condicion de pago
+// (ver `LicenciaPagaRaw`) — un agente en LP sin match ahi se asume PAGO por
+// defecto (comportamiento previo a distinguir esto).
 function agruparAgentesPorServicio(
-  agentes: Agente[]
+  agentes: Agente[],
+  licenciaPagaPorDni: Map<string, boolean> = new Map()
 ): Map<ServicioKey, GrupoServicio> {
   const mapa = new Map<ServicioKey, GrupoServicio>();
   for (const key of getServiciosKeys()) {
-    mapa.set(key, { hcActivos: 0, hcLP: 0, hcCapa: 0, hsBrutas: 0, hsSemanalSuma: 0, hsSemanalConteo: 0 });
+    mapa.set(key, { hcActivos: 0, hcLP: 0, hcLPPaga: 0, hcCapa: 0, hsBrutas: 0, hsSemanalSuma: 0, hsSemanalConteo: 0 });
   }
 
   for (const agente of agentes) {
@@ -172,6 +183,8 @@ function agruparAgentesPorServicio(
       if (agente.esCapa) grupo.hcCapa += 1;
     } else {
       grupo.hcLP += 1;
+      const esPaga = licenciaPagaPorDni.get(normalizarDni(agente.dni)) ?? true;
+      if (esPaga) grupo.hcLPPaga += 1;
     }
   }
 
@@ -215,6 +228,7 @@ function construirInputDiaADia(
     anio: anioNum,
     mes: mesNum,
     licenciaConstante: grupo.hcLP,
+    licenciaPagaConstante: grupo.hcLPPaga,
     rotacionMensual: rotacion,
     ausentismoMensual: ausentismo,
     deslogueoMensual: deslogueo,
@@ -317,7 +331,8 @@ export function calcularResultados(
   modo: ModoReductor,
   topeFacturacion = 103,
   francosServicio: FrancoServicioDatos[] = [],
-  vacacionesDetalle: VacacionRaw[] = []
+  vacacionesDetalle: VacacionRaw[] = [],
+  licenciaPagaDetalle: LicenciaPagaRaw[] = []
 ): ResultadoGeneral {
   const reductorPorServicio = new Map<ServicioKey, Reductor>();
   for (const r of reductores) {
@@ -352,13 +367,17 @@ export function calcularResultados(
   const mesNumPre = primerFechaPre ? primerFechaPre.getUTCMonth() + 1 : null;
   const anioNumPre = primerFechaPre ? primerFechaPre.getUTCFullYear() : null;
 
-  const grupos = agruparAgentesPorServicio(agentes);
+  const licenciaPagaPorDni = new Map(
+    licenciaPagaDetalle.map((l) => [normalizarDni(l.agente_dni), l.pagada])
+  );
+  const grupos = agruparAgentesPorServicio(agentes, licenciaPagaPorDni);
   const resultados: ResultadoServicio[] = [];
 
   for (const servicio of getServiciosKeys()) {
     const grupo = grupos.get(servicio) ?? {
       hcActivos: 0,
       hcLP: 0,
+      hcLPPaga: 0,
       hcCapa: 0,
       hsBrutas: 0,
       hsSemanalSuma: 0,

@@ -28,6 +28,15 @@ export interface InputDiaADia {
   /** Agentes de LP para un dia dado. Si no se pasa, se usa `licenciaConstante`. */
   licenciaPorDia?: (dia: number) => number;
   licenciaConstante?: number;
+  /**
+   * De la LP total (arriba), cuantos agentes tienen licencia PAGA (vs no
+   * paga) para un dia dado. Si no se pasa, se usa `licenciaPagaConstante`; si
+   * tampoco se pasa, se asume que TODA la LP es paga (comportamiento previo a
+   * distinguir esto). Solo importa en un dia de cierre total del servicio
+   * (ver `francoBaseSobre` mas abajo) — un dia normal no la usa para nada.
+   */
+  licenciaPagaPorDia?: (dia: number) => number;
+  licenciaPagaConstante?: number;
   rotacionMensual: number; // fraccion 0-1
   ausentismoMensual: number; // fraccion 0-1
   deslogueoMensual: number; // fraccion 0-1
@@ -112,24 +121,32 @@ export function calcularHsLogueoDiaADia(input: InputDiaADia): ResultadoDiaADia {
 
     const nominaActiva = nominaBase - vacaciones - licencia - bajasRotacion;
 
+    const licenciaPagaRaw = input.licenciaPagaPorDia
+      ? input.licenciaPagaPorDia(dia)
+      : input.licenciaPagaConstante ?? licencia;
+    const licenciaPaga = Math.min(licencia, licenciaPagaRaw);
+
     const francoPctNormal = input.francoPorDiaSemana[diaSemana] ?? 0;
     const pctHsRequeridasFeriado = input.francoFeriadoPorDia?.get(dia);
     // Replica la planilla de referencia del area. Dos componentes de franco,
-    // con bases distintas (verificado contra el ejemplo real de Integral
-    // Movil AMBA, dia a dia):
+    // con bases distintas (verificado contra los ejemplos reales de Integral
+    // Movil AMBA e Interior, dia a dia):
     //  - Franco normal del dia de semana: si la tasa es 100% (cierre TOTAL
     //    del servicio ese dia, ej. findes de un call center que no atiende),
-    //    se aplica sobre la nomina BASE completa — la referencia manda a
-    //    franco tambien a la gente en LP, que ya no trabaja igual. Si la tasa
-    //    es parcial (rotacion normal de descanso entre el staff activo), se
-    //    aplica sobre la nomina YA activa (ejemplo real: Individuos Abono
-    //    Fijo, donde LP nunca entra en la rotacion de francos).
+    //    se aplica sobre la nomina activa MAS la LP paga — la referencia
+    //    sigue contando a la gente en LP paga en el franco del cierre (sigue
+    //    "en el roster"), pero a la LP NO paga ya la excluyo del todo (no
+    //    entra ni como presente ni como franco). Si la tasa es parcial
+    //    (rotacion normal de descanso entre el staff activo), se aplica sobre
+    //    la nomina activa sola, sin sumar LP de ningun tipo (ejemplo real:
+    //    Individuos Abono Fijo, donde LP nunca entra en la rotacion de
+    //    francos).
     //  - Extra por feriado: siempre sobre la nomina activa, sea cual sea la
     //    tasa normal del dia.
-    // Sin piso en cero: un cierre total de fin de semana con LP manda a
+    // Sin piso en cero: un cierre total de fin de semana con LP paga manda a
     // franco a mas gente de la que hay activa, y ese dia aporta HS LOGUEO
     // NEGATIVO al mes — igual que la referencia, que no clampea este calculo.
-    const francoBaseSobre = francoPctNormal >= 1 ? nominaBase : nominaActiva;
+    const francoBaseSobre = francoPctNormal >= 1 ? nominaActiva + licenciaPaga : nominaActiva;
     const francoExtra =
       pctHsRequeridasFeriado === undefined
         ? 0

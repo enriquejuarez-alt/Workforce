@@ -320,28 +320,40 @@ dia del mes encadena:
 ```text
 nomina activa dia    = nomina inicial - vacaciones dia - licencia - bajas por rotacion (en rampa lineal)
 agentes de franco dia = %franco del dia de semana * BASE, donde BASE es:
-                          - nomina inicial (nomina completa, LP incluida) si el dia es de CIERRE TOTAL
-                            segun el schedule semanal (%franco = 100%, ej. fin de semana de un
-                            servicio que no atiende)
-                          - nomina activa dia (LP ya excluida) si es franco parcial/rotativo entre
-                            el staff activo (ej. un contrato 6x1 rotando su dia libre)
+                          - (nomina activa dia + LP PAGA) si el dia es de CIERRE TOTAL segun el
+                            schedule semanal (%franco = 100%, ej. fin de semana de un servicio que
+                            no atiende) — la LP paga sigue "en el roster" y el cierre la manda a
+                            franco igual que a todos; la LP NO paga ya esta afuera del todo y no
+                            se vuelve a contar
+                          - nomina activa dia (sin sumar LP de ningun tipo) si es franco
+                            parcial/rotativo entre el staff activo (ej. un contrato 6x1 rotando su
+                            dia libre)
 agentes ausentes dia  = (nomina activa dia - agentes de franco dia) * ausentismo mensual
 agentes presentes dia = nomina activa dia - agentes de franco dia - agentes ausentes dia
 hs logueo dia         = agentes presentes dia * horas ponderadas * (1 - deslogueo mensual)
 ```
 
-**Sin piso en cero, en ningun paso.** Un dia de cierre total con gente en LP
-manda a franco a mas cabezas de las que hay activas (LP ya estaba afuera de
-"nomina activa", pero el cierre total la cuenta igual porque nadie trabaja
-ese dia) — eso da `agentes presentes dia` NEGATIVO, y ese dia resta horas al
-mes en vez de sumar cero. Verificado exacto contra el Excel del area para
-Integral Movil AMBA julio 2026 (Nomina 16, LP 1): los 8 findes de semana del
-mes aportan -6.86hs cada uno (-54.8hs en total), y sin este ajuste el
-cumplimiento calculado quedaba ~3 puntos por encima del real. El caso de
-franco parcial (base = nomina activa dia) sigue validado contra el ejemplo
-real de Individuos Abono Fijo (ver test
-`hsLogueoDiaADia.test.ts`) — ese si nunca deberia dar negativo porque la
-nomina activa nunca queda en 0 by design (LP ya se resta antes).
+**Sin piso en cero, en ningun paso.** Un dia de cierre total con LP paga
+manda a franco a mas cabezas de las que hay activas (la LP paga ya estaba
+afuera de "nomina activa", pero el cierre la vuelve a contar porque nadie
+trabaja ese dia) — eso da `agentes presentes dia` NEGATIVO, y ese dia resta
+horas al mes en vez de sumar cero. El caso de franco parcial (base = nomina
+activa dia) sigue validado contra el ejemplo real de Individuos Abono Fijo
+(ver test `hsLogueoDiaADia.test.ts`) — ese si nunca deberia dar negativo
+porque la nomina activa nunca queda en 0 by design (LP ya se resta antes).
+
+**LP paga vs. LP no paga:** verificado exacto contra dos ejemplos reales del
+mismo mes (julio 2026) que solo difieren en esto — Integral Movil AMBA
+(1 LP **paga**) e Integral Movil Interior (1 LP **no paga**). Con AMBA, los
+8 findes de cierre total del mes aportan -6.86hs cada uno (-54.8hs en total)
+porque la LP paga se re-cuenta en el cierre; con Interior, los mismos findes
+dan exactamente 0hs porque la LP no paga ya no cuenta para nada — sin
+distinguir esto, cualquiera de los dos casos queda con el signo del efecto
+equivocado. El dato de paga/no-paga se importa desde el reporte de RRHH
+("LP AL &lt;fecha&gt;", hoja detectada por nombre) en `/planificacion/licencias-paga`
+(`backend/src/controllers/licenciasPaga.ts`, tablas `LicenciaPaga`/
+`LicenciaPagaImportacion`) — un agente en LP sin match ahi se asume **paga**
+por defecto (comportamiento previo a distinguir esto).
 
 `totalHsLogueo` (suma de todos los dias, incluidos los negativos) pasa a ser
 las HS Netas del servicio, y el factor productivo mostrado se recalcula
@@ -378,6 +390,15 @@ mas arriba).
 `construirInputDiaADia` (`lib/domain/calculos.ts`), reutilizado tambien por
 `simularDiaADiaServicio` (ver "Simulador dia a dia" mas abajo) para que el
 calculo "oficial" y el simulador nunca diverjan.
+
+La condicion de pago de LP sigue el mismo patron: `agruparAgentesPorServicio`
+recibe un `Map<dni, boolean>` armado a partir de `LicenciaPagaRaw[]`
+(parametro opcional `licenciaPagaDetalle` de `calcularResultados`) y cuenta,
+por servicio, cuanta de la LP total es paga (`GrupoServicio.hcLPPaga`) —
+`construirInputDiaADia` lo pasa como `licenciaPagaConstante`. A diferencia de
+las vacaciones, esto no necesita excluirse de ningun prorrateo (no afecta
+`aplicarDiasAlMes`): solo importa dentro del motor dia a dia, en el dia de
+cierre total.
 
 **Fix de parseo de fechas incluido:** el export de vacaciones trae fechas
 `d/m/yyyy` sin cero a la izquierda (ej. `31/8/2026`); el regex de

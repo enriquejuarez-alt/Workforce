@@ -40,9 +40,9 @@ export interface InputDiaADia {
    * dias similares, por dia del mes (1-based), calculado por
    * `calcularFrancoFeriados`. En un dia con entrada acá, la cantidad de
    * francos NO reemplaza al franco normal del dia de semana — se le suma un
-   * extra sobre la gente que quedaria presente:
+   * extra sobre la nomina activa:
    *
-   *   francoPct = %francoNormal + (1 - %francoNormal) * (1 - %hsRequeridasFeriado)
+   *   agentesFrancoExtra = (1 - %francoNormal) * (1 - %hsRequeridasFeriado) * nominaActiva
    *
    * Si el cliente pide el 100% de lo habitual, el extra da 0 (el feriado se
    * comporta como un dia normal de esa semana). Si pide 0% (cierre total),
@@ -110,24 +110,34 @@ export function calcularHsLogueoDiaADia(input: InputDiaADia): ResultadoDiaADia {
     const bajasRotacion =
       (input.rotacionMensual / input.diasDelMes) * dia * nominaBase;
 
-    const nominaActiva = Math.max(
-      0,
-      nominaBase - vacaciones - licencia - bajasRotacion
-    );
+    const nominaActiva = nominaBase - vacaciones - licencia - bajasRotacion;
 
     const francoPctNormal = input.francoPorDiaSemana[diaSemana] ?? 0;
     const pctHsRequeridasFeriado = input.francoFeriadoPorDia?.get(dia);
-    // CANTIDAD DE FRANCOS (feriado) = Dotacion*%Francos + Dotacion*(1-%Francos)*(1-%HsReqFeriado)
-    // El franco normal del dia de semana es la base; el ajuste del feriado
-    // solo se aplica sobre la gente que quedaria presente, no lo reemplaza.
-    const francoPct =
+    // Replica la planilla de referencia del area. Dos componentes de franco,
+    // con bases distintas (verificado contra el ejemplo real de Integral
+    // Movil AMBA, dia a dia):
+    //  - Franco normal del dia de semana: si la tasa es 100% (cierre TOTAL
+    //    del servicio ese dia, ej. findes de un call center que no atiende),
+    //    se aplica sobre la nomina BASE completa — la referencia manda a
+    //    franco tambien a la gente en LP, que ya no trabaja igual. Si la tasa
+    //    es parcial (rotacion normal de descanso entre el staff activo), se
+    //    aplica sobre la nomina YA activa (ejemplo real: Individuos Abono
+    //    Fijo, donde LP nunca entra en la rotacion de francos).
+    //  - Extra por feriado: siempre sobre la nomina activa, sea cual sea la
+    //    tasa normal del dia.
+    // Sin piso en cero: un cierre total de fin de semana con LP manda a
+    // franco a mas gente de la que hay activa, y ese dia aporta HS LOGUEO
+    // NEGATIVO al mes — igual que la referencia, que no clampea este calculo.
+    const francoBaseSobre = francoPctNormal >= 1 ? nominaBase : nominaActiva;
+    const francoExtra =
       pctHsRequeridasFeriado === undefined
-        ? francoPctNormal
-        : Math.min(1, Math.max(0, francoPctNormal + (1 - francoPctNormal) * (1 - pctHsRequeridasFeriado)));
-    const agentesFranco = francoPct * nominaActiva;
+        ? 0
+        : (1 - francoPctNormal) * (1 - pctHsRequeridasFeriado) * nominaActiva;
+    const agentesFranco = francoPctNormal * francoBaseSobre + francoExtra;
 
-    const agentesAusentes = Math.max(0, nominaActiva - agentesFranco) * input.ausentismoMensual;
-    const agentesPresentes = Math.max(0, nominaActiva - agentesFranco - agentesAusentes);
+    const agentesAusentes = (nominaActiva - agentesFranco) * input.ausentismoMensual;
+    const agentesPresentes = nominaActiva - agentesFranco - agentesAusentes;
 
     const hsLogueo = agentesPresentes * input.ponderadoHoras * (1 - input.deslogueoMensual);
 

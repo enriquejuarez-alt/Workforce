@@ -45,11 +45,12 @@ import {
   aplicarDiasAlMes,
   parsearHorario,
   construirVacacionesPorDni,
+  normalizarDni,
 } from "@/lib/parsers/parseNomina";
 import { parseCPVentas, validarHojasCPVentas } from "@/lib/parsers/parseCPVentas";
 import { parseReductores } from "@/lib/parsers/parseReductores";
 import { calcularReductoresDesdeArchivos, reductoresAFile } from "@/lib/parsers/calcularReductores";
-import { calcularResultados } from "@/lib/domain/calculos";
+import { calcularResultados, resolverServiciosDiaADia } from "@/lib/domain/calculos";
 import type { Agente, FrancoServicioDatos, MatrizServicio, Reductor, ServicioKey } from "@/lib/domain/types";
 import { deserializarMatrices } from "@/lib/domain/serializacion";
 import {
@@ -373,23 +374,25 @@ export default function UploadPage() {
   // picker mostraba todos esos CPs mezclados como "Agosto 2026 · N
   // servicios" indistinguibles entre si, obligando a abrir uno por uno para
   // encontrar el correcto. Se filtra ademas por si el CP realmente contiene
-  // el servicio activo (mismo universo que usa serviciosDelCP).
+  // el servicio activo.
+  //
+  // A diferencia de serviciosDelCP (que necesita el grupo ENTERO de
+  // PersonalPay/SMB/Onboarding/Ventas para poder reconocer un archivo
+  // recien subido que trae varios sub-servicios juntos en una sola hoja),
+  // aca conviene usar solo getServiciosActivos() — el servicio puntual
+  // activo. Filtrar por el grupo entero hacia que, con "Ventas WA" activo,
+  // el picker mostrara TAMBIEN los CPs guardados de Ventas WA Hogar/Movil/
+  // Out Movil (cualquier CP que contenga CUALQUIER key del grupo Ventas).
+  // Angostar a getServiciosActivos() no rompe el caso de un CP guardado que
+  // sí incluye varios servicios juntos (ej. el "Unificado" de SMB): alcanza
+  // con que el activo este entre los suyos para seguir matcheando.
   const cpsGuardadosDelFormato = useMemo(() => {
-    const universoActivo = esPersonalPay
-      ? SERVICIOS_PPAY
-      : esSmb
-        ? SERVICIOS_SMB
-        : esOnboarding
-          ? SERVICIOS_ONB
-          : esVentas
-            ? SERVICIOS_VENTAS
-            : getServiciosActivos();
-    const keysActivo = new Set(universoActivo.map((d) => d.key));
+    const keysActivo = new Set(getServiciosActivos().map((d) => d.key));
     return cpsGuardados
       .filter((cp) => cp.formato === formatoCPActivo)
       .filter((cp) => (cp.servicios ?? []).some((s) => keysActivo.has(s.servicio_norm as ServicioKey)))
       .sort((a, b) => b.anio - a.anio || b.mes - a.mes || +new Date(b.fecha_importacion) - +new Date(a.fecha_importacion));
-  }, [cpsGuardados, formatoCPActivo, esPersonalPay, esSmb, esOnboarding, esVentas]);
+  }, [cpsGuardados, formatoCPActivo, servicioActivo]);
 
   // Meses/años realmente disponibles entre los CPs que ya pasaron el filtro
   // de formato+servicio de arriba — para elegir el periodo sin tener que
@@ -1055,17 +1058,17 @@ export default function UploadPage() {
       if (todosErrores.length > 0) { setErrores(todosErrores); return; }
 
       setPasoActual("Descontando vacaciones...");
-      let vacacionesPorDni: Map<string, number> | undefined;
+      let vacacionesRaw: Awaited<ReturnType<typeof vacacionesApi.list>>["data"] = [];
       const primeraMatriz = matrices.values().next().value;
       const primerDia = primeraMatriz?.dias[0]?.fecha;
       const ultimoDia = primeraMatriz?.dias[primeraMatriz.dias.length - 1]?.fecha;
       if (primerDia && ultimoDia) {
         try {
-          const { data: vacaciones } = await vacacionesApi.list({
+          const { data } = await vacacionesApi.list({
             desde: primerDia.toISOString().slice(0, 10),
             hasta: ultimoDia.toISOString().slice(0, 10),
           });
-          vacacionesPorDni = construirVacacionesPorDni(vacaciones, primerDia, ultimoDia);
+          vacacionesRaw = data;
         } catch {
           // No bloqueante: si falla la consulta, se procesa sin descuento de vacaciones.
         }
@@ -1114,8 +1117,25 @@ export default function UploadPage() {
         return dest ? { ...a, segmentoNorm: dest } : a;
       });
       const hipoteticos = expandirAgentesHipoteticos(agentesHipoteticos);
-      const agentes = aplicarDiasAlMes([...agentesConPases, ...hipoteticos], diasDelMes, vacacionesPorDni);
-      const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, francosServicio);
+      const agentesPreVacaciones = [...agentesConPases, ...hipoteticos];
+
+      // Servicios con Franco real (dia a dia): la vacacion puntual se aplica
+      // exacta esos dias (mas abajo, via calcularResultados), no prorrateada
+      // en todo el mes — se excluyen aca para no descontarla dos veces.
+      const serviciosDiaADia = resolverServiciosDiaADia(francosServicio);
+      const dnisDiaADia = new Set(
+        agentesPreVacaciones
+          .filter((a) => serviciosDiaADia.has(a.segmentoNorm as ServicioKey))
+          .map((a) => normalizarDni(a.dni))
+      );
+      const vacacionesParaProrrateo = vacacionesRaw.filter((v) => !dnisDiaADia.has(normalizarDni(v.agente_dni)));
+      const vacacionesParaDiaADia = vacacionesRaw.filter((v) => dnisDiaADia.has(normalizarDni(v.agente_dni)));
+      const vacacionesPorDni = primerDia && ultimoDia
+        ? construirVacacionesPorDni(vacacionesParaProrrateo, primerDia, ultimoDia)
+        : undefined;
+
+      const agentes = aplicarDiasAlMes(agentesPreVacaciones, diasDelMes, vacacionesPorDni);
+      const resultado = calcularResultados(agentes, matrices, reductores, diasDelMes, modoReductor, topeFacturacion, francosServicio, vacacionesParaDiaADia);
 
       setPasoActual("Generando alertas...");
       const alertas = generarAlertas(resultado);

@@ -17,12 +17,45 @@ import {
   getFrancoConfigRuntime,
 } from "../config/servicesRuntime";
 import { normalizar } from "../config/services";
+import { normalizarDni } from "../parsers/parseNomina";
 import {
   calcularHsLogueoDiaADia,
   calcularFrancoFeriados,
   type InputDiaADia,
   type ResultadoDiaADia,
 } from "./hsLogueoDiaADia";
+
+// Vacacion cruda tal como llega de la API (ver `Vacacion` en types/index.ts),
+// sin depender de ese tipo para no acoplar el dominio a la capa de API.
+export interface VacacionRaw {
+  agente_dni: string;
+  fecha_desde: string | Date;
+  fecha_hasta: string | Date;
+}
+
+// Servicios con Franco real cargado (ponderadoHoras > 0) -> usan el motor dia a
+// dia. Para esos, las vacaciones puntuales se aplican dia-a-dia via
+// `vacacionesPorDia` en vez de prorratearse en `hsMensualBrutas` (ver
+// `aplicarDiasAlMes`) — el llamador debe excluir esos agentes del prorrateo
+// para no descontar la vacacion dos veces.
+export function resolverServiciosDiaADia(
+  francosServicio: FrancoServicioDatos[]
+): Set<ServicioKey> {
+  const resultado = new Set<ServicioKey>();
+  for (const f of francosServicio) {
+    if (f.ponderadoHoras <= 0) continue;
+    const keys = getServiciosActivos()
+      .filter((def) =>
+        def.reductorNombres.some((alias) => normalizar(alias) === normalizar(f.servicioNorm))
+      )
+      .map((def) => def.key);
+    const resolvedKeys = keys.length > 0 ? keys : [resolverServicioPorReductorRuntime(f.servicioNorm)].filter(Boolean);
+    for (const key of resolvedKeys) {
+      resultado.add(key as ServicioKey);
+    }
+  }
+  return resultado;
+}
 
 // ─── Funciones puras de cálculo ────────────────────────────────────────────────
 
@@ -155,7 +188,8 @@ function construirInputDiaADia(
   matrizServicio: MatrizServicio | undefined,
   diasDelMes: number,
   mesNum: number,
-  anioNum: number
+  anioNum: number,
+  vacacionesPorDia?: (dia: number) => number
 ): InputDiaADia | null {
   if (!franco || franco.ponderadoHoras <= 0) return null;
 
@@ -195,6 +229,36 @@ function construirInputDiaADia(
       domingo: franco.francoDomingo,
     },
     francoFeriadoPorDia,
+    vacacionesPorDia,
+  };
+}
+
+// Arma, para un servicio puntual, una funcion vacacionesPorDia(dia) a partir de
+// las vacaciones puntuales (fecha_desde/fecha_hasta) de sus agentes activos —
+// para el motor dia a dia, que aplica la baja de nomina exactamente esos dias
+// en vez de prorratearla en todo el mes (ver `resolverServiciosDiaADia`).
+function construirVacacionesPorDiaServicio(
+  agentesServicio: Agente[],
+  vacacionesDetalle: VacacionRaw[],
+  anioNum: number,
+  mesNum: number
+): ((dia: number) => number) | undefined {
+  if (vacacionesDetalle.length === 0) return undefined;
+  const dnisServicio = new Set(
+    agentesServicio
+      .filter((a) => a.estado.toUpperCase() === "ACTIVO")
+      .map((a) => normalizarDni(a.dni))
+  );
+  if (dnisServicio.size === 0) return undefined;
+
+  const rangos = vacacionesDetalle
+    .filter((v) => dnisServicio.has(normalizarDni(v.agente_dni)))
+    .map((v) => ({ desde: new Date(v.fecha_desde), hasta: new Date(v.fecha_hasta) }));
+  if (rangos.length === 0) return undefined;
+
+  return (dia: number) => {
+    const fecha = new Date(Date.UTC(anioNum, mesNum - 1, dia));
+    return rangos.filter((r) => fecha >= r.desde && fecha <= r.hasta).length;
   };
 }
 
@@ -252,7 +316,8 @@ export function calcularResultados(
   diasDelMes: number,
   modo: ModoReductor,
   topeFacturacion = 103,
-  francosServicio: FrancoServicioDatos[] = []
+  francosServicio: FrancoServicioDatos[] = [],
+  vacacionesDetalle: VacacionRaw[] = []
 ): ResultadoGeneral {
   const reductorPorServicio = new Map<ServicioKey, Reductor>();
   for (const r of reductores) {
@@ -316,7 +381,13 @@ export function calcularResultados(
     const franco = francoPorServicio.get(servicio);
     if (mesNumPre && anioNumPre) {
       const matrizServicio = matrices.get(servicio);
-      const inputDiaADia = construirInputDiaADia(grupo, franco, reductor, matrizServicio, diasDelMes, mesNumPre, anioNumPre);
+      const vacacionesPorDia = construirVacacionesPorDiaServicio(
+        agentes.filter((a) => a.segmentoNorm === servicio),
+        vacacionesDetalle,
+        anioNumPre,
+        mesNumPre
+      );
+      const inputDiaADia = construirInputDiaADia(grupo, franco, reductor, matrizServicio, diasDelMes, mesNumPre, anioNumPre, vacacionesPorDia);
       if (inputDiaADia) {
         const { totalHsLogueo } = calcularHsLogueoDiaADia(inputDiaADia);
         hsNetas = totalHsLogueo;

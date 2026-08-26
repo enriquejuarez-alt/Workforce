@@ -301,8 +301,15 @@ calcular resultados:
    servicio activo (matcheando por los mismos alias de nombre que usa el
    resto del sistema).
 2. Busca tambien vacaciones que se superponen con ese rango de fechas
-   (`GET /vacaciones?desde=&hasta=`) y arma un descuento real por DNI
-   (`construirVacacionesPorDni`), en vez de estimarlo.
+   (`GET /vacaciones?desde=&hasta=`). Para servicios **sin** Francos reales
+   (modelo plano) arma un descuento por DNI prorrateado en todo el mes
+   (`construirVacacionesPorDni`, via `aplicarDiasAlMes`). Para servicios
+   **con** Francos reales (motor dia a dia) NO se prorratea — se aplica el
+   dia exacto en el motor (ver "Vacaciones puntuales" mas abajo), asi que
+   esos agentes se excluyen del prorrateo antes de llamarlo (si no, se
+   descontaria la vacacion dos veces). `resolverServiciosDiaADia`
+   (`lib/domain/calculos.ts`) resuelve, a partir de los Francos cargados,
+   que `ServicioKey` usan el motor dia a dia.
 
 Si hay Francos para ese servicio+mes+año, `calcularResultados`
 (`lib/domain/calculos.ts`) reemplaza el modelo plano
@@ -311,18 +318,61 @@ Si hay Francos para ese servicio+mes+año, `calcularResultados`
 dia del mes encadena:
 
 ```text
-nomina activa dia = nomina inicial - vacaciones dia - licencia - bajas por rotacion (en rampa lineal)
-agentes de franco dia = % franco real del dia de semana * nomina activa dia
+nomina activa dia    = nomina inicial - vacaciones dia - licencia - bajas por rotacion (en rampa lineal)
+agentes de franco dia = %franco del dia de semana * BASE, donde BASE es:
+                          - nomina inicial (nomina completa, LP incluida) si el dia es de CIERRE TOTAL
+                            segun el schedule semanal (%franco = 100%, ej. fin de semana de un
+                            servicio que no atiende)
+                          - nomina activa dia (LP ya excluida) si es franco parcial/rotativo entre
+                            el staff activo (ej. un contrato 6x1 rotando su dia libre)
 agentes ausentes dia  = (nomina activa dia - agentes de franco dia) * ausentismo mensual
 agentes presentes dia = nomina activa dia - agentes de franco dia - agentes ausentes dia
 hs logueo dia         = agentes presentes dia * horas ponderadas * (1 - deslogueo mensual)
 ```
 
-`totalHsLogueo` (suma de todos los dias) pasa a ser las HS Netas del
-servicio, y el factor productivo mostrado se recalcula como
-`hsNetas / hsBrutas` solo para mantener coherente el resto de la UI. Si no
-hay Francos cargados para ese servicio+mes+año, se sigue usando el modelo
-plano de siempre sin cambios.
+**Sin piso en cero, en ningun paso.** Un dia de cierre total con gente en LP
+manda a franco a mas cabezas de las que hay activas (LP ya estaba afuera de
+"nomina activa", pero el cierre total la cuenta igual porque nadie trabaja
+ese dia) — eso da `agentes presentes dia` NEGATIVO, y ese dia resta horas al
+mes en vez de sumar cero. Verificado exacto contra el Excel del area para
+Integral Movil AMBA julio 2026 (Nomina 16, LP 1): los 8 findes de semana del
+mes aportan -6.86hs cada uno (-54.8hs en total), y sin este ajuste el
+cumplimiento calculado quedaba ~3 puntos por encima del real. El caso de
+franco parcial (base = nomina activa dia) sigue validado contra el ejemplo
+real de Individuos Abono Fijo (ver test
+`hsLogueoDiaADia.test.ts`) — ese si nunca deberia dar negativo porque la
+nomina activa nunca queda en 0 by design (LP ya se resta antes).
+
+`totalHsLogueo` (suma de todos los dias, incluidos los negativos) pasa a ser
+las HS Netas del servicio, y el factor productivo mostrado se recalcula
+como `hsNetas / hsBrutas` solo para mantener coherente el resto de la UI.
+Si no hay Francos cargados para ese servicio+mes+año, se sigue usando el
+modelo plano de siempre sin cambios.
+
+### Vacaciones puntuales dentro del motor dia a dia
+
+Para servicios con Francos reales, una vacacion cargada en el modulo de
+Vacaciones WF (`GET /vacaciones`) **no se prorratea** en `hsMensualBrutas`
+como en el modelo plano — se aplica el dia exacto, via
+`InputDiaADia.vacacionesPorDia(dia)`, restando de la nomina activa solo esos
+dias puntuales. Antes de este cambio, una vacacion del 27 al 31 se diluia
+como una reduccion pareja de `5/diasDelMes` durante los 31 dias del mes; la
+referencia del area, en cambio, la aplica exacta esa semana (columna
+"Vacaciones" de su Excel dia a dia). Para un mes sin feriados/rampas de
+rotacion superpuestas con la semana de vacaciones, el total mensual apenas
+cambia entre diluir y concentrar (son las mismas horas-persona quitadas, solo
+en distinto orden) — el impacto real de este fix depende de si esa semana
+puntual coincide con algo que si varie dia a dia (un feriado, una rampa de
+rotacion en curso).
+
+`construirVacacionesPorDiaServicio` (`lib/domain/calculos.ts`) arma esa
+funcion por servicio a partir del listado crudo de vacaciones
+(`VacacionRaw[]`), filtrando solo los DNI activos de ese `ServicioKey`.
+`calcularResultados` recibe ese listado crudo como parametro opcional
+(`vacacionesDetalle`); quien arma el input completo
+(`app/planificacion/page.tsx`) es responsable de excluir esos mismos DNI del
+prorrateo de `aplicarDiasAlMes` para no descontar la vacacion dos veces (ver
+mas arriba).
 
 `calcularResultados` arma el input del motor via el helper compartido
 `construirInputDiaADia` (`lib/domain/calculos.ts`), reutilizado tambien por
@@ -344,10 +394,16 @@ area de referencia (verificada formula-por-formula contra su Excel, ver
 `lib/domain/hsLogueoDiaADia.ts::calcularHsLogueoDiaADia`):
 
 ```text
-Dias no feriados: Francos = Dotacion Activa * %Francos (normal del dia de semana)
-Dias feriados:     Francos = Dotacion Activa * %Francos
+Dias no feriados: Francos = BASE * %Francos                         (BASE: ver arriba, nomina inicial o activa segun sea cierre total o parcial)
+Dias feriados:     Francos = BASE * %Francos
                             + Dotacion Activa * (1 - %Francos) * (1 - %HsRequeridasFeriado)
 ```
+
+El extra por feriado siempre se calcula sobre Dotacion Activa (nunca sobre
+Nomina Inicial), sea cual sea el `%Francos` normal de ese dia de semana —
+verificado contra el feriado nacional (9/7, jueves, cierre total,
+`%Francos` normal 0%) y el "puente" no nacional (10/7, viernes, demanda
+parcial) del mismo ejemplo real de Integral Movil AMBA.
 
 `%HsRequeridasFeriado` (el "%Presente" que la referencia declara a mano por
 feriado) se deriva automaticamente de la propia curva del CP:

@@ -203,7 +203,7 @@ function normalizarFecha(raw: string): string | null {
   return null;
 }
 
-function normalizarDni(dni: string): string {
+export function normalizarDni(dni: string): string {
   return dni.replace(/\D/g, "");
 }
 

@@ -59,6 +59,14 @@ export const importLicenciasPaga = async (req: AuthRequest, res: Response) => {
     const todosAgentes = await prisma.agente.findMany({ select: { id: true, dni: true } })
     const agenteByDni = new Map(todosAgentes.map((a) => [normalizeDni(a.dni), a]))
 
+    // El archivo "LP AL <fecha>" es una foto completa de TODAS las licencias
+    // vigentes a esa fecha, no una lista incremental — cada carga nueva
+    // reemplaza por completo el snapshot anterior (igual criterio que
+    // /vacaciones, pero a nivel de todo el archivo en vez de por DNI, porque
+    // acá no hay forma de saber que un DNI ausente del archivo nuevo ya no
+    // tiene licencia vigente vs. que el archivo lo omitio por error).
+    await prisma.licenciaPaga.deleteMany({})
+
     const importacion = await prisma.licenciaPagaImportacion.create({
       data: {
         archivo_nombre: req.file.originalname,
